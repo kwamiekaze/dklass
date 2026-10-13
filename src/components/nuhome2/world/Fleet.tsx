@@ -40,7 +40,7 @@ const asset = (name: string, o: { wheels?: WheelFit; length?: number; flip?: boo
 
 /** The three Meshy cars selected for the new homepage. Their baked paint and surface detail are preserved. */
 export const IMPORTED_FLEET: Partial<Record<keyof typeof CAR_SPECS, ImportedFleetAsset>> = {
-  corolla: asset('dk-meshy-future-ev', { wheels: { pos: [1.41, .4, .4], neg: [-1.65, .39, .39] },  lamps: { front: [2.1, .62, .7, .26, .13, .24], rear: [-2.12, .8, .7, .24, .1, .22] } }),
+  corolla: asset('dk-meshy-rx7-white', { wheels: { pos: [1.40, .377, .375], neg: [-1.435, .376, .378] },  length: 4.4, plateRy: .41, lamps: { front: [-1.98, .53, .63, .09, .063, .135], rear: [2.07, .69, .59, .09, .072, .225] } }),   // the white car: a white RX-7 (Meshy, supplied by the owner, cut down to ~30k triangles for the web); nose points to -x
   elantra: asset('dk-meshy-red-sport', { wheels: { pos: [1.33, .38, .38], neg: [-1.49, .34, .34] },  lamps: { front: [2.1, .66, .7, .26, .13, .22], rear: [-2.12, .8, .66, .26, .12, .24] } }),
   // the other three spots: Matra Laser 1971, orange sports car, red roadster (all Meshy, CC0 models supplied by the owner)
   civic: asset('dk-meshy-green2-sport', { wheels: { pos: [1.394, .377, .375], neg: [-1.349, .37, .375] },  length: 4.5, lamps: { front: [1.89, .58, .643, .2, .12, .2], rear: [-2.0, .73, .54, .184, .064, .22] } }),   // the second green sports car (supplied by the owner) in row A's east stall, where the Matra stood: the model faces +x like the other green one
@@ -517,5 +517,5 @@ export function FleetCar({ color, plate, specId, position, rotationY = 0, lite =
   // textured first; if its file is not in the build the painted sedan stays, so the lot is never empty
   const house = useTexturedFleet() ? <Fallback fallback={standard}><Suspense fallback={null}><LoadedTex color={color} plate={plate} position={position} rotationY={rotationY} lite={lite} /></Suspense></Fallback> : standard;
   const imported = IMPORTED_FLEET[specId];
-  return imported ? <Fallback fallback={house}><Suspense fallback={null}><LoadedImported files={imported} plate={['civic', 'camry', 'sentra', 'hero'].includes(specId) ? plate : undefined} position={position} rotationY={rotationY} lite={lite} signal={signal} wheels={wheels} /></Suspense></Fallback> : house;
+  return imported ? <Fallback fallback={house}><Suspense fallback={null}><LoadedImported files={imported} plate={['civic', 'camry', 'sentra', 'hero', 'corolla'].includes(specId) ? plate : undefined} position={position} rotationY={rotationY} lite={lite} signal={signal} wheels={wheels} /></Suspense></Fallback> : house;
 }
