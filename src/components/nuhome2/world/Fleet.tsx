@@ -31,8 +31,8 @@ export const fleetFiles = (id: string) => (IMPORTED_FLEET as Record<string, Impo
 /** The real lamps of a Meshy car, measured on the model in car space (metres, nose +x, up +y). Centre and half size of the lamp on the car's right (+z); the left lamp is its mirror. Lets the turn signal light the car's own headlight and tail light. */
 type LampBox = [cx: number, cy: number, cz: number, hx: number, hy: number, hz: number];
 type Lamps = { front: LampBox; rear: LampBox };
-type ImportedFleetAsset = { full: string; lite: string; wheels?: WheelFit; length?: number; flip?: boolean; roofX?: number; lamps?: Lamps; plateRy?: number };   // length: metres, flip: model nose guess is wrong, roofX: topper position along the car (fraction of length from the middle)
-const asset = (name: string, o: { wheels?: WheelFit; length?: number; flip?: boolean; roofX?: number; lamps?: Lamps; plateRy?: number } = {}): ImportedFleetAsset => ({
+type ImportedFleetAsset = { full: string; lite: string; wheels?: WheelFit; length?: number; flip?: boolean; roofX?: number; roofY?: number; lamps?: Lamps; plateRy?: number };   // length: metres, flip: model nose guess is wrong, roofX: topper position along the car (fraction of length from the middle)
+const asset = (name: string, o: { wheels?: WheelFit; length?: number; flip?: boolean; roofX?: number; roofY?: number; lamps?: Lamps; plateRy?: number } = {}): ImportedFleetAsset => ({
   full: `${import.meta.env.BASE_URL}models/${name}.glb`,
   lite: `${import.meta.env.BASE_URL}models/${name}-lite.glb`,
   ...o,
@@ -40,7 +40,7 @@ const asset = (name: string, o: { wheels?: WheelFit; length?: number; flip?: boo
 
 /** The three Meshy cars selected for the new homepage. Their baked paint and surface detail are preserved. */
 export const IMPORTED_FLEET: Partial<Record<keyof typeof CAR_SPECS, ImportedFleetAsset>> = {
-  corolla: asset('dk-meshy-rx7-white', { wheels: { pos: [1.40, .377, .375], neg: [-1.435, .376, .378] },  length: 4.4, plateRy: .41, lamps: { front: [-1.98, .53, .63, .09, .063, .135], rear: [2.07, .69, .59, .09, .072, .225] } }),   // the white car: a white RX-7 (Meshy, supplied by the owner, cut down to ~30k triangles for the web); nose points to -x
+  corolla: asset('dk-meshy-aventador-white', { wheels: { pos: [1.21, .376, .34], neg: [-1.416, .367, .343] },  length: 4.5, roofX: .15, roofY: -.14, lamps: { front: [1.79, .59, .615, .147, .055, .129], rear: [-2.2, .81, .70, .11, .10, .22] } }),   // the white car: a white open-top supercar (supplied by the owner, ~10k triangles, 517 KB); nose points to +z in the file
   elantra: asset('dk-meshy-red-sport', { wheels: { pos: [1.33, .38, .38], neg: [-1.49, .34, .34] },  lamps: { front: [2.1, .66, .7, .26, .13, .22], rear: [-2.12, .8, .66, .26, .12, .24] } }),
   // the other three spots: Matra Laser 1971, orange sports car, red roadster (all Meshy, CC0 models supplied by the owner)
   civic: asset('dk-meshy-green2-sport', { wheels: { pos: [1.394, .377, .375], neg: [-1.349, .37, .375] },  length: 4.5, lamps: { front: [1.89, .58, .643, .2, .12, .2], rear: [-2.0, .73, .54, .184, .064, .22] } }),   // the second green sports car (supplied by the owner) in row A's east stall, where the Matra stood: the model faces +x like the other green one
@@ -495,7 +495,7 @@ function LoadedImported({ files, plate, position, rotationY, lite, signal, wheel
         <mesh position={[pf.x + nz * .012, pf.y, 0]} rotation-y={nz > 0 ? Math.PI / 2 : -Math.PI / 2} material={plateMat}><planeGeometry args={[.3, .15]} /></mesh>
         <mesh position={[pr.x - nz * .012, pr.y, 0]} rotation-y={nz > 0 ? -Math.PI / 2 : Math.PI / 2} material={plateMat}><planeGeometry args={[.3, .15]} /></mesh>
       </>}
-      <Topper position={[rf.x + (files.roofX ?? 0) * P.L * fit, rf.y - .012, 0]} />
+      <Topper position={[rf.x + (files.roofX ?? 0) * P.L * fit, rf.y - .012 + (files.roofY ?? 0), 0]} />
       {sig && (lampU && files.lamps ? <LampHalos lamps={files.lamps} u={lampU} signal={sig} lite={lite} /> : <Blinkers L={P.L * fit} W={P.W * fit} H={P.H * fit} signal={sig} />)}
       </group>
     </group>
