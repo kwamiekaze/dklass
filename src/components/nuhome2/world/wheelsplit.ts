@@ -102,8 +102,8 @@ export function wheelMaterials() {
  * A clean wheel built in code, axle along z, centred on the origin, `r` the outer radius and `w` the width: a round black tyre (flat tread, rounded shoulders, bulging sidewalls)
  * with a dark five spoke rim set in each side. The car files' own wheels are lumpy and carry the body paint in their texture, so they are cut out and these take their place.
  */
-export function buildWheel(r: number, w: number, lite: boolean): THREE.Group {
-  const { rubber, rim } = wheelMaterials(), g = new THREE.Group(), seg = lite ? 28 : 56, h = w / 2, rr = r * .6;
+export function buildWheel(r: number, w: number, lite: boolean, rimK = .6): THREE.Group {
+  const { rubber, rim } = wheelMaterials(), g = new THREE.Group(), seg = lite ? 28 : 56, h = w / 2, rr = r * rimK;
   // tyre profile, (radius, height along the axle): from the inner bead out over the tread and back to the other bead
   const prof: THREE.Vector2[] = [[rr, -h * .8], [r * .82, -h * .98], [r * .93, -h * 1.0], [r * .985, -h * .78], [r, -h * .5], [r, h * .5], [r * .985, h * .78], [r * .93, h * 1.0], [r * .82, h * .98], [rr, h * .8], [rr, -h * .8]].map(([x, y]) => new THREE.Vector2(x, y));
   const tyre = new THREE.Mesh(new THREE.LatheGeometry(prof, seg), rubber); tyre.rotation.x = Math.PI / 2; tyre.castShadow = !lite; g.add(tyre);
