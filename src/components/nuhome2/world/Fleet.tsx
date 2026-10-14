@@ -40,7 +40,7 @@ const asset = (name: string, o: { wheels?: WheelFit; length?: number; flip?: boo
 
 /** The three Meshy cars selected for the new homepage. Their baked paint and surface detail are preserved. */
 export const IMPORTED_FLEET: Partial<Record<keyof typeof CAR_SPECS, ImportedFleetAsset>> = {
-  corolla: asset('dk-meshy-aventador-white', { wheels: { pos: [1.21, .376, .34], neg: [-1.416, .367, .343] },  length: 4.5, roofAt: [.05, 1.0], noseX: 2.3, rimK: .74, tyreK: 1.07, lamps: { front: [1.79, .59, .615, .147, .055, .129], rear: [-2.2, .81, .70, .11, .10, .22] } }),   // the white car: a white open-top supercar (supplied by the owner, ~10k triangles, 517 KB); nose points to +z in the file
+  corolla: asset('dk-meshy-aventador-white', { wheels: { pos: [1.21, .376, .34], neg: [-1.416, .367, .343] },  length: 4.5, roofAt: [.0, 1.02], noseX: 2.3, rimK: .74, tyreK: 1.07, lamps: { front: [1.79, .59, .615, .147, .055, .129], rear: [-2.2, .81, .70, .11, .10, .22] } }),   // the white car: a white open-top supercar (supplied by the owner, ~10k triangles, 517 KB); nose points to +z in the file
   elantra: asset('dk-meshy-red-sport', { wheels: { pos: [1.33, .38, .38], neg: [-1.49, .34, .34] },  lamps: { front: [2.1, .66, .7, .26, .13, .22], rear: [-2.12, .8, .66, .26, .12, .24] } }),
   // the other three spots: Matra Laser 1971, orange sports car, red roadster (all Meshy, CC0 models supplied by the owner)
   civic: asset('dk-meshy-green2-sport', { wheels: { pos: [1.394, .377, .375], neg: [-1.349, .37, .375] },  length: 4.5, lamps: { front: [1.89, .58, .643, .2, .12, .2], rear: [-2.0, .73, .54, .184, .064, .22] } }),   // the second green sports car (supplied by the owner) in row A's east stall, where the Matra stood: the model faces +x like the other green one
@@ -412,6 +412,18 @@ function LampHalos({ lamps, u, signal, lite, noseX }: { lamps: Lamps; u: LampUni
   </group>;
 }
 
+/** A closed black roof for an open-top car: a rounded, crowned slab over the cockpit, glossy like the glass roofs of the other cars. Top centre at (x, y). */
+const roofGeo = (() => {
+  const L = .96, W = 1.42, r = .32, h = .22, sh = new THREE.Shape(), a = L / 2, b = W / 2;
+  sh.moveTo(-a + r, -b); sh.lineTo(a - r, -b); sh.quadraticCurveTo(a, -b, a, -b + r); sh.lineTo(a, b - r); sh.quadraticCurveTo(a, b, a - r, b); sh.lineTo(-a + r, b); sh.quadraticCurveTo(-a, b, -a, b - r); sh.lineTo(-a, -b + r); sh.quadraticCurveTo(-a, -b, -a + r, -b);
+  const g = new THREE.ExtrudeGeometry(sh, { depth: h, bevelEnabled: true, bevelThickness: .025, bevelSize: .03, bevelSegments: 4, curveSegments: 14 });
+  g.rotateX(-Math.PI / 2); g.translate(0, -h, 0);   // shape plane to the ground: x along the car, z across; the top face at y 0
+  const p = g.attributes.position as THREE.BufferAttribute; for (let i = 0; i < p.count; i++) { const t = p.getZ(i) / b, u = p.getX(i) / a, dn = Math.min(1, Math.max(0, -p.getY(i) / h)); p.setZ(i, p.getZ(i) * (1 + .12 * dn)); p.setX(i, p.getX(i) * (1 + .08 * dn)); p.setY(i, p.getY(i) - .05 * t * t - (u > 0 ? .11 : .035) * u * u); }
+  g.computeVertexNormals(); return g;
+})();
+const roofMat = new THREE.MeshPhysicalMaterial({ color: '#0d0e11', roughness: .5, metalness: 0, clearcoat: .35, clearcoatRoughness: .35, envMapIntensity: .3, side: THREE.DoubleSide });
+function RoofCap({ x, y }: { x: number; y: number }) { return <mesh geometry={roofGeo} material={roofMat} position={[x, y - .03, 0]} />; }
+
 /** A selected Meshy car with its original identity, finish and baked PBR detail intact. */
 function LoadedImported({ files, plate, position, rotationY, lite, signal, wheels }: { files: ImportedFleetAsset; plate?: string; position: [number, number, number]; rotationY: number; lite: boolean; signal?: { current: CarSignal }; wheels?: { current: WheelState } }) {
   const url = lite ? files.lite : files.full;
@@ -495,7 +507,7 @@ function LoadedImported({ files, plate, position, rotationY, lite, signal, wheel
         <mesh position={[pf.x + nz * .012, pf.y, 0]} rotation-y={nz > 0 ? Math.PI / 2 : -Math.PI / 2} material={plateMat}><planeGeometry args={[.3, .15]} /></mesh>
         <mesh position={[pr.x - nz * .012, pr.y, 0]} rotation-y={nz > 0 ? -Math.PI / 2 : Math.PI / 2} material={plateMat}><planeGeometry args={[.3, .15]} /></mesh>
       </>}
-      {files.roofAt && <mesh position={[files.roofAt[0], files.roofAt[1] - .03, 0]}><boxGeometry args={[1.0, .06, .84]} /><meshPhysicalMaterial color="#0b0c0f" roughness={.35} metalness={.1} clearcoat={1} clearcoatRoughness={.15} /></mesh>}   {/* open-top car: a black roof panel for the magnet to sit on */}
+      {files.roofAt && <RoofCap x={files.roofAt[0]} y={files.roofAt[1]} />}   {/* open-top car: a closed black roof for the magnet to sit on */}
       <Topper position={files.roofAt ? [files.roofAt[0], files.roofAt[1], 0] : [rf.x + (files.roofX ?? 0) * P.L * fit, rf.y - .012 + (files.roofY ?? 0), 0]} />
       {sig && (lampU && files.lamps ? <LampHalos lamps={files.lamps} u={lampU} signal={sig} lite={lite} noseX={files.noseX} /> : <Blinkers L={P.L * fit} W={P.W * fit} H={P.H * fit} signal={sig} />)}
       </group>
