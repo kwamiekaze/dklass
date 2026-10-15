@@ -31,8 +31,8 @@ export const fleetFiles = (id: string) => (IMPORTED_FLEET as Record<string, Impo
 /** The real lamps of a Meshy car, measured on the model in car space (metres, nose +x, up +y). Centre and half size of the lamp on the car's right (+z); the left lamp is its mirror. Lets the turn signal light the car's own headlight and tail light. */
 type LampBox = [cx: number, cy: number, cz: number, hx: number, hy: number, hz: number];
 type Lamps = { front: LampBox; rear: LampBox };
-type ImportedFleetAsset = { full: string; lite: string; wheels?: WheelFit; length?: number; flip?: boolean; roofX?: number; roofY?: number; roofAt?: [x: number, y: number]; noseX?: number; rimK?: number; tyreK?: number; lamps?: Lamps; plateRy?: number };   // length: metres, flip: model nose guess is wrong, roofX: topper position along the car (fraction of length from the middle)
-const asset = (name: string, o: { wheels?: WheelFit; length?: number; flip?: boolean; roofX?: number; roofY?: number; roofAt?: [x: number, y: number]; noseX?: number; rimK?: number; tyreK?: number; lamps?: Lamps; plateRy?: number } = {}): ImportedFleetAsset => ({
+type ImportedFleetAsset = { full: string; lite: string; wheels?: WheelFit; length?: number; flip?: boolean; roofX?: number; lamps?: Lamps; plateRy?: number; objectNormals?: boolean };   // length: metres, flip: model nose guess is wrong, roofX: topper position along the car (fraction of length from the middle)
+const asset = (name: string, o: { wheels?: WheelFit; length?: number; flip?: boolean; roofX?: number; lamps?: Lamps; plateRy?: number; objectNormals?: boolean } = {}): ImportedFleetAsset => ({
   full: `${import.meta.env.BASE_URL}models/${name}.glb`,
   lite: `${import.meta.env.BASE_URL}models/${name}-lite.glb`,
   ...o,
@@ -40,7 +40,7 @@ const asset = (name: string, o: { wheels?: WheelFit; length?: number; flip?: boo
 
 /** The three Meshy cars selected for the new homepage. Their baked paint and surface detail are preserved. */
 export const IMPORTED_FLEET: Partial<Record<keyof typeof CAR_SPECS, ImportedFleetAsset>> = {
-  corolla: asset('dk-meshy-aventador-white', { wheels: { pos: [1.21, .376, .34], neg: [-1.416, .367, .343] },  length: 4.5, roofAt: [.0, 1.02], noseX: 2.3, rimK: .74, tyreK: 1.07, lamps: { front: [1.79, .59, .615, .147, .055, .129], rear: [-2.2, .81, .70, .11, .10, .22] } }),   // the white car: a white open-top supercar (supplied by the owner, ~10k triangles, 517 KB); nose points to +z in the file
+  corolla: asset('dk-meshy-white-concept', { wheels: { pos: [1.55, .407, .406], neg: [-1.588, .407, .408], zIn: .776 },  length: 4.6, roofX: .09, objectNormals: true, lamps: { front: [-2.095, .656, .762, .17, .06, .155], rear: [2.26, .76, .46, .12, .04, .44] } }),   // the white car: a long low grand tourer (Meshy, supplied by the owner, rebuilt as a light model with its paint baked in). Nose points to -x; its headlights are thin slits and the tail light is one red bar across the back
   elantra: asset('dk-meshy-red-sport', { wheels: { pos: [1.33, .38, .38], neg: [-1.49, .34, .34] },  lamps: { front: [2.1, .66, .7, .26, .13, .22], rear: [-2.12, .8, .66, .26, .12, .24] } }),
   // the other three spots: Matra Laser 1971, orange sports car, red roadster (all Meshy, CC0 models supplied by the owner)
   civic: asset('dk-meshy-green2-sport', { wheels: { pos: [1.394, .377, .375], neg: [-1.349, .37, .375] },  length: 4.5, lamps: { front: [1.89, .58, .643, .2, .12, .2], rear: [-2.0, .73, .54, .184, .064, .22] } }),   // the second green sports car (supplied by the owner) in row A's east stall, where the Matra stood: the model faces +x like the other green one
@@ -361,7 +361,7 @@ const ease = (v: number, target: number, dt: number, rate: number) => v + (targe
  * the turn signal halos, the headlight halos with a pool of light on the road and a real spot lamp on the road ahead (night only), and the reverse
  * lamps' white halos with a short pool on the road behind. The lenses themselves glow in the paint shader; `u` holds the values it reads.
  */
-function LampHalos({ lamps, u, signal, lite, noseX }: { lamps: Lamps; u: LampUniforms; signal: { current: CarSignal }; lite: boolean; noseX?: number }) {
+function LampHalos({ lamps, u, signal, lite }: { lamps: Lamps; u: LampUniforms; signal: { current: CarSignal }; lite: boolean }) {
   const halos = useRef<(THREE.Sprite | null)[]>([]), sl = useRef({ v: -1 }), sr = useRef({ v: -1 });
   const headHalos = useRef<(THREE.Sprite | null)[]>([]), revHalos = useRef<(THREE.Sprite | null)[]>([]), headCores = useRef<(THREE.Sprite | null)[]>([]), revCores = useRef<(THREE.Sprite | null)[]>([]);
   const headPool = useRef<(THREE.Mesh | null)[]>([]), revPool = useRef<(THREE.Mesh | null)[]>([]), beams = useRef<(THREE.SpotLight | null)[]>([]);
@@ -403,7 +403,7 @@ function LampHalos({ lamps, u, signal, lite, noseX }: { lamps: Lamps; u: LampUni
     {[-1, 1].map((sd, i) => <sprite key={`r${i}`} ref={(h) => { revHalos.current[i] = h; }} position={[r[0] + ro * r[3] * .55, r[1], sd * (r[2] - r[5] * .45)]} scale={[.62, .46, 1]} visible={false}><spriteMaterial map={whiteGlow} color="#f4f7ff" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} /></sprite>)}
     {[-1, 1].map((sd, i) => <sprite key={`hc${i}`} ref={(h) => { headCores.current[i] = h; }} position={[f[0] + fo * f[3] * .75, f[1], sd * f[2]]} scale={[.36, .26, 1]} visible={false}><spriteMaterial map={whiteGlow} color="#fff6e0" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} /></sprite>)}
     {[-1, 1].map((sd, i) => <sprite key={`rc${i}`} ref={(h) => { revCores.current[i] = h; }} position={[r[0] + ro * r[3] * .75, r[1], sd * (r[2] - r[5] * .22)]} scale={[.3, .22, 1]} visible={false}><spriteMaterial map={whiteGlow} color="#ffffff" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} /></sprite>)}
-    {[-1, 1].map((sd, i) => lobe(`hp${i}`, noseX != null ? fo * Math.max(fo * f[0] + f[3], noseX) : f[0] + fo * f[3], sd * f[2], fo > 0 ? -sd : sd, fo, 15, 6, '#ffe2a8', headPool, i, .07))}
+    {[-1, 1].map((sd, i) => lobe(`hp${i}`, f[0] + fo * f[3], sd * f[2], fo > 0 ? -sd : sd, fo, 15, 6, '#ffe2a8', headPool, i, .07))}
     {[-1, 1].map((sd, i) => lobe(`rp${i}`, r[0] + ro * r[3], sd * (r[2] - r[5] * .45), ro > 0 ? -sd : sd, ro, 4.6, 2.8, '#e8f0ff', revPool, i, .09))}
     {!lite && [-1, 1].map((sd, i) => <group key={`b${i}`}>
       <primitive object={aim[i]!} position={[f[0] + fo * 9, 0, sd * f[2] * .55]} />
@@ -411,18 +411,6 @@ function LampHalos({ lamps, u, signal, lite, noseX }: { lamps: Lamps; u: LampUni
     </group>)}
   </group>;
 }
-
-/** A closed black roof for an open-top car: a rounded, crowned slab over the cockpit, glossy like the glass roofs of the other cars. Top centre at (x, y). */
-const roofGeo = (() => {
-  const L = .96, W = 1.42, r = .32, h = .22, sh = new THREE.Shape(), a = L / 2, b = W / 2;
-  sh.moveTo(-a + r, -b); sh.lineTo(a - r, -b); sh.quadraticCurveTo(a, -b, a, -b + r); sh.lineTo(a, b - r); sh.quadraticCurveTo(a, b, a - r, b); sh.lineTo(-a + r, b); sh.quadraticCurveTo(-a, b, -a, b - r); sh.lineTo(-a, -b + r); sh.quadraticCurveTo(-a, -b, -a + r, -b);
-  const g = new THREE.ExtrudeGeometry(sh, { depth: h, bevelEnabled: true, bevelThickness: .025, bevelSize: .03, bevelSegments: 4, curveSegments: 14 });
-  g.rotateX(-Math.PI / 2); g.translate(0, -h, 0);   // shape plane to the ground: x along the car, z across; the top face at y 0
-  const p = g.attributes.position as THREE.BufferAttribute; for (let i = 0; i < p.count; i++) { const t = p.getZ(i) / b, u = p.getX(i) / a, dn = Math.min(1, Math.max(0, -p.getY(i) / h)); p.setZ(i, p.getZ(i) * (1 + .12 * dn)); p.setX(i, p.getX(i) * (1 + .08 * dn)); p.setY(i, p.getY(i) - .05 * t * t - (u > 0 ? .11 : .035) * u * u); }
-  g.computeVertexNormals(); return g;
-})();
-const roofMat = new THREE.MeshPhysicalMaterial({ color: '#0d0e11', roughness: .5, metalness: 0, clearcoat: .35, clearcoatRoughness: .35, envMapIntensity: .3, side: THREE.DoubleSide });
-function RoofCap({ x, y }: { x: number; y: number }) { return <mesh geometry={roofGeo} material={roofMat} position={[x, y - .03, 0]} />; }
 
 /** A selected Meshy car with its original identity, finish and baked PBR detail intact. */
 function LoadedImported({ files, plate, position, rotationY, lite, signal, wheels }: { files: ImportedFleetAsset; plate?: string; position: [number, number, number]; rotationY: number; lite: boolean; signal?: { current: CarSignal }; wheels?: { current: WheelState } }) {
@@ -439,6 +427,7 @@ function LoadedImported({ files, plate, position, rotationY, lite, signal, wheel
       const material = source.clone();
       if (material instanceof THREE.MeshStandardMaterial) {
         material.envMapIntensity = lite ? .75 : 1.05;
+        if (files.objectNormals && material.normalMap) material.normalMapType = THREE.ObjectSpaceNormalMap;   // this car's normal map is baked in the model's own space (one smooth surface drawn on a light mesh)
         if (lampU) lampShader(material, lampU);
         material.needsUpdate = true;
       }
@@ -478,7 +467,7 @@ function LoadedImported({ files, plate, position, rotationY, lite, signal, wheel
       const [cx, cy, cr] = part.posAxle ? files.wheels.pos : files.wheels.neg;
       const w = Math.min(.3, Math.max(.2, part.z1 - part.z0)), zc = part.z1 - w / 2;
       const pivot = new THREE.Group(), spin = new THREE.Group(); pivot.position.set(cx * fit, cy * fit, part.side * zc * fit);
-      spin.add(buildWheel(cr * fit * (files.tyreK ?? 1), w * fit, lite, files.rimK)); pivot.add(spin); out.group.add(pivot);
+      spin.add(buildWheel(cr * fit * 1.0, w * fit, lite)); pivot.add(spin); out.group.add(pivot);
       out.w.push({ pivot, spin, front: part.posAxle === (nz > 0), r: cr * fit });
     }
     return out;
@@ -507,9 +496,8 @@ function LoadedImported({ files, plate, position, rotationY, lite, signal, wheel
         <mesh position={[pf.x + nz * .012, pf.y, 0]} rotation-y={nz > 0 ? Math.PI / 2 : -Math.PI / 2} material={plateMat}><planeGeometry args={[.3, .15]} /></mesh>
         <mesh position={[pr.x - nz * .012, pr.y, 0]} rotation-y={nz > 0 ? -Math.PI / 2 : Math.PI / 2} material={plateMat}><planeGeometry args={[.3, .15]} /></mesh>
       </>}
-      {files.roofAt && <RoofCap x={files.roofAt[0]} y={files.roofAt[1]} />}   {/* open-top car: a closed black roof for the magnet to sit on */}
-      <Topper position={files.roofAt ? [files.roofAt[0], files.roofAt[1], 0] : [rf.x + (files.roofX ?? 0) * P.L * fit, rf.y - .012 + (files.roofY ?? 0), 0]} />
-      {sig && (lampU && files.lamps ? <LampHalos lamps={files.lamps} u={lampU} signal={sig} lite={lite} noseX={files.noseX} /> : <Blinkers L={P.L * fit} W={P.W * fit} H={P.H * fit} signal={sig} />)}
+      <Topper position={[rf.x + (files.roofX ?? 0) * P.L * fit, rf.y - .012, 0]} />
+      {sig && (lampU && files.lamps ? <LampHalos lamps={files.lamps} u={lampU} signal={sig} lite={lite} /> : <Blinkers L={P.L * fit} W={P.W * fit} H={P.H * fit} signal={sig} />)}
       </group>
     </group>
   </group>;
@@ -530,5 +518,5 @@ export function FleetCar({ color, plate, specId, position, rotationY = 0, lite =
   // textured first; if its file is not in the build the painted sedan stays, so the lot is never empty
   const house = useTexturedFleet() ? <Fallback fallback={standard}><Suspense fallback={null}><LoadedTex color={color} plate={plate} position={position} rotationY={rotationY} lite={lite} /></Suspense></Fallback> : standard;
   const imported = IMPORTED_FLEET[specId];
-  return imported ? <Fallback fallback={house}><Suspense fallback={null}><LoadedImported files={imported} plate={['civic', 'camry', 'sentra', 'hero', 'corolla'].includes(specId) ? plate : undefined} position={position} rotationY={rotationY} lite={lite} signal={signal} wheels={wheels} /></Suspense></Fallback> : house;
+  return imported ? <Fallback fallback={house}><Suspense fallback={null}><LoadedImported files={imported} plate={['civic', 'camry', 'sentra', 'hero'].includes(specId) ? plate : undefined} position={position} rotationY={rotationY} lite={lite} signal={signal} wheels={wheels} /></Suspense></Fallback> : house;
 }

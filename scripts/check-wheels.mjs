@@ -7,7 +7,7 @@ import { STALLS } from '../src/components/nuhome2/world/cast.ts';
 import { setStall } from '../src/components/nuhome2/world/intro.ts';
 const LIFT = .05;
 // wheel centres (x along the nose, as the car drives; the model's own axle table, signs resolved so + is the nose) and the half track
-const AX = { hero: [1.35, -1.41], camry: [1.27, -1.53], corolla: [1.41, -1.65], civic: [1.59, -1.37], elantra: [1.33, -1.49], sentra: [1.51, -1.47] };
+const AX = { hero: [1.35, -1.41], camry: [1.27, -1.53], corolla: [1.49, -1.46], civic: [1.59, -1.37], elantra: [1.33, -1.49], sentra: [1.51, -1.47] };
 const HALF_TRACK = .86;
 const modes = ['parallel', 'bayFront', 'bayBox', 'turn', 'back', 'exit', 'enterStall'];
 let fail = 0;
