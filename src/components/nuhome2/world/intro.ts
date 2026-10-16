@@ -244,6 +244,10 @@ export function introAt(t: number, narrow = false): Pose {
 
 /** Shared clock: the rig advances it, the car reads it. Lets the car carry on if the visitor takes the camera. */
 export const intro = { t: 0, t3: T_GO, done: false };
+/** The opening shot's clock waits while the splash video covers the scene; the page lets it go as the splash fades. */
+export const introHold = { v: false };
+/** True once the scene's files are in and every shader is compiled and drawn once: the splash waits for it before it lets go. */
+export const sceneWarm = { v: false };
 /** True while the school car is actually rolling (on the avenue, or between the stop sign and its stall). */
 export function carMoving() { return !intro.done && (intro.t < T_STOP || (intro.t >= intro.t3 && intro.t < intro.t3 + T_DRIVE + .3)); }
 /** Called when the visitor takes the camera mid-shot: the car carries on with its route (no waiting for the tour). */

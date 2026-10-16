@@ -77,13 +77,11 @@
 
 .n2-lost { position: absolute; z-index: 50; left: 50%; top: 116px; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; padding: 12px 14px 12px 20px; border-radius: 999px; background: rgba(14, 14, 18, .8); border: 1px solid rgba(242, 193, 78, .35); font: 500 13px "Poppins", sans-serif; backdrop-filter: blur(12px); }
 .n2-lost p { margin: 0; }
-.n2-splash { position: absolute; inset: 0; z-index: 80; display: grid; place-items: center; background: radial-gradient(circle at 50% 42%, #2a2110 0%, #0b0b0f 65%); transition: opacity .8s ease, visibility .8s; }
-.n2-splash[data-done="true"] { opacity: 0; visibility: hidden; pointer-events: none; }
-.n2-splash-inner { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 0 20px; }
-.n2-splash-inner b { font-size: clamp(32px, 8vw, 84px); font-weight: 700; letter-spacing: .09em; }
-.n2-splash-inner em { font-family: "Italianno", cursive; font-style: normal; font-size: clamp(24px, 4vw, 40px); color: #ffe9b0; }
-.n2-bar { width: min(220px, 50vw); height: 3px; border-radius: 3px; background: rgba(242, 193, 78, .2); overflow: hidden; margin-top: 10px; }
-.n2-bar i { display: block; height: 100%; width: 40%; background: linear-gradient(90deg, transparent, #f2c14e, transparent); animation: n2-load 1.3s ease-in-out infinite; }
+.n2-splash { position: fixed; inset: 0; z-index: 400; background: #0a0806; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; outline: none; opacity: 1; transition: opacity var(--fade, .7s) ease; overflow: hidden; }
+.n2-splash[data-fading="true"] { opacity: 0; pointer-events: none; }
+.n2-splash-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 42%; background: #0a0806; pointer-events: none; }
+/* a wide screen shows the whole portrait film, centred, with its sides melting into the dark */
+@media (min-aspect-ratio: 5/8) { .n2-splash-video { object-fit: contain; object-position: 50% 50%; -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14%, #000 86%, transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 14%, #000 86%, transparent 100%); } }
 @keyframes n2-load { from { transform: translateX(-120%); } to { transform: translateX(320%); } }
 
 /* message form section */

@@ -22,6 +22,8 @@ import { useTheme } from "@/components/ThemeProvider";
 import { getPackagesSortedByPosition } from "@/data/packages";
 import { BRAND } from "@/components/nuhome2/content";
 import { STAGES } from "@/components/nuhome2/world/views";
+import { SplashVideo } from "@/components/nuhome2/SplashVideo";
+import { introHold, sceneWarm } from "@/components/nuhome2/world/intro";
 import "@/components/nuhome2/nuhome2.css";
 import "@/components/nuhome2/header.css";
 
@@ -91,7 +93,6 @@ export default function NuHome2() {
   const q = useMemo(() => (typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search)), []);
   const [stage, setStage] = useState(() => Math.max(0, Math.min(STAGES.length - 1, Number(q.get("stage")) || 0)));
   const [ready, setReady] = useState(false);
-  const [splashDone, setSplashDone] = useState(false);
   const [lost, setLost] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [reviewsOpen, setReviewsOpen] = useState(false);
@@ -106,6 +107,19 @@ export default function NuHome2() {
     return INTRO_SEEN.v;                              // coming back to the page inside the app skips it; a refresh (a new page load) plays it
   }, [q]);
   useEffect(() => { INTRO_SEEN.v = true; }, []);
+  // The opening film covers the page while the 3D world loads and warms up behind it. The opening shot's clock is held until the film fades.
+  const [splashOn, setSplashOn] = useState(() => { const on = !skipIntro; introHold.v = on; return on; });
+  const [splashDone, setSplashDone] = useState(skipIntro);
+  const [warm, setWarm] = useState(false);
+  useEffect(() => () => { introHold.v = false; }, []);
+  useEffect(() => {
+    if (!splashOn || warm) return;
+    if (!gl || lost) { setWarm(true); return; }
+    const id = window.setInterval(() => { if (sceneWarm.v) { setWarm(true); window.clearInterval(id); } }, 120);
+    return () => window.clearInterval(id);
+  }, [splashOn, warm, gl, lost]);
+  const onFadeStart = useCallback(() => { introHold.v = false; setSplashDone(true); }, []);
+  const onSplashDone = useCallback(() => setSplashOn(false), []);
   const packages = useMemo(() => getPackagesSortedByPosition(), []);
 
   useEffect(() => {
@@ -136,13 +150,6 @@ export default function NuHome2() {
     const id = window.setInterval(() => setOpen(georgiaOpen()), 20000);
     return () => window.clearInterval(id);
   }, []);
-
-  useEffect(() => {
-    if (!ready && gl) return;
-    const t = setTimeout(() => setSplashDone(true), 700);
-    return () => clearTimeout(t);
-  }, [ready, gl]);
-  useEffect(() => { const t = setTimeout(() => setSplashDone(true), 9000); return () => clearTimeout(t); }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -249,11 +256,7 @@ export default function NuHome2() {
             <button type="button" className="n2-btn n2-btn--gold" onClick={() => window.location.reload()}>Reload</button></div>
         )}
 
-        <div className="n2-splash" data-done={splashDone} aria-hidden={splashDone}>
-          <div className="n2-splash-inner">
-            <b className="n2-gold">{BRAND.wordmark}</b><em>{BRAND.slogan}</em><Stars /><span className="n2-bar"><i /></span>
-          </div>
-        </div>
+        {splashOn && <SplashVideo ready={warm} onFadeStart={onFadeStart} onDone={onSplashDone} />}
       </main>
 
       <Journey theme={night ? "night" : "day"} onBook={() => setSheet(true)} onTheme={() => setTheme(night ? "light" : "dark")} />

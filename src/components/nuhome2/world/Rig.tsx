@@ -4,7 +4,7 @@ import { useProgress } from '@react-three/drei';
 import * as THREE from 'three';
 import { FOV, PAN, STAGES, type Stop, type V3 } from './views';
 import { OrbitGuard } from './orbitGuard';
-import { T_END, T_DRIVE, T_GO, carMoving, intro, introAt, parkCarNow, releaseCar } from './intro';
+import { T_END, T_DRIVE, T_GO, carMoving, intro, introAt, introHold, parkCarNow, releaseCar, sceneWarm } from './intro';
 import { usableShots, type Shot } from './shots';
 import { cinema, stopReel } from './reel';
 import { engine } from '../music/engine';
@@ -98,14 +98,14 @@ export function Rig({ stage, reducedMotion, skipIntro, onIntroDone }: { stage: n
         state.scene.traverse(o => { if (o.frustumCulled) { o.frustumCulled = false; culled.push(o); } });
         try { gl.compile(state.scene, camera); gl.shadowMap.needsUpdate = true; gl.render(state.scene, camera); } catch { /* ignore */ }
         culled.forEach(o => { o.frustumCulled = true; });
-        g.ready = true; g.frames = 0;
+        g.ready = true; g.frames = 0; sceneWarm.v = true;
       }
       return;
     }
     // shadows refresh every frame while the car rolls (its shadow must move with it), every other frame once nothing moves
     gl.shadowMap.autoUpdate = false; if (carMoving() || parkMoving() || g.frames % 2 === 0) gl.shadowMap.needsUpdate = true;
     if (park.phase === 'run' && parkT === null) { park.t += Math.min(Math.max(g.dt, 1 / 250), .05); if (park.t >= parkTotal()) finishPark(); }
-    if (!intro.done && introT === null) { intro.t += Math.min(Math.max(g.dt, 1 / 250), .05); if (intro.t >= intro.t3 + T_DRIVE && intro.t >= T_END) intro.done = true; }
+    if (!intro.done && introT === null && !introHold.v) { intro.t += Math.min(Math.max(g.dt, 1 / 250), .05); if (intro.t >= intro.t3 + T_DRIVE && intro.t >= T_END) intro.done = true; }
   }, -5);
   useFrame((state, delta) => {
     if (!controls) return;
