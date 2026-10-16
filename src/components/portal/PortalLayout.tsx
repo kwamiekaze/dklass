@@ -39,7 +39,9 @@ interface PortalLayoutProps {
 }
 
 export function PortalLayout({ children }: PortalLayoutProps) {
-  const { profile, role, signOut } = usePortalAuth();
+  const { profile, role, signOut, user } = usePortalAuth();
+  const { me: familyMe } = useAccountFamily(user?.id);
+  const aliasMe = familyMe && !familyMe.is_primary ? familyMe : null;
   const { notifications, unreadCount, markAsRead, markAllAsRead, hasMore, loadingMore, loadMore } = useNotifications();
   const location = useLocation();
   const navigate = useNavigate();
