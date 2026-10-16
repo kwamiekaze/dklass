@@ -32,6 +32,7 @@ import { resolveNotificationRoute, buildNotificationUrl } from "@/lib/notificati
 import { Notification, UserRole } from "@/types/portal";
 import { LanguageSwitcherInline } from "@/components/LanguageSwitcher";
 import { useTranslation } from "react-i18next";
+import { useAccountFamily, RELATIONSHIP_LABELS } from "@/hooks/useAccountFamily";
 
 interface PortalLayoutProps {
   children: ReactNode;
@@ -238,6 +239,12 @@ export function PortalLayout({ children }: PortalLayoutProps) {
                   <div className="flex flex-col">
                     <span className="text-sm">{profile?.full_name || 'User'}</span>
                     <span className="text-xs text-muted-foreground font-normal capitalize">{role}</span>
+                    {aliasMe && (
+                      <span className="text-xs text-muted-foreground font-normal">
+                        Signed in as {aliasMe.full_name || aliasMe.email}
+                        {aliasMe.relationship ? ` (${RELATIONSHIP_LABELS[aliasMe.relationship] || aliasMe.relationship})` : ""}
+                      </span>
+                    )}
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
