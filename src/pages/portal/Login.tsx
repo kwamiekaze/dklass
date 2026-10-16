@@ -201,7 +201,8 @@ export default function Login() {
                 setIsGoogleLoading(true);
                 setError("");
                 try {
-                  const { error } = await lovable.auth.signInWithOAuth("google", {
+                  try { sessionStorage.setItem("dk_oauth_pending", "1"); } catch { /* private mode */ }
+      const { error } = await lovable.auth.signInWithOAuth("google", {
                     redirect_uri: window.location.origin,
                   });
                   if (error) {

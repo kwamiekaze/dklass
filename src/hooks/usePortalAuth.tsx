@@ -23,6 +23,15 @@ interface PortalAuthContextType {
 
 const PortalAuthContext = createContext<PortalAuthContextType | undefined>(undefined);
 
+/** True when this page load is the return from a sign-in provider (the address carries its code or token). Read once, before the library tidies the address. */
+const OAUTH_RETURN = (() => {
+  try { const l = window.location; return /(^|[#&?])(access_token|code|provider_token)=/.test(`${l.hash}${l.search}`); } catch { return false; }
+})();
+const oauthHandled = { v: false };
+/** Set by the sign-in buttons just before they hand over to Google, so the return trip is recognised even when the address carries nothing. */
+export const OAUTH_FLAG = "dk_oauth_pending";
+const oauthPending = () => { try { const v = sessionStorage.getItem(OAUTH_FLAG); if (v) sessionStorage.removeItem(OAUTH_FLAG); return !!v; } catch { return false; } };
+
 export function PortalAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -98,10 +107,12 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
           setRole(null);
         }
 
-        // Handle OAuth callback
-        if (event === 'SIGNED_IN' && session?.user) {
+        // Handle OAuth callback: only when this page load really is the return from a sign-in provider.
+        // (The auth library also announces SIGNED_IN whenever a tab is refocused or a session is restored, which must never carry a visitor from the home page into the dashboard.)
+        if (event === 'SIGNED_IN' && session?.user && (OAUTH_RETURN || oauthPending()) && !oauthHandled.v) {
           const path = window.location.pathname;
           if (path === '/' || path === '') {
+            oauthHandled.v = true;
             setTimeout(() => {
               window.location.href = '/login';
             }, 500);

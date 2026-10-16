@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useBlinkSync } from "./blink";
 import { useNavigate } from "react-router-dom";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 
@@ -33,13 +34,15 @@ export function PortalSign() {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [signedIn]);
+  const btn = useRef<HTMLButtonElement>(null);
+  useBlinkSync(btn, [signedIn]);
   if (!signedIn) return null;
   const go = () => {
     if (!isApproved && role !== "admin" && role !== "instructor") return navigate("/pending-approval");
     navigate(role === "admin" ? "/admin" : role === "instructor" ? "/instructor" : "/student");
   };
   return (
-    <button type="button" className="n2-exit n2-portal" style={{ top, minWidth: minW || undefined }} aria-label="Open your portal" onClick={go}>
+    <button ref={btn} type="button" className="n2-exit n2-portal" style={{ top, minWidth: minW || undefined }} aria-label="Open your portal" onClick={go}>
       <svg viewBox="0 0 512 512" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="34" strokeLinecap="round" strokeLinejoin="round">
         <path d="M84 452V236a172 172 0 0 1 344 0v216" />
         <path d="M172 452V250a84 84 0 0 1 168 0v202" />

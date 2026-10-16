@@ -95,6 +95,7 @@ export default function Auth() {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
+      try { sessionStorage.setItem("dk_oauth_pending", "1"); } catch { /* private mode */ }
       const { error } = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
       });

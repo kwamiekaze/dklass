@@ -253,9 +253,7 @@ function InstructorStudentViewContent() {
                     {format(new Date(student.permit_expiration_date), 'MMM d, yyyy')}
                   </p>
                 )}
-                {student.permit_file_url && (
-                  <PermitPreview permitFileUrl={student.permit_file_url} className="max-w-full sm:max-w-md" />
-                )}
+                <PermitPreview permitFileUrl={student.permit_file_url} studentId={student.id} className="max-w-full sm:max-w-md" />
               </CardContent>
             </Card>
 

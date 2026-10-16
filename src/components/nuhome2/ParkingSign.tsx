@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useBlinkSync } from "./blink";
 import { canStartPark, requestEnter } from "./world/park";
 
 /**
@@ -24,9 +25,11 @@ export function ParkingSign() {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, []);
+  const btn = useRef<HTMLButtonElement>(null);
+  useBlinkSync(btn, [show]);
   if (!show) return null;
   return (
-    <button type="button" className="n2-exit n2-park" style={{ top }} aria-label="Go to the back parking lot" onClick={() => requestEnter()}>
+    <button ref={btn} type="button" className="n2-exit n2-park" style={{ top }} aria-label="Go to the back parking lot" onClick={() => requestEnter()}>
       <svg viewBox="0 0 512 512" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="34" strokeLinecap="round" strokeLinejoin="round">
         <rect x="62" y="62" width="388" height="388" rx="62" />
         <path d="M188 356V158h86a56 56 0 0 1 0 112h-86" />

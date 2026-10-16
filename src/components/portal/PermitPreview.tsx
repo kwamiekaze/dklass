@@ -3,9 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw, FileText, AlertCircle, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { findPermitForStudent } from "@/lib/permitDocuments";
 
 interface PermitPreviewProps {
   permitFileUrl: string | null | undefined;
+  /** When given, the permit is looked up wherever it was saved (profile link, documents, older permits, storage), so it is found even when the profile's own link is missing or stale. */
+  studentId?: string;
   className?: string;
 }
 
@@ -17,13 +20,27 @@ interface PermitPreviewProps {
  * - PDF files (shows view button)
  * - Loading states and error fallbacks
  */
-export function PermitPreview({ permitFileUrl, className }: PermitPreviewProps) {
+export function PermitPreview({ permitFileUrl, studentId, className }: PermitPreviewProps) {
+  const [missing, setMissing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPdf, setIsPdf] = useState(false);
 
   const loadPreview = useCallback(async () => {
+    if (studentId) {
+      setIsLoading(true); setError(null); setMissing(false);
+      try {
+        let found = await findPermitForStudent(studentId, permitFileUrl);
+        if (!found) { await new Promise((r) => setTimeout(r, 700)); found = await findPermitForStudent(studentId, permitFileUrl); }   // one more try: a dropped connection looks just like "no permit"
+        if (found) { setPreviewUrl(found.signedUrl); setIsPdf(found.isPdf); }
+        else { setPreviewUrl(null); setMissing(true); }
+      } catch (err) {
+        console.error('Failed to look up the permit:', err);
+        setError('Could not load the permit. Tap to retry.'); setPreviewUrl(null);
+      } finally { setIsLoading(false); }
+      return;
+    }
     if (!permitFileUrl) {
       setPreviewUrl(null);
       setError(null);
@@ -105,15 +122,26 @@ export function PermitPreview({ permitFileUrl, className }: PermitPreviewProps) 
     } finally {
       setIsLoading(false);
     }
-  }, [permitFileUrl]);
+  }, [permitFileUrl, studentId]);
 
   useEffect(() => {
     loadPreview();
   }, [loadPreview]);
 
-  // No URL provided
-  if (!permitFileUrl) {
+  // No URL provided (and nothing to look up)
+  if (!permitFileUrl && !studentId) {
     return null;
+  }
+
+  // Looked everywhere: there really is no permit on file
+  if (missing && !isLoading) {
+    return (
+      <div className={cn("flex flex-col items-center justify-center gap-2 p-4 rounded-lg border border-border bg-muted/50", className)}>
+        <FileText className="h-6 w-6 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground text-center">No permit has been uploaded yet.</span>
+        <Button variant="ghost" size="sm" className="gap-1.5" onClick={loadPreview}><RefreshCw className="h-4 w-4" />Check again</Button>
+      </div>
+    );
   }
 
   // Loading state

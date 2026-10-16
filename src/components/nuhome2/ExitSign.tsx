@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useBlinkSync } from "./blink";
 import { canRequestExit, park, requestExit } from "./world/park";
 
 /**
@@ -24,9 +25,11 @@ export function ExitSign() {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, []);
+  const btn = useRef<HTMLButtonElement>(null);
+  useBlinkSync(btn, [show]);
   if (!show) return null;
   return (
-    <button type="button" className="n2-exit" style={{ top }} aria-label="Exit the parking lot" onClick={() => requestExit()}>
+    <button ref={btn} type="button" className="n2-exit" style={{ top }} aria-label="Exit the parking lot" onClick={() => requestExit()}>
       <svg viewBox="0 0 512 512" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="34" strokeLinecap="round" strokeLinejoin="round">
         <path d="M332 195V63a18 18 0 0 0-18-18H96a18 18 0 0 0-18 18v389a18 18 0 0 0 18 18h218a18 18 0 0 0 18-18V315" />
         <path d="M185 255h265M392 175l60 80-60 80" />
