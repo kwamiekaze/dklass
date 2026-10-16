@@ -36,6 +36,13 @@
       "when": 1792109762823,
       "tag": "0004_merge_skip_unique_conflicts",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792109975600,
+      "tag": "0005_merge_skip_health_scan_rows",
+      "breakpoints": true
     }
   ]
 }
