@@ -711,7 +711,7 @@ export function AdminUserProfileModal({
               </div>
 
               {/* Secondary Emails (aliases) */}
-              <SecondaryEmailsSection userId={profile.id} />
+              <SecondaryEmailsSection userId={profile.id} onMergeClick={() => setMergeOpen(true)} />
 
               {/* Merge pending account into an approved one */}
               {profile.approval_status === 'pending' && (

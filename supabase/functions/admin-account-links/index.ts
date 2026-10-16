@@ -70,16 +70,20 @@ serve(async (req: Request): Promise<Response> => {
       if (!canonicalId) return json({ error: "canonical_user_id required" }, 400);
       const { data: links, error } = await admin
         .from("account_links")
-        .select("id, alias_user_id, created_at, created_by")
+        .select("id, alias_user_id, created_at, created_by, relationship, previous_status, label")
         .eq("canonical_user_id", canonicalId);
       if (error) return json({ error: error.message }, 500);
       const ids = (links || []).map((l: any) => l.alias_user_id);
       let emails: Record<string, string> = {};
+      const names: Record<string, string | null> = {};
       if (ids.length) {
-        const { data: profs } = await admin.from("profiles").select("id, email").in("id", ids);
+        const { data: profs } = await admin.from("profiles").select("id, email, full_name, first_name, last_name").in("id", ids);
         emails = Object.fromEntries((profs || []).map((p: any) => [p.id, p.email]));
+        for (const p of profs || []) {
+          names[p.id] = [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || p.full_name || null;
+        }
       }
-      return json({ links: (links || []).map((l: any) => ({ ...l, email: emails[l.alias_user_id] || null })) });
+      return json({ links: (links || []).map((l: any) => ({ ...l, email: emails[l.alias_user_id] || null, full_name: names[l.alias_user_id] || null })) });
     }
 
     if (action === "add") {
@@ -145,13 +149,60 @@ serve(async (req: Request): Promise<Response> => {
       return json({ ok: true, alias_user_id: aliasId, email });
     }
 
+    if (action === "set_relationship") {
+      const aliasId = String(body.alias_user_id || "");
+      const rel = body.relationship == null || body.relationship === "" ? null : String(body.relationship).toLowerCase();
+      if (!aliasId) return json({ error: "alias_user_id required" }, 400);
+      if (rel !== null && !["student", "parent", "guardian", "other"].includes(rel)) {
+        return json({ error: "Relationship must be student, parent, guardian or other" }, 400);
+      }
+      const { data: updated, error } = await admin
+        .from("account_links").update({ relationship: rel }).eq("alias_user_id", aliasId).select("id");
+      if (error) return json({ error: error.message }, 500);
+      if (!updated?.length) return json({ error: "Linked account not found" }, 404);
+      return json({ ok: true });
+    }
+
     if (action === "remove") {
       const aliasId = String(body.alias_user_id || "");
       if (!aliasId) return json({ error: "alias_user_id required" }, 400);
+      const { data: link } = await admin
+        .from("account_links").select("id, canonical_user_id, previous_status, relationship")
+        .eq("alias_user_id", aliasId).maybeSingle();
+      if (!link) return json({ error: "Linked account not found" }, 404);
+
       const { error } = await admin.from("account_links").delete().eq("alias_user_id", aliasId);
       if (error) return json({ error: error.message }, 500);
+
+      // If this login was merged from a real profile, give that person their own account back.
+      let restoredStatus: string | null = null;
+      if (link.previous_status) {
+        const { data: prof } = await admin.from("profiles").select("approval_status").eq("id", aliasId).maybeSingle();
+        if (prof?.approval_status === "merged") {
+          const { error: upErr } = await admin.from("profiles")
+            .update({ approval_status: link.previous_status, updated_at: new Date().toISOString() })
+            .eq("id", aliasId);
+          if (!upErr) restoredStatus = link.previous_status;
+        }
+      }
+
+      await admin.from("account_merge_log").insert({
+        source_user_id: aliasId,
+        target_user_id: link.canonical_user_id,
+        performed_by: caller.id,
+        action: "unlink",
+        relationship: link.relationship,
+        moved: { restored_status: restoredStatus },
+      });
+
       // The alias auth user row is intentionally kept (never delete data).
-      return json({ ok: true });
+      return json({
+        ok: true,
+        restored_status: restoredStatus,
+        message: restoredStatus
+          ? `Unlinked. This person can sign in to their own account again (status: ${restoredStatus}). Records moved during the merge stay with the main account.`
+          : "Unlinked. Records moved during any merge stay with the main account.",
+      });
     }
 
     return json({ error: `Unknown action '${action}'` }, 400);

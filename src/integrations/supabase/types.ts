@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -21,6 +21,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          label: string | null
+          previous_status: string | null
+          relationship: string | null
         }
         Insert: {
           alias_user_id: string
@@ -28,6 +31,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          label?: string | null
+          previous_status?: string | null
+          relationship?: string | null
         }
         Update: {
           alias_user_id?: string
@@ -35,31 +41,40 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          label?: string | null
+          previous_status?: string | null
+          relationship?: string | null
         }
         Relationships: []
       }
       account_merge_log: {
         Row: {
+          action: string
           created_at: string
           id: string
           moved: Json
           performed_by: string | null
+          relationship: string | null
           source_user_id: string
           target_user_id: string
         }
         Insert: {
+          action?: string
           created_at?: string
           id?: string
           moved?: Json
           performed_by?: string | null
+          relationship?: string | null
           source_user_id: string
           target_user_id: string
         }
         Update: {
+          action?: string
           created_at?: string
           id?: string
           moved?: Json
           performed_by?: string | null
+          relationship?: string | null
           source_user_id?: string
           target_user_id?: string
         }
@@ -758,6 +773,27 @@ export type Database = {
           status?: string
           summary?: Json
           triggered_by?: string | null
+        }
+        Relationships: []
+      }
+      home_weather_settings: {
+        Row: {
+          id: number
+          night: string
+          updated_at: string
+          weather: string
+        }
+        Insert: {
+          id?: number
+          night?: string
+          updated_at?: string
+          weather?: string
+        }
+        Update: {
+          id?: number
+          night?: string
+          updated_at?: string
+          weather?: string
         }
         Relationships: []
       }
@@ -3391,6 +3427,17 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_account_family: {
+        Args: never
+        Returns: {
+          email: string
+          full_name: string
+          is_me: boolean
+          is_primary: boolean
+          relationship: string
+          user_id: string
+        }[]
+      }
       get_email_render: {
         Args: { p_log_id: string }
         Returns: {
@@ -3595,8 +3642,16 @@ export type Database = {
         }
         Returns: undefined
       }
-      merge_student_account: {
+      merge_preview: {
         Args: { p_source_user_id: string; p_target_user_id: string }
+        Returns: Json
+      }
+      merge_student_account: {
+        Args: {
+          p_relationship?: string
+          p_source_user_id: string
+          p_target_user_id: string
+        }
         Returns: Json
       }
       move_to_dlq: {

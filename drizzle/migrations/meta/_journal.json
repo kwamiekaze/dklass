@@ -22,6 +22,27 @@
       "when": 1789696723734,
       "tag": "0002_allow_authors_delete_own_report_card_ratings",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792109563262,
+      "tag": "0003_account_family_merge",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792109762823,
+      "tag": "0004_merge_skip_unique_conflicts",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792109975600,
+      "tag": "0005_merge_skip_health_scan_rows",
+      "breakpoints": true
     }
   ]
 }
