@@ -31,8 +31,8 @@ export const fleetFiles = (id: string) => (IMPORTED_FLEET as Record<string, Impo
 /** The real lamps of a Meshy car, measured on the model in car space (metres, nose +x, up +y). Centre and half size of the lamp on the car's right (+z); the left lamp is its mirror. Lets the turn signal light the car's own headlight and tail light. */
 type LampBox = [cx: number, cy: number, cz: number, hx: number, hy: number, hz: number];
 type Lamps = { front: LampBox; rear: LampBox };
-type ImportedFleetAsset = { full: string; lite: string; wheels?: WheelFit; length?: number; flip?: boolean; roofX?: number; lamps?: Lamps; plateRy?: number; objectNormals?: boolean; ownWheels?: boolean };   // ownWheels: the file carries its own four wheels as separate nodes (wheel_*), turned and rolled as they are instead of cut out and redrawn. length: metres, flip: model nose guess is wrong, roofX: topper position along the car (fraction of length from the middle)
-const asset = (name: string, o: { wheels?: WheelFit; length?: number; flip?: boolean; roofX?: number; lamps?: Lamps; plateRy?: number; objectNormals?: boolean; ownWheels?: boolean } = {}): ImportedFleetAsset => ({
+type ImportedFleetAsset = { full: string; lite: string; wheels?: WheelFit; length?: number; flip?: boolean; roofX?: number; lamps?: Lamps; plateRy?: number; objectNormals?: boolean };   // length: metres, flip: model nose guess is wrong, roofX: topper position along the car (fraction of length from the middle)
+const asset = (name: string, o: { wheels?: WheelFit; length?: number; flip?: boolean; roofX?: number; lamps?: Lamps; plateRy?: number; objectNormals?: boolean } = {}): ImportedFleetAsset => ({
   full: `${import.meta.env.BASE_URL}models/${name}.glb`,
   lite: `${import.meta.env.BASE_URL}models/${name}-lite.glb`,
   ...o,
@@ -40,7 +40,7 @@ const asset = (name: string, o: { wheels?: WheelFit; length?: number; flip?: boo
 
 /** The three Meshy cars selected for the new homepage. Their baked paint and surface detail are preserved. */
 export const IMPORTED_FLEET: Partial<Record<keyof typeof CAR_SPECS, ImportedFleetAsset>> = {
-  corolla: asset('dk-meshy-white-concept', { wheels: { pos: [1.55, .407, .406], neg: [-1.588, .407, .408], zIn: .776 },  length: 4.6, roofX: .09, objectNormals: true, ownWheels: true, lamps: { front: [-2.095, .656, .762, .17, .06, .155], rear: [2.26, .76, .46, .12, .04, .44] } }),   // the white car: a long low grand tourer (Meshy, supplied by the owner, rebuilt as a light model with its paint baked in). Nose points to -x; its headlights are thin slits and the tail light is one red bar across the back
+  corolla: asset('dk-meshy-white-concept', { wheels: { pos: [1.55, .407, .406], neg: [-1.588, .407, .408], zIn: .776 },  length: 4.6, roofX: .09, objectNormals: true, lamps: { front: [-2.095, .656, .762, .17, .06, .155], rear: [2.26, .76, .46, .12, .04, .44] } }),   // the white car: a long low grand tourer (Meshy, supplied by the owner, rebuilt as a light model with its paint baked in). Nose points to -x; its headlights are thin slits and the tail light is one red bar across the back
   elantra: asset('dk-meshy-red-sport', { wheels: { pos: [1.33, .38, .38], neg: [-1.49, .34, .34] },  lamps: { front: [2.1, .66, .7, .26, .13, .22], rear: [-2.12, .8, .66, .26, .12, .24] } }),
   // the other three spots: Matra Laser 1971, orange sports car, red roadster (all Meshy, CC0 models supplied by the owner)
   civic: asset('dk-meshy-green2-sport', { wheels: { pos: [1.394, .377, .375], neg: [-1.349, .37, .375] },  length: 4.5, lamps: { front: [1.89, .58, .643, .2, .12, .2], rear: [-2.0, .73, .54, .184, .064, .22] } }),   // the second green sports car (supplied by the owner) in row A's east stall, where the Matra stood: the model faces +x like the other green one
@@ -421,15 +421,14 @@ function LoadedImported({ files, plate, position, rotationY, lite, signal, wheel
   const xf = useMemo(() => { const p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3(); P.M.decompose(p, q, sc); return { p: p.multiplyScalar(fit), q, sc: sc.multiplyScalar(fit) }; }, [P, fit]);
   const lampU = useMemo(() => (signal && files.lamps ? makeLampUniforms(files.lamps, new THREE.Matrix4().compose(xf.p, xf.q, xf.sc)) : null), [signal, files.lamps, xf]);
   const cut = useRef<WheelSplit | null>(null);
-  const own = useRef<{ mesh: THREE.Mesh; hub: THREE.Vector3 }[]>([]);
   const root = useMemo(() => {
     const r = scene.clone(true);
-    const polish = (source: THREE.Material, wheel = false) => {
+    const polish = (source: THREE.Material) => {
       const material = source.clone();
       if (material instanceof THREE.MeshStandardMaterial) {
         material.envMapIntensity = lite ? .75 : 1.05;
         if (files.objectNormals && material.normalMap) material.normalMapType = THREE.ObjectSpaceNormalMap;   // this car's normal map is baked in the model's own space (one smooth surface drawn on a light mesh)
-        if (lampU && !wheel) lampShader(material, lampU);
+        if (lampU) lampShader(material, lampU);
         material.needsUpdate = true;
       }
       return material;
@@ -437,20 +436,13 @@ function LoadedImported({ files, plate, position, rotationY, lite, signal, wheel
     r.traverse(o => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
-      const isWheel = !!files.ownWheels && m.name.startsWith('wheel_');
-      m.material = Array.isArray(m.material) ? m.material.map(x => polish(x, isWheel)) : polish(m.material, isWheel);
+      m.material = Array.isArray(m.material) ? m.material.map(polish) : polish(m.material);
       m.castShadow = !lite;
       m.receiveShadow = !lite;
     });
     // wheels (wheelsplit.ts): the file's own wheels are cut out of the body (it is one fused mesh) and drawn again as clean black tyres built in code, see `rig` below. If the cut is not clean, the car stays exactly as the file has it.
-    cut.current = null; own.current = [];
-    if (files.ownWheels) {
-      // the file's own wheels (separate nodes, each centred on its hub): lifted out of the body so the rig below can steer and roll them, exactly as drawn in the model
-      r.updateMatrixWorld(true);
-      const found: THREE.Mesh[] = []; r.traverse(o => { if ((o as THREE.Mesh).isMesh && o.name.startsWith('wheel_')) found.push(o as THREE.Mesh); });
-      for (const w of found) { const h = w.userData.hub as number[] | undefined; own.current.push({ mesh: w, hub: h && h.length === 3 ? new THREE.Vector3(h[0], h[1], h[2]) : new THREE.Vector3().setFromMatrixPosition(w.matrixWorld) }); w.parent?.remove(w); }   // the node's own transform also carries the model's compression, so the hub is stored beside it (extras)
-      if (own.current.length !== 4) { for (const o of own.current) r.add(o.mesh); own.current = []; }   // not four wheels: leave the car as the file has it
-    } else if (files.wheels) {
+    cut.current = null;
+    if (files.wheels) {
       let mesh: THREE.Mesh | null = null; r.traverse(o => { if (!mesh && (o as THREE.Mesh).isMesh) mesh = o as THREE.Mesh; });
       const src = mesh as THREE.Mesh | null;
       if (src && src.geometry.index && !Array.isArray(src.material)) {
@@ -470,17 +462,6 @@ function LoadedImported({ files, plate, position, rotationY, lite, signal, wheel
   // the four clean wheels, in car space: a pivot at each wheel centre that steers (front pair), holding the wheel that rolls
   const rig = useMemo(() => {
     const sp = cut.current, out = { group: new THREE.Group(), w: [] as { pivot: THREE.Group; spin: THREE.Group; front: boolean; r: number }[] };
-    if (own.current.length && files.wheels) {
-      for (const o of own.current) {
-        const hub = o.hub.clone().applyMatrix4(P.M).multiplyScalar(fit), posAxle = hub.x > 0, rr = (posAxle ? files.wheels.pos : files.wheels.neg)[2];
-        const pivot = new THREE.Group(), spin = new THREE.Group(); pivot.position.copy(hub);
-        o.mesh.position.sub(o.hub);   // what is left is the compression's own offset: the wheel now sits centred on its hub
-        const holder = new THREE.Group(); holder.quaternion.copy(xf.q); holder.scale.copy(xf.sc); holder.add(o.mesh);
-        spin.add(holder); pivot.add(spin); out.group.add(pivot);
-        out.w.push({ pivot, spin, front: posAxle === (nz > 0), r: rr * fit });
-      }
-      return out;
-    }
     if (!sp || !files.wheels) return out;
     for (const part of sp.wheels) {
       const [cx, cy, cr] = part.posAxle ? files.wheels.pos : files.wheels.neg;
