@@ -11,6 +11,7 @@ import { SteeringLive, SteeringCaption } from "@/components/nuhome2/SteeringLive
 import { WeatherAdmin } from "@/components/nuhome2/WeatherAdmin";
 import { RecenterButton } from "@/components/nuhome2/RecenterButton";
 import { ParkingSign } from "@/components/nuhome2/ParkingSign";
+import { PortalSign } from "@/components/nuhome2/PortalSign";
 import wheelUrl from "@/assets/dk-steering-wheel.webp";
 import { Journey } from "@/components/nuhome2/journey/Journey";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -208,6 +209,7 @@ export default function NuHome2() {
         <ExitSign />
         <SteeringCaption />
         <ParkingSign />
+        <PortalSign />
         <WeatherAdmin />
         <RecenterButton />
 
