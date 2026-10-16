@@ -22,6 +22,13 @@
       "when": 1789696723734,
       "tag": "0002_allow_authors_delete_own_report_card_ratings",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792109563262,
+      "tag": "0003_account_family_merge",
+      "breakpoints": true
     }
   ]
 }
