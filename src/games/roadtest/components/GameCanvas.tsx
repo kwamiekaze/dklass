@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Phaser from 'phaser';
 import { DrivingScene, GAME_W, GAME_H } from '../game/DrivingScene';
 import { GAME_EVENTS, type Difficulty, type LevelResult } from '../game/types';
@@ -8,6 +8,10 @@ import { TouchControls } from './TouchControls';
 import { FeedbackModal } from './FeedbackModal';
 import { Game3D } from '../g3d/Game3D';
 import { useGameScene, type SceneHandle } from '../g3d/GameScene';
+
+const AtlPlay = lazy(() => import('../atl/Play'));
+/** What the page needs from a run, whichever mode it is: pause it and end it early. */
+type RunHandle = { sim: { finished: boolean; endEarly: () => void }; paused: { current: boolean } };
 
 /** The 3D game needs WebGL. Anything that cannot give it (or a visitor who adds ?engine=2d) plays the original 2D game instead. */
 function canUse3D(): boolean {
@@ -46,8 +50,8 @@ export function GameCanvas({ levelId, difficulty, onComplete, onQuit }: Props) {
   const [showToast, setShowToast] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [use3d, setUse3d] = useState(canUse3D);
-  const handle3d = useRef<SceneHandle | null>(null);
-  const setHandle = useCallback((h: SceneHandle) => { handle3d.current = h; }, []);
+  const handle3d = useRef<RunHandle | null>(null);
+  const setHandle = useCallback((h: RunHandle) => { handle3d.current = h; }, []);
   const goFlat = useCallback(() => { handle3d.current = null; setUse3d(false); }, []);
 
   // Show a one-time "sound on" toast on the very first run per device.
@@ -186,7 +190,7 @@ export function GameCanvas({ levelId, difficulty, onComplete, onQuit }: Props) {
         >
           ← Quit lesson
         </button>
-        <span className="game-topbar-hint">↑ gas · ↓ brake · ←→ steer</span>
+        <span className="game-topbar-hint">{levelId.startsWith('atl-') ? '↑ gas · ↓ brake · ←→ steer · Q/E signal' : '↑ gas · ↓ brake · ←→ steer'}</span>
         <button
           className="dk-btn dk-btn-gold-outline dk-btn-small"
           onClick={() => setShowFeedback(true)}
@@ -197,7 +201,11 @@ export function GameCanvas({ levelId, difficulty, onComplete, onQuit }: Props) {
       </div>
       {use3d
         ? <div className="game-host rt3d-host">
-            <Play3D levelId={levelId} difficulty={difficulty} onHandle={setHandle} onComplete={(r) => onCompleteRef.current(r)} onLost={goFlat} />
+            {levelId.startsWith('atl-')
+              ? <Suspense fallback={<div className="rt3d-loading"><div className="rt3d-spin" /><h3>Atlanta</h3><p>Loading the interstate…</p></div>}>
+                  <AtlPlay levelId={levelId} difficulty={difficulty} onHandle={setHandle} onComplete={(r) => onCompleteRef.current(r)} onLost={goFlat} />
+                </Suspense>
+              : <Play3D levelId={levelId} difficulty={difficulty} onHandle={setHandle} onComplete={(r) => onCompleteRef.current(r)} onLost={goFlat} />}
           </div>
         : <div ref={hostRef} className="game-host" />}
       <TouchControls />

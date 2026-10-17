@@ -1,0 +1,43 @@
+/* The Atlanta mode's own HUD extras. Scoped to .atl-root so nothing here can reach the homepage or the other lessons. */
+.atl-hud { position: absolute; inset: 0; pointer-events: none; z-index: 6; font-family: var(--display, 'Bebas Neue', Impact, sans-serif); color: #fff; }
+.atl-road { position: absolute; left: 10px; top: 112px; display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 8px; border-radius: 99px; background: #00694a; border: 2px solid #fff; box-shadow: 0 6px 16px rgba(0,0,0,.4); font-size: 16px; letter-spacing: 1.5px; }
+.atl-road i { font-style: normal; font-size: 16px; line-height: 1; }
+.atl-road em { font-style: normal; font-size: 12px; letter-spacing: 1px; opacity: .85; padding-left: 8px; border-left: 1px solid rgba(255,255,255,.5); }
+.atl-sig { position: absolute; inset: 0; }
+.atl-sig .atl-sig-l { position: absolute; left: 12px; bottom: 206px; } .atl-sig .atl-sig-r { position: absolute; right: 12px; bottom: 206px; }
+.atl-sig .atl-gap { position: absolute; left: 10px; top: 150px; }
+.atl-sig button { pointer-events: auto; width: 54px; height: 54px; border-radius: 50%; border: 2px solid rgba(242,193,78,.55); background: rgba(16,16,20,.62); color: #ffe08a; font-size: 22px; line-height: 1; box-shadow: 0 6px 16px rgba(0,0,0,.4); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); touch-action: manipulation; }
+.atl-sig button.armed { border-color: #29e069; color: #29e069; }
+.atl-sig button.on { background: #29e069; color: #06210f; box-shadow: 0 0 22px rgba(41,224,105,.9); }
+.atl-gap { min-width: 74px; padding: 5px 10px; border-radius: 12px; background: rgba(16,16,20,.62); border: 1px solid rgba(255,255,255,.3); text-align: center; line-height: .95; transition: opacity .2s, border-color .2s; }
+.atl-gap small { display: block; font-size: 11px; letter-spacing: 2px; opacity: .8; }
+.atl-gap b { font-size: 24px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.atl-gap[data-s="good"] { border-color: #29e069; color: #b6ffcf; } .atl-gap[data-s="warn"] { border-color: #ffc21a; color: #ffe08a; } .atl-gap[data-s="bad"] { border-color: #ff5a4e; color: #ff9d94; animation: atl-pulse .35s ease-in-out infinite alternate; }
+@keyframes atl-pulse { to { box-shadow: 0 0 14px rgba(255,90,78,.9); } }
+.atl-prompt { position: absolute; left: 50%; transform: translateX(-50%) translateY(10px); bottom: 232px; max-width: min(92%, 560px); padding: 8px 16px; border-radius: 12px; background: rgba(0,50,36,.88); border: 1px solid rgba(255,255,255,.75); font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.3; letter-spacing: 0; text-align: center; opacity: 0; transition: opacity .35s, transform .35s; }
+.atl-prompt.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.atl-loading { background: radial-gradient(circle at 50% 38%, #12254a, #070b18 72%); }
+.atl-loading h3 { color: #f2c14e; }
+.atl-load-wx { font-weight: 600; letter-spacing: .5px; }
+.atl-load-tip { max-width: 420px; text-align: center; padding: 8px 18px; border-radius: 12px; background: rgba(0,105,74,.35); border: 1px solid rgba(255,255,255,.35); line-height: 1.35; }
+@media (max-width: 700px) { .atl-sig .atl-sig-l, .atl-sig .atl-sig-r { bottom: 196px; } .atl-prompt { bottom: 250px; font-size: 13px; } .atl-road { top: 108px; font-size: 14px; } }
+
+/* ---- the Atlanta Drive section of the menu ---- */
+.atl-menu { margin: 14px 0 18px; padding: 14px; border-radius: 18px; background: linear-gradient(160deg, #0b1d3f, #08122a); border: 1px solid rgba(242,193,78,.45); box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.atl-menu-hero { display: flex; gap: 14px; align-items: center; margin-bottom: 8px; }
+.atl-menu-hero h2 { margin: 0 0 2px; font-family: var(--display, 'Bebas Neue', Impact, sans-serif); font-weight: 400; font-size: 30px; letter-spacing: 2px; color: #f2c14e; }
+.atl-menu-hero p { margin: 0; font-size: 13px; line-height: 1.4; color: #e8ecf5; opacity: .92; }
+.atl-menu-badge { flex: none; width: 62px; height: 70px; border-radius: 10px 10px 30px 30px; background: linear-gradient(180deg, #c8102e 0 26%, #0a3f95 26% 100%); border: 3px solid #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; font-family: Arial Black, Arial, sans-serif; line-height: 1; }
+.atl-menu-badge b { font-size: 12px; margin-top: -2px; } .atl-menu-badge i { font-style: normal; font-size: 18px; margin-top: 4px; }
+.atl-group { margin-top: 12px; }
+.atl-group h3 { margin: 0 0 6px; font-family: var(--display, 'Bebas Neue', Impact, sans-serif); font-weight: 400; font-size: 17px; letter-spacing: 1.5px; color: #fff; display: flex; align-items: baseline; gap: 10px; }
+.atl-group h3 small { font-family: Inter, system-ui, sans-serif; font-size: 11px; letter-spacing: 0; color: #f2c14e; opacity: .9; }
+.atl-card { display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 8px; padding: 10px 12px; text-align: left; cursor: pointer; border-radius: 12px; background: #00694a; color: #fff; border: 3px solid #fff; box-shadow: inset 0 0 0 2px #00694a, 0 6px 14px rgba(0,0,0,.35); transition: transform .12s, filter .12s; }
+.atl-card:hover { transform: translateY(-1px); filter: brightness(1.08); } .atl-card:active { transform: scale(.99); }
+.atl-lim { flex: none; display: flex; flex-direction: column; align-items: center; line-height: .95; padding: 3px 8px 4px; border-radius: 6px; background: #fff; color: #111; border: 2px solid #111; font-family: Arial Narrow, Arial, sans-serif; }
+.atl-lim small { font-size: 8px; font-weight: 700; letter-spacing: 1px; } .atl-lim b { font-size: 22px; font-weight: 800; }
+.atl-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.atl-info strong { font-size: 15px; font-weight: 700; }
+.atl-info small { font-size: 12px; opacity: .88; }
+.atl-info em { font-style: normal; font-size: 11px; letter-spacing: 1px; color: #ffe08a; font-weight: 600; }
+.atl-best { flex: none; font-size: 12px; font-weight: 700; color: #ffe08a; }

@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { FleetCar, fleetFiles, type CarSignal, type WheelState } from '../../../components/nuhome2/world/Fleet';
 import { NightCtx } from '../../../components/nuhome2/world/theme';
 import type { CastId } from '../../../components/nuhome2/world/cast';
-import { atmo } from '../../../components/nuhome2/world/atmosphere';
+import { atmo } from './atmo';
 import { MPH_TO_MPS, type RunSim } from './sim';
 import { GARAGE, type GarageId } from './garage';
 import { glowTexture } from './textures';

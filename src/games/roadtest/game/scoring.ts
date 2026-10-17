@@ -9,6 +9,13 @@ export const POINTS = {
   STAR: 25,
   NEAR_MISS: 15,
   PED_SAFE_PASS: 40,
+  SIGNALLED: 12,
+  SAFE_GAP: 20,
+  MOVE_OVER: 120,
+  RAIL_STOP: 140,
+  CIRCLE_YIELD: 100,
+  KEEP_RIGHT: 10,
+  WORK_ZONE_OK: 80,
 
   HIT_CONE: -50,
   LANE_CROSS: -30,
@@ -17,6 +24,13 @@ export const POINTS = {
   RAN_RED_LIGHT: -120,
   HIT_PARKED_CAR: -100,
   HIT_TRAFFIC: -150,
+  NO_SIGNAL: -15,
+  TAILGATE: -25,
+  HOV_SOLO: -60,
+  NO_MOVE_OVER: -80,
+  RAN_RAIL: -250,
+  CIRCLE_CUTOFF: -100,
+  BLOCK_PASSING: -15,
   HIT_PEDESTRIAN: 0, // catastrophic — ends run but preserves earned score
 } as const;
 
@@ -37,12 +51,26 @@ const LABELS: Record<string, string> = {
   HIT_PARKED_CAR: 'Hit a parked car',
   HIT_TRAFFIC: 'Collided with traffic',
   HIT_PEDESTRIAN: '🛑 HIT A PEDESTRIAN — run ended',
+  SIGNALLED: 'Signalled before changing lanes',
+  SAFE_GAP: 'Kept a safe following gap',
+  MOVE_OVER: 'Moved over for emergency vehicles',
+  RAIL_STOP: 'Stopped for the railroad crossing',
+  CIRCLE_YIELD: 'Yielded in the traffic circle',
+  KEEP_RIGHT: 'Kept right except to pass',
+  WORK_ZONE_OK: 'Slow and steady through the work zone',
+  NO_SIGNAL: 'Changed lanes without signalling',
+  TAILGATE: 'Tailgating',
+  HOV_SOLO: 'Solo driver in the HOV lane',
+  NO_MOVE_OVER: 'Did not move over or slow down',
+  RAN_RAIL: 'Crossed with the gates down',
+  CIRCLE_CUTOFF: 'Cut off traffic in the circle',
+  BLOCK_PASSING: 'Cruised in the passing lane',
 };
 
 export type PointKey = keyof typeof POINTS;
 
 /** Positive events that build the combo meter. */
-const POSITIVE_COMBO: PointKey[] = ['STAR', 'CHECKPOINT', 'FULL_STOP', 'GREEN_LIGHT', 'SMOOTH_DRIVING', 'NEAR_MISS', 'PED_SAFE_PASS'];
+const POSITIVE_COMBO: PointKey[] = ['SIGNALLED', 'SAFE_GAP', 'MOVE_OVER', 'RAIL_STOP', 'CIRCLE_YIELD', 'WORK_ZONE_OK', 'STAR', 'CHECKPOINT', 'FULL_STOP', 'GREEN_LIGHT', 'SMOOTH_DRIVING', 'NEAR_MISS', 'PED_SAFE_PASS'];
 
 export class ScoreTracker {
   private counts = new Map<PointKey, number>();

@@ -2,7 +2,7 @@
  * What each lesson looks like in 3D. The art direction is the homepage's: warm cream light, gold accents, black and ivory
  * buildings, the same sun, sky, clouds, rain and snow. A lesson picks a place (kind), a time of day and a weather.
  */
-import type { WeatherKind } from '../../../components/nuhome2/world/atmosphere';
+import type { WeatherKind } from './atmo';
 
 export type Place = 'suburb' | 'city' | 'lot' | 'highway' | 'works' | 'plaza' | 'alley' | 'country' | 'school' | 'neon';
 export type TimeOfDay = 'day' | 'golden' | 'dusk' | 'night';

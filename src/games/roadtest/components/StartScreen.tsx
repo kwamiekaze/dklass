@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { LEVELS } from '../game/levels';
+import { ATL_STAGES } from '../atl/stages';
+import '../atl/atl.css';
 import { DIFFICULTIES, type Difficulty } from '../game/types';
 import { sound } from '../sound';
 import { InstallTutorial, shouldAutoShowInstallTutorial } from './InstallTutorial';
@@ -87,7 +89,12 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
 
   const clickTick = () => { sound.init(); sound.uiTick(); };
   const endless = LEVELS.find((l) => l.endless);
-  const lessons = LEVELS.filter((l) => !l.endless);
+  const lessons = LEVELS.filter((l) => !l.endless && !l.id.startsWith('atl-'));
+  const atlGroups = [
+    { title: 'Interstates and freeways', note: 'Speed limit 70', items: ATL_STAGES.filter((x) => x.road === 'interstate') },
+    { title: 'Carrollton and west Georgia', note: '30117 and neighbors', items: ATL_STAGES.filter((x) => x.road !== 'interstate' && ['carrollton', 'rural', 'villarica', 'douglasville'].includes(x.region)) },
+    { title: 'Metro Atlanta streets', note: 'Lights, rail and circles', items: ATL_STAGES.filter((x) => x.road !== 'interstate' && !['carrollton', 'rural', 'villarica', 'douglasville'].includes(x.region)) },
+  ];
   const startLevel = (id: string) => { clickTick(); onStart(id); };
 
   const goHome = async () => {
@@ -180,6 +187,32 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
           </span>
         </button>
       )}
+
+      <section className="atl-menu" aria-label="Atlanta Drive">
+        <div className="atl-menu-hero">
+          <div className="atl-menu-badge" aria-hidden="true"><b>I</b><i>75 85</i></div>
+          <div>
+            <h2>Atlanta Drive</h2>
+            <p>The real roads of Georgia: the Downtown Connector, I-285, I-20, Carrollton 30117 and the streets around Metro Atlanta. Learn to signal, merge, keep your distance and cross the tracks the right way.</p>
+          </div>
+        </div>
+        {atlGroups.map((g) => (
+          <div className="atl-group" key={g.title}>
+            <h3>{g.title}<small>{g.note}</small></h3>
+            {g.items.map((st) => (
+              <button key={st.id} className="atl-card" onClick={() => startLevel(st.id)}>
+                <span className="atl-lim"><small>LIMIT</small><b>{st.limit}</b></span>
+                <span className="atl-info">
+                  <strong>{st.name}</strong>
+                  <small>{st.subtitle}</small>
+                  <em>{st.roadName}</em>
+                </span>
+                <span className="atl-best">{bestScores[st.id] ? `Best ${bestScores[st.id]}` : 'Drive →'}</span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </section>
 
       <section className="level-list" aria-label="Choose a lesson">
         {lessons.map((lvl, i) => (

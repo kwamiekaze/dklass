@@ -1,6 +1,7 @@
 import type { LevelConfig } from './types';
+import { atlLevels } from '../atl/stages';
 
-export const LEVELS: LevelConfig[] = [
+const BASE_LEVELS: LevelConfig[] = [
   { id: 'endless', name: 'Rush Hour Endless', subtitle: 'How far can you go? Three car crashes and you\'re out', length: 999999, speedLimit: 45, maxSpeed: 65, features: ['cone', 'stopSign', 'trafficLight', 'parkedCar', 'traffic', 'star'], obstacleGap: 260, parScore: 2000, shoulderColor: 0x2c3a44, endless: true },
   { id: 'parking-lot', name: 'Parking Lot Practice', subtitle: 'Lesson 1 · Slow and steady around the cones', length: 6000, speedLimit: 25, maxSpeed: 40, features: ['cone', 'checkpoint', 'stopSign', 'star'], obstacleGap: 400, parScore: 650, shoulderColor: 0x4a4a50 },
   { id: 'neighborhood', name: 'Neighborhood Drive', subtitle: 'Lesson 2 · Stop signs and parked cars', length: 8000, speedLimit: 35, maxSpeed: 55, features: ['cone', 'stopSign', 'parkedCar', 'checkpoint', 'star'], obstacleGap: 350, parScore: 900, shoulderColor: 0x3c5a34 },
@@ -29,6 +30,9 @@ export const LEVELS: LevelConfig[] = [
   { id: 'precision-parking-final', name: 'Precision Parking Final', subtitle: 'Lesson 23 · Cone slaloms, checkpoint precision', length: 10500, speedLimit: 25, maxSpeed: 40, features: ['cone', 'cone', 'checkpoint', 'star', 'parkedCar'], obstacleGap: 180, parScore: 1500, shoulderColor: 0x4a4a50, isNew: true },
   { id: 'everything-at-once', name: 'Everything At Once Mastery', subtitle: 'Lesson 24 · The ultimate combined stage — five-star drivers only', length: 14000, speedLimit: 40, maxSpeed: 65, features: ['cone', 'stopSign', 'trafficLight', 'parkedCar', 'traffic', 'checkpoint', 'star'], obstacleGap: 220, parScore: 1900, shoulderColor: 0x2c3a44, nightAlpha: 0.20, weatherTint: { color: 0x3a5878, alpha: 0.14 }, pedDensityMul: 1.6, dogDensityMul: 1.4, isNew: true }
 ];
+
+/** The original lessons first, then the Atlanta stages (their rules live in ../atl). */
+export const LEVELS: LevelConfig[] = [...BASE_LEVELS, ...atlLevels()];
 
 export function getLevel(id: string): LevelConfig {
   return LEVELS.find((l) => l.id === id) ?? LEVELS[1];

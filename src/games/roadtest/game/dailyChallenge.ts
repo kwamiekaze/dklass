@@ -48,7 +48,7 @@ export function getDailyChallenge(day = todayKey()): DailyChallenge {
   const seed = hashStr('dk-daily-' + day);
   const rng = seededRng(seed);
   // Exclude the endless level for daily challenge (needs a bounded run).
-  const pool = LEVELS.filter((l) => !l.endless);
+  const pool = LEVELS.filter((l) => !l.endless && !l.id.startsWith('atl-'));
   const level = pool[Math.floor(rng() * pool.length)];
   const diff = DIFFICULTIES[Math.floor(rng() * DIFFICULTIES.length)];
   const flavor = FLAVORS[Math.floor(rng() * FLAVORS.length)];

@@ -2,10 +2,10 @@ import { Suspense, useContext, useEffect, useLayoutEffect, useMemo, useRef } fro
 import { useFrame, useThree } from '@react-three/fiber';
 import { Environment, Lightformer } from '@react-three/drei';
 import * as THREE from 'three';
-import { Clouds, Moon, ShootingStars, SkyDome, Stars, Sun } from '../../../components/nuhome2/world/Sky';
-import { Weather } from '../../../components/nuhome2/world/Weather';
+import { Clouds, Moon, ShootingStars, SkyDome, Stars, Sun } from './sky';
+import { Weather } from './weather';
 import { NightCtx } from '../../../components/nuhome2/world/theme';
-import { apply as applyAtmo, atmo, tickAtmo } from '../../../components/nuhome2/world/atmosphere';
+import { apply as applyAtmo, atmo, tickAtmo } from './atmo';
 import type { Quality } from '../../../components/nuhome2/world/quality';
 import { ROAD_HALF, type RunSim } from './sim';
 import { Bloom } from './Bloom';
@@ -370,11 +370,11 @@ function Backdrop({ theme }: { theme: Theme }) {
 export function World({ sim, theme, quality, bloom = false }: { sim: RunSim; theme: Theme; quality: Quality; bloom?: boolean }) {
   const mix = useRef(TOD_MIX[theme.tod]);
   const lite = quality.lite;
-  // pin the homepage's weather store to this lesson (and give the homepage its own back afterwards)
+  // pin the game's own weather store to this lesson (the homepage's store is never touched)
   useLayoutEffect(() => {
     atmo.debug = true; atmo.preview = { weather: theme.weather, night: 'normal' }; applyAtmo();
     atmo.look = { ...atmo.goal }; atmo.deep = atmo.deepGoal;
-    return () => { atmo.debug = false; atmo.preview = { weather: 'live', night: 'live' }; applyAtmo(); };
+    return () => { atmo.debug = false; atmo.preview = { weather: 'clear', night: 'normal' }; applyAtmo(); };
   }, [theme.weather]);
   return <NightCtx.Provider value={mix}>
     <Atmosphere theme={theme} mix={mix} shadow={quality.shadow} sim={sim} />

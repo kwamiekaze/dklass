@@ -10,7 +10,7 @@ import { sound } from '../sound';
 import { MPH_TO_MPS, RunSim, type Controls, type Sfx, type SimEvent } from './sim';
 import { themeFor } from './themes';
 import { FRONTS, FRONT_BANNER, loadConditions, resolveConditions, type Resolved } from './conditions';
-import { apply as applyAtmo, atmo } from '../../../components/nuhome2/world/atmosphere';
+import { apply as applyAtmo, atmo } from './atmo';
 import { World } from './World';
 import { Actors, Player } from './Actors';
 import { SkidMarks, Sparks, SpeedLines, fx } from './Fx';
