@@ -389,7 +389,7 @@ export function World({ sim, theme, quality, bloom = false }: { sim: RunSim; the
     <Ground theme={theme} sim={sim} />
     <Road theme={theme} sim={sim} />
     <Suspense fallback={null}><Town sim={sim} theme={theme} quality={quality} /></Suspense>
-    <Weather lite={lite} offline />
+    <Weather lite={lite} />
     {bloom && <Bloom sim={sim} mix={mix} />}
   </NightCtx.Provider>;
 }

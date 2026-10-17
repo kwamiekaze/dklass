@@ -180,10 +180,19 @@ function TrafficCar({ spec, index, slots }: { spec: CastId; index: number; slots
     g.current!.visible = false;
     return () => { delete slots.current[index]; };
   }, [index, slots, spec]);
+  // Traffic cars do not wear the gold roof sign (that is the player's): find the sign once the car has loaded and hide it. The homepage's own car code is untouched.
+  const stripped = useRef(false), tick = useRef(0);
+  useFrame(() => {
+    if (stripped.current || !g.current || ++tick.current % 15) return;
+    g.current.traverse((o) => {
+      const m = o as THREE.Mesh, p = (m.geometry as THREE.CylinderGeometry | undefined)?.parameters;
+      if (m.isMesh && p && Math.abs((p.radiusTop ?? 0) - 0.085) < 1e-6 && m.parent?.parent && m.parent.parent !== g.current) { m.parent.parent.visible = false; stripped.current = true; }
+    });
+  });
   return <group ref={g} visible={false}>
     <group rotation-y={Math.PI / 2}>
       <Suspense fallback={null}>
-        <FleetCar specId={spec} color={SWATCH[spec] ?? '#888'} plate={PLATE[spec] ?? ''} position={[0, 0, 0]} lite topper={false} wheels={wheels} />
+        <FleetCar specId={spec} color={SWATCH[spec] ?? '#888'} plate={PLATE[spec] ?? ''} position={[0, 0, 0]} lite wheels={wheels} />
       </Suspense>
     </group>
   </group>;

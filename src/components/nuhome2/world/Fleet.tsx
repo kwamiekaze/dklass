@@ -413,7 +413,7 @@ function LampHalos({ lamps, u, signal, lite }: { lamps: Lamps; u: LampUniforms; 
 }
 
 /** A selected Meshy car with its original identity, finish and baked PBR detail intact. */
-function LoadedImported({ files, plate, position, rotationY, lite, signal, wheels, topper = true }: { topper?: boolean; files: ImportedFleetAsset; plate?: string; position: [number, number, number]; rotationY: number; lite: boolean; signal?: { current: CarSignal }; wheels?: { current: WheelState } }) {
+function LoadedImported({ files, plate, position, rotationY, lite, signal, wheels }: { files: ImportedFleetAsset; plate?: string; position: [number, number, number]; rotationY: number; lite: boolean; signal?: { current: CarSignal }; wheels?: { current: WheelState } }) {
   const url = lite ? files.lite : files.full;
   const { scene } = useGLTF(url);
   const P = useMemo(() => { let p = prepared.get(url); if (!p) { p = prepare(scene.clone(true)); prepared.set(url, p); } return p; }, [scene, url]);
@@ -496,7 +496,7 @@ function LoadedImported({ files, plate, position, rotationY, lite, signal, wheel
         <mesh position={[pf.x + nz * .012, pf.y, 0]} rotation-y={nz > 0 ? Math.PI / 2 : -Math.PI / 2} material={plateMat}><planeGeometry args={[.3, .15]} /></mesh>
         <mesh position={[pr.x - nz * .012, pr.y, 0]} rotation-y={nz > 0 ? -Math.PI / 2 : Math.PI / 2} material={plateMat}><planeGeometry args={[.3, .15]} /></mesh>
       </>}
-      {topper && <Topper position={[rf.x + (files.roofX ?? 0) * P.L * fit, rf.y - .012, 0]} />}
+      <Topper position={[rf.x + (files.roofX ?? 0) * P.L * fit, rf.y - .012, 0]} />
       {sig && (lampU && files.lamps ? <LampHalos lamps={files.lamps} u={lampU} signal={sig} lite={lite} /> : <Blinkers L={P.L * fit} W={P.W * fit} H={P.H * fit} signal={sig} />)}
       </group>
     </group>
@@ -510,7 +510,7 @@ class Fallback extends Component<{ fallback: ReactNode; children: ReactNode }, {
 }
 
 /** One fleet car: three selected Meshy cars plus two house sedans, all with automatic mobile variants and fallbacks. */
-export function FleetCar({ color, plate, specId, position, rotationY = 0, lite = false, signal, wheels, topper = true }: { topper?: boolean; color: string; plate: string; specId: keyof typeof CAR_SPECS; position: [number, number, number]; rotationY?: number; lite?: boolean; signal?: { current: CarSignal }; wheels?: { current: WheelState } }) {
+export function FleetCar({ color, plate, specId, position, rotationY = 0, lite = false, signal, wheels }: { color: string; plate: string; specId: keyof typeof CAR_SPECS; position: [number, number, number]; rotationY?: number; lite?: boolean; signal?: { current: CarSignal }; wheels?: { current: WheelState } }) {
   const spec = useMemo(() => ({ ...CAR_SPECS[specId]!, color }), [specId, color]);
   const fallback = <Car spec={spec} position={position} rotationY={rotationY} />;
   // while the file loads the spot stays empty for a moment, so the boxy stand-in never flashes up first
@@ -518,5 +518,5 @@ export function FleetCar({ color, plate, specId, position, rotationY = 0, lite =
   // textured first; if its file is not in the build the painted sedan stays, so the lot is never empty
   const house = useTexturedFleet() ? <Fallback fallback={standard}><Suspense fallback={null}><LoadedTex color={color} plate={plate} position={position} rotationY={rotationY} lite={lite} /></Suspense></Fallback> : standard;
   const imported = IMPORTED_FLEET[specId];
-  return imported ? <Fallback fallback={house}><Suspense fallback={null}><LoadedImported files={imported} plate={['civic', 'camry', 'sentra', 'hero'].includes(specId) ? plate : undefined} position={position} rotationY={rotationY} lite={lite} signal={signal} wheels={wheels} topper={topper} /></Suspense></Fallback> : house;
+  return imported ? <Fallback fallback={house}><Suspense fallback={null}><LoadedImported files={imported} plate={['civic', 'camry', 'sentra', 'hero'].includes(specId) ? plate : undefined} position={position} rotationY={rotationY} lite={lite} signal={signal} wheels={wheels} /></Suspense></Fallback> : house;
 }
