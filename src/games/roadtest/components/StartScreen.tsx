@@ -9,6 +9,7 @@ import { FeedbackModal } from './FeedbackModal';
 import { DailyChallengeCard } from './DailyChallengeCard';
 import { RankBar } from './RankBar';
 import { MissionsPanel } from './MissionsPanel';
+import { GaragePicker } from './GaragePicker';
 
 interface Props {
   bestScores: Record<string, number>;
@@ -163,6 +164,8 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
           </button>
         ))}
       </section>
+
+      <GaragePicker />
 
       {endless && (
         <button className="level-card endless" onClick={() => startLevel(endless.id)}>

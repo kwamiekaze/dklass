@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Phaser from 'phaser';
 import { DrivingScene, GAME_W, GAME_H } from '../game/DrivingScene';
 import { GAME_EVENTS, type Difficulty, type LevelResult } from '../game/types';
@@ -6,6 +6,24 @@ import { resetTouchControls } from '../game/controls';
 import { sound } from '../sound';
 import { TouchControls } from './TouchControls';
 import { FeedbackModal } from './FeedbackModal';
+import { Game3D } from '../g3d/Game3D';
+import { useGameScene, type SceneHandle } from '../g3d/GameScene';
+
+/** The 3D game needs WebGL. Anything that cannot give it (or a visitor who adds ?engine=2d) plays the original 2D game instead. */
+function canUse3D(): boolean {
+  try {
+    if (new URLSearchParams(window.location.search).get('engine') === '2d') return false;
+    const c = document.createElement('canvas');
+    return !!(c.getContext('webgl2') || c.getContext('webgl'));
+  } catch { return false; }
+}
+
+/** Mounts one 3D run and hands its controls up to the page (pause, finish early). */
+function Play3D({ levelId, difficulty, onHandle, onComplete, onLost }: { levelId: string; difficulty: Difficulty; onHandle: (h: SceneHandle) => void; onComplete: (r: LevelResult) => void; onLost: () => void }) {
+  const handle = useGameScene(levelId, difficulty);
+  useEffect(() => { onHandle(handle); }, [handle, onHandle]);
+  return <Game3D handle={handle} onComplete={onComplete} onLost={onLost} />;
+}
 
 interface Props {
   levelId: string;
@@ -27,6 +45,10 @@ export function GameCanvas({ levelId, difficulty, onComplete, onQuit }: Props) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [use3d, setUse3d] = useState(canUse3D);
+  const handle3d = useRef<SceneHandle | null>(null);
+  const setHandle = useCallback((h: SceneHandle) => { handle3d.current = h; }, []);
+  const goFlat = useCallback(() => { handle3d.current = null; setUse3d(false); }, []);
 
   // Show a one-time "sound on" toast on the very first run per device.
   useEffect(() => {
@@ -72,6 +94,7 @@ export function GameCanvas({ levelId, difficulty, onComplete, onQuit }: Props) {
   }, []);
 
   useEffect(() => {
+    if (use3d) { resetTouchControls(); return () => resetTouchControls(); }
     if (!hostRef.current) return;
     resetTouchControls();
 
@@ -96,11 +119,15 @@ export function GameCanvas({ levelId, difficulty, onComplete, onQuit }: Props) {
       gameRef.current = null;
       resetTouchControls();
     };
-  }, [levelId, difficulty]);
+  }, [levelId, difficulty, use3d]);
 
   // Auto-pause on tab hide (single-player). Countdown 3-2-1 on resume.
   useEffect(() => {
     const onVis = () => {
+      if (handle3d.current) {
+        if (document.visibilityState === 'hidden' && !handle3d.current.sim.finished) { handle3d.current.paused.current = true; resetTouchControls(); setPaused(true); }
+        return;
+      }
       const scene = gameRef.current?.scene.getScene('driving') as Phaser.Scene | undefined;
       if (!scene) return;
       if (document.visibilityState === 'hidden') {
@@ -122,6 +149,7 @@ export function GameCanvas({ levelId, difficulty, onComplete, onQuit }: Props) {
   useEffect(() => {
     if (countdown === null) return;
     if (countdown <= 0) {
+      if (handle3d.current) handle3d.current.paused.current = false;
       const scene = gameRef.current?.scene.getScene('driving') as Phaser.Scene | undefined;
       try { scene?.scene.resume(); } catch { /* ignore */ }
       setPaused(false);
@@ -133,6 +161,12 @@ export function GameCanvas({ levelId, difficulty, onComplete, onQuit }: Props) {
   }, [countdown]);
 
   const saveAndQuit = () => {
+    if (handle3d.current) {
+      setShowQuitPrompt(false);
+      handle3d.current.paused.current = false;
+      handle3d.current.sim.endEarly();
+      return;
+    }
     const scene = gameRef.current?.scene.getScene('driving') as DrivingScene | undefined;
     if (scene?.endEarly) {
       setShowQuitPrompt(false);
@@ -144,11 +178,11 @@ export function GameCanvas({ levelId, difficulty, onComplete, onQuit }: Props) {
   };
 
   return (
-    <div className="game-wrap">
+    <div className={`game-wrap${use3d ? ' rt3d-on' : ''}`}>
       <div className="game-topbar">
         <button
           className="dk-btn dk-btn-ghost dk-btn-small"
-          onClick={() => setShowQuitPrompt(true)}
+          onClick={() => { if (handle3d.current) handle3d.current.paused.current = true; setShowQuitPrompt(true); }}
         >
           ← Quit lesson
         </button>
@@ -161,7 +195,11 @@ export function GameCanvas({ levelId, difficulty, onComplete, onQuit }: Props) {
           ★ Feedback
         </button>
       </div>
-      <div ref={hostRef} className="game-host" />
+      {use3d
+        ? <div className="game-host rt3d-host">
+            <Play3D levelId={levelId} difficulty={difficulty} onHandle={setHandle} onComplete={(r) => onCompleteRef.current(r)} onLost={goFlat} />
+          </div>
+        : <div ref={hostRef} className="game-host" />}
       <TouchControls />
 
       {showToast && (
@@ -190,14 +228,14 @@ export function GameCanvas({ levelId, difficulty, onComplete, onQuit }: Props) {
       )}
 
       {showQuitPrompt && (
-        <div className="dk-modal-backdrop" onClick={() => setShowQuitPrompt(false)}>
+        <div className="dk-modal-backdrop" onClick={() => { if (handle3d.current) handle3d.current.paused.current = false; setShowQuitPrompt(false); }}>
           <div className="dk-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 360 }}>
             <h2 style={{ marginTop: 0 }}>Quit lesson?</h2>
             <p style={{ opacity: 0.85 }}>
               End the run now and save your score to the leaderboard, or discard and go back to the menu.
             </p>
             <div className="btn-row" style={{ marginTop: 12, flexWrap: 'wrap' }}>
-              <button className="dk-btn dk-btn-ghost" onClick={() => setShowQuitPrompt(false)}>
+              <button className="dk-btn dk-btn-ghost" onClick={() => { if (handle3d.current) handle3d.current.paused.current = false; setShowQuitPrompt(false); }}>
                 Keep Playing
               </button>
               <button className="dk-btn dk-btn-outline" onClick={onQuit}>
