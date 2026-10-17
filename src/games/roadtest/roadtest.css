@@ -1409,3 +1409,18 @@
   backdrop-filter: blur(10px);
 }
 .brand-header { background: transparent !important; box-shadow: none !important; border: 0 !important; backdrop-filter: none; }
+
+/* Garage: pick your car (3D mode, cosmetic) */
+.garage { margin: 10px 0 14px; padding: 10px 12px; border-radius: 14px; background: rgba(12,12,16,.72); border: 1px solid rgba(242,193,78,.22); }
+.garage-head { display: flex; justify-content: space-between; align-items: baseline; font-family: 'Bebas Neue', sans-serif; letter-spacing: .08em; color: #fff; font-size: 16px; }
+.garage-stars { color: var(--gold); font-size: 15px; }
+.garage-row { display: flex; gap: 8px; overflow-x: auto; padding: 8px 2px 4px; scrollbar-width: none; }
+.garage-row::-webkit-scrollbar { display: none; }
+.garage-car { flex: 0 0 auto; min-width: 92px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 8px 6px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); color: #fff; font-family: 'Bebas Neue', sans-serif; letter-spacing: .05em; font-size: 14px; cursor: pointer; }
+.garage-car small { font-family: 'Inter', sans-serif; font-size: 10px; color: #a9a9b3; letter-spacing: 0; }
+.garage-swatch { width: 38px; height: 16px; border-radius: 8px 12px 6px 6px; border: 1px solid rgba(255,255,255,.35); box-shadow: 0 2px 8px rgba(0,0,0,.5); }
+.garage-car.active { border-color: var(--gold); box-shadow: 0 0 14px rgba(242,193,78,.35); }
+.garage-car.active small { color: var(--gold); }
+.garage-car.locked { opacity: .55; }
+.garage-next { margin: 4px 2px 0; font-size: 11px; color: #a9a9b3; }
+.garage-next b { color: var(--gold); font-weight: 600; }

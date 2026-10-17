@@ -50,11 +50,11 @@ void main() {
 }`;
 const SNOW_F = `varying float vA; uniform float uOpacity; void main() { vec2 p = gl_PointCoord - .5; float r = length(p) * 2.; float a = (1. - smoothstep(.2, 1., r)) * vA * uOpacity; if (a < .01) discard; gl_FragColor = vec4(.96, .97, 1., a); }`;
 
-export function Weather({ lite }: { lite: boolean }) {
+export function Weather({ lite, offline = false }: { lite: boolean; offline?: boolean }) {
   const { camera, size, gl } = useThree(), mix = useContext(NightCtx);
   const rainRef = useRef<THREE.Mesh>(null), snowRef = useRef<THREE.Points>(null);
   const bolt = useRef({ next: 4, t: 0, n: 0 });
-  useEffect(() => { debugOverride(); void refreshLive(); void loadSite(); }, []);
+  useEffect(() => { if (offline) return; debugOverride(); void refreshLive(); void loadSite(); }, [offline]);   // offline: the Road Test game sets the weather itself, so nothing is fetched
   const nRain = lite ? 3500 : 8000, nSnow = lite ? 2600 : 6000;
   const rainGeo = useMemo(() => {
     const r = rng(77), g = new THREE.InstancedBufferGeometry();

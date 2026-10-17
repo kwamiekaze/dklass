@@ -121,7 +121,7 @@ export function tickAtmo(dt: number) {
   const k = 1 - Math.exp(-.9 * Math.min(dt, .05));
   for (const key of Object.keys(atmo.look) as (keyof Look)[]) { const g = atmo.goal[key]; atmo.look[key] += (g - atmo.look[key]) * k; if (Math.abs(g - atmo.look[key]) < .002) atmo.look[key] = g; }
   atmo.deep += (atmo.deepGoal - atmo.deep) * (1 - Math.exp(-.7 * Math.min(dt, .05))); if (Math.abs(atmo.deepGoal - atmo.deep) < .002) atmo.deep = atmo.deepGoal;
-  clockT += dt; if (clockT > 20) { clockT = 0; apply(); if (!atmo.live || Date.now() - atmo.live.at > 15 * 60 * 1000) void refreshLive(); void loadSite(); }
+  clockT += dt; if (clockT > 20) { clockT = 0; apply(); if (!atmo.debug) { if (!atmo.live || Date.now() - atmo.live.at > 15 * 60 * 1000) void refreshLive(); void loadSite(); } }   // pinned (a screenshot link or the Road Test game): nothing is fetched
   atmo.flash = Math.max(0, atmo.flash - dt * 3.2);
 }
 

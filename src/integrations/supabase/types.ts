@@ -3598,6 +3598,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      instructor_can_read_permit_object: {
+        Args: { _instructor_id: string; _name: string }
+        Returns: boolean
+      }
+      instructor_teaches_student: {
+        Args: { _instructor_id: string; _student_id: string }
+        Returns: boolean
+      }
       is_assigned_instructor: {
         Args: { _instructor_id: string; _student_id: string }
         Returns: boolean
