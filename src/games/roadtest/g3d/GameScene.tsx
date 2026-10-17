@@ -9,6 +9,8 @@ import type { Difficulty } from '../game/types';
 import { sound } from '../sound';
 import { MPH_TO_MPS, RunSim, type Controls, type Sfx, type SimEvent } from './sim';
 import { themeFor } from './themes';
+import { FRONTS, FRONT_BANNER, loadConditions, resolveConditions, type Resolved } from './conditions';
+import { apply as applyAtmo, atmo } from '../../../components/nuhome2/world/atmosphere';
 import { World } from './World';
 import { Actors, Player } from './Actors';
 import { SkidMarks, Sparks, SpeedLines, fx } from './Fx';
@@ -36,7 +38,7 @@ export const readControls = (): Controls => ({
   right: !!(keys.ArrowRight || keys.KeyD) || touchControls.right,
 });
 
-export interface SceneHandle { sim: RunSim; hud: HudState; paused: { current: boolean }; introT: number; skip: { current: boolean } }
+export interface SceneHandle { sim: RunSim; hud: HudState; paused: { current: boolean }; introT: number; skip: { current: boolean }; cond: Resolved }
 
 const shakeState = { amp: 0, t: 0, dur: 0.01, punch: 0 };
 
@@ -49,6 +51,9 @@ function Driver({ handle, onComplete, onReady }: { handle: SceneHandle; onComple
   const prog = useProgress();
   const ready = useRef(false);
   const waited = useRef(0);
+  const front = useRef(0);
+  const frontStart = useRef(handle.cond.weather === 'cloudy' ? 1 : 0);
+  const introDone = () => intro.current >= INTRO_SECONDS;
   const v = useMemo(() => new THREE.Vector3(), []);
   useEffect(() => bindKeys(), []);
   const project = (x: number, y: number, d: number) => {
@@ -58,7 +63,7 @@ function Driver({ handle, onComplete, onReady }: { handle: SceneHandle; onComple
   const dispatch = (e: SimEvent) => {
     const now = performance.now();
     switch (e.k) {
-      case 'float': { const p = project(e.x, 1.9, e.d); hud.floats.push({ text: e.text, good: e.good, sx: p.sx, sy: p.sy, born: now }); if (hud.floats.length > 8) hud.floats.shift(); break; }
+      case 'float': { if (e.text.includes('CLOSE')) { shakeState.punch = Math.max(shakeState.punch, 0.6); fx.emit({ x: e.x, y: 0.9, d: e.d, n: 10, color: [0xffffff, 0xf2c14e], speed: 4, up: 1.2, life: 0.5, size: 0.22, gravity: 1 }); } const p = project(e.x, 1.9, e.d); hud.floats.push({ text: e.text, good: e.good, sx: p.sx, sy: p.sy, born: now }); if (hud.floats.length > 8) hud.floats.shift(); break; }
       case 'burst': fx.emit({ x: e.x, y: 1.1, d: e.d, n: e.n * 3, color: [e.color, 0xfff3c4, 0xffffff], speed: 5.5, up: e.up ? 5 : 2.5, life: 0.9, size: 0.4, gravity: 7, ring: false }); break;
       case 'crash':
         fx.emit({ x: e.x, y: 0.7, d: e.d, n: e.big ? 60 : 26, color: [0xffb347, 0xffffff, 0xff6a13, 0xf2c14e], speed: 7, up: 4, life: 0.8, size: 0.34, gravity: 12 });
@@ -99,6 +104,16 @@ function Driver({ handle, onComplete, onReady }: { handle: SceneHandle; onComple
         sim.step(dt, readControls());
       }
       for (const e of sim.drain()) dispatch(e);
+    }
+    // rolling weather: a new front every stretch of the drive (every 450 m in endless)
+    if (handle.cond.rolling && !sim.finished && introDone()) {
+      const step = sim.level.endless ? Math.floor(sim.traveled / 450) : Math.floor(sim.progress * 4);
+      if (step > front.current) {
+        front.current = step;
+        const kind = FRONTS[(frontStart.current + step) % FRONTS.length]!;
+        atmo.preview = { weather: kind, night: 'normal' }; applyAtmo();
+        const b = FRONT_BANNER[kind]; hud.banners.push({ title: b[0], sub: b[1], ms: 2000, tone: 'white', born: performance.now() });
+      }
     }
     // HUD snapshot
     hud.score = sim.tracker.score;
@@ -175,7 +190,7 @@ export function useGameScene(levelId: string, difficulty: Difficulty): SceneHand
     const hud = newHud();
     hud.levelName = sim.level.name; hud.levelSub = sim.level.subtitle; hud.difficulty = sim.difficulty.label; hud.mult = sim.difficulty.scoreMul;
     hud.limit = sim.level.speedLimit; hud.endless = !!sim.level.endless; hud.best = sim.pbBestDistance;
-    return { sim, hud, paused: { current: false }, introT: 0, skip: { current: false } } as SceneHandle;
+    return { sim, hud, paused: { current: false }, introT: 0, skip: { current: false }, cond: resolveConditions(loadConditions()) } as SceneHandle;
   }, [levelId, difficulty]);
 }
 
@@ -183,7 +198,7 @@ export interface GameSceneProps { handle: SceneHandle; carId: GarageId; onComple
 
 export function GameScene({ handle, carId, onComplete, onReady, onLost }: GameSceneProps) {
   const { sim } = handle;
-  const theme = useMemo(() => themeFor(sim.level.id), [sim]);
+  const theme = useMemo(() => themeFor(sim.level.id, handle.cond), [sim, handle]);
   const tierName = useMemo(() => detectTier(), []);
   const quality: Quality = qualityFor(tierName);
   const playerRig = useRef<THREE.Group | null>(null);
@@ -213,7 +228,7 @@ export function GameScene({ handle, carId, onComplete, onReady, onLost }: GameSc
   >
     <Dpr cap={cap} onDecline={() => setDpr(-1)} onIncline={() => setDpr(1)} />
     <Suspense fallback={null}>
-      <World sim={sim} theme={theme} quality={quality} />
+      <World sim={sim} theme={theme} quality={quality} bloom={tierName === 'high' && new URLSearchParams(window.location.search).get('bloom') !== '0'} />
       <Actors sim={sim} carId={carId} lite={quality.lite} playerRig={playerRig} />
       <Player sim={sim} carId={carId} lite={quality.lite} rig={playerRig} />
       <Sparks sim={sim} />

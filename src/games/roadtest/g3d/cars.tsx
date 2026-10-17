@@ -38,6 +38,40 @@ function BrakeGlow({ id, brake }: { id: GarageId; brake: { current: number } }) 
   </>;
 }
 
+
+/** Headlight beams: soft cones of light that show up in the dark, in fog, rain and snow, plus a real light that paints the road ahead. */
+function Beams({ id, sim }: { id: GarageId; sim: RunSim }) {
+  const night = useContext(NightCtx);
+  const lamps = fleetFiles(id)?.lamps?.front;
+  const grp = useRef<THREE.Group>(null), spot = useRef<THREE.SpotLight>(null), tgt = useRef<THREE.Object3D>(null);
+  useEffect(() => { if (spot.current && tgt.current) spot.current.target = tgt.current; });
+  const mat = useMemo(() => new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false, fog: false,
+    uniforms: { uA: { value: 0 } },
+    vertexShader: 'varying vec3 vN; varying vec3 vV; varying float vU; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vU = clamp((position.y + 12.) / 24., 0., 1.); gl_Position = projectionMatrix * mv; }',
+    fragmentShader: 'varying vec3 vN; varying vec3 vV; varying float vU; uniform float uA; void main(){ float e = pow(abs(dot(normalize(vN), normalize(vV))), 1.6); float along = pow(vU, 1.7); gl_FragColor = vec4(vec3(1., .93, .78), e * along * uA * .5); }',
+  }), []);
+  useFrame((_, dt) => {
+    const L = atmo.look;
+    const dark = Math.max(night.current, 0.55 * L.fog, 0.35 * L.storm, 0.3 * L.rain, 0.25 * L.snow);
+    const want = clamp((dark - 0.15) / 0.5, 0, 1) * (sim.finished ? 0.3 : 1);
+    mat.uniforms.uA!.value = damp(mat.uniforms.uA!.value as number, want, 5, dt);
+    if (grp.current) grp.current.visible = (mat.uniforms.uA!.value as number) > 0.02;
+    if (spot.current) spot.current.intensity = (mat.uniforms.uA!.value as number) * 38;
+  });
+  if (!lamps) return null;
+  const x = Math.abs(lamps[0]) - 0.1, y = lamps[1], z = lamps[2];
+  return <>
+    <group ref={grp} visible={false}>
+      {[-1, 1].map((sd) => <mesh key={sd} position={[x + 12, y - 0.05, sd * z]} rotation-z={-Math.PI / 2} material={mat} renderOrder={5}>
+        <cylinderGeometry args={[0.12, 2.5, 24, 20, 1, true]} />
+      </mesh>)}
+    </group>
+    <spotLight ref={spot} position={[x, y + 0.2, 0]} angle={0.5} penumbra={0.85} distance={46} decay={1.2} intensity={0} color="#fff1d6" />
+    <object3D ref={tgt} position={[x + 20, 0, 0]} />
+  </>;
+}
+
 /** A soft ring of light under the car and a gold halo when the star magnet is on. */
 function Auras({ sim }: { sim: RunSim }) {
   const shield = useRef<THREE.Mesh>(null), magnet = useRef<THREE.Group>(null), ring = useRef<THREE.Mesh>(null);
@@ -117,6 +151,7 @@ export function PlayerCar({ sim, carId, lite, rig }: { sim: RunSim; carId: Garag
           <FleetCar specId={carId} color={SWATCH[carId] ?? '#f2b92a'} plate={PLATE[carId] ?? 'DK00GO'} position={[0, 0, 0]} lite={lite} signal={signal} wheels={wheels} />
         </Suspense>
         <BrakeGlow id={carId} brake={brake} />
+        <Beams id={carId} sim={sim} />
       </group>
     </group>
     <Auras sim={sim} />

@@ -8,6 +8,7 @@ import { NightCtx } from '../../../components/nuhome2/world/theme';
 import { apply as applyAtmo, atmo, tickAtmo } from '../../../components/nuhome2/world/atmosphere';
 import type { Quality } from '../../../components/nuhome2/world/quality';
 import { ROAD_HALF, type RunSim } from './sim';
+import { Bloom } from './Bloom';
 import { TOD_MIX, type Theme, type TimeOfDay } from './themes';
 import { ROAD_TEX_L, ROAD_TEX_W, billboardTexture, facade, groundTexture, pavingTexture, roadTexture, speedSignTexture, schoolSignTexture, glowTexture } from './textures';
 import { clamp, facadeBox, hash, hideInst, mod, setInst, smooth } from './util';
@@ -22,21 +23,33 @@ const FOG: Record<TimeOfDay, string> = { day: '#f3e4c6', golden: '#f4d39a', dusk
 const SUN: Record<TimeOfDay, { color: string; k: number }> = {
   day: { color: '#ffe6bf', k: 2.7 }, golden: { color: '#ffc983', k: 2.7 }, dusk: { color: '#ff9d6e', k: 1.7 }, night: { color: '#9db8ff', k: 0.55 },
 };
+const ORDER: TimeOfDay[] = ['day', 'golden', 'dusk', 'night'];
+const SUN_C = ORDER.map((t) => new THREE.Color(SUN[t].color)), FOG_C = ORDER.map((t) => new THREE.Color(FOG[t]));
+/** The sky colours at any point of the day (m = 0 day .. 1 night), blended between the four times of day. */
+function todAt(m: number, fog: THREE.Color, sun: THREE.Color): number {
+  const keys = ORDER.map((t) => TOD_MIX[t]);
+  let i = 0; while (i < keys.length - 2 && m > keys[i + 1]!) i++;
+  const k = clamp((m - keys[i]!) / (keys[i + 1]! - keys[i]!), 0, 1);
+  fog.copy(FOG_C[i]!).lerp(FOG_C[i + 1]!, k); sun.copy(SUN_C[i]!).lerp(SUN_C[i + 1]!, k);
+  return SUN[ORDER[i]!].k + (SUN[ORDER[i + 1]!].k - SUN[ORDER[i]!].k) * k;
+}
 
 function Atmosphere({ theme, mix, shadow, sim }: { theme: Theme; mix: { current: number }; shadow: number; sim: RunSim }) {
   const { scene, gl } = useThree();
   const amb = useRef<THREE.AmbientLight>(null), hemi = useRef<THREE.HemisphereLight>(null), dir = useRef<THREE.DirectionalLight>(null), fill = useRef<THREE.DirectionalLight>(null);
-  const c = useMemo(() => ({ fog: new THREE.Color(FOG[theme.tod]), grey: new THREE.Color('#b4bcc6'), greyN: new THREE.Color('#0d1226'), tmp: new THREE.Color() }), [theme.tod]);
+  const c = useMemo(() => ({ fog: new THREE.Color(FOG[theme.tod]), sunC: new THREE.Color(SUN[theme.tod].color), grey: new THREE.Color('#b4bcc6'), greyN: new THREE.Color('#0d1226'), tmp: new THREE.Color() }), [theme.tod]);
   useEffect(() => { scene.fog = new THREE.Fog(FOG[theme.tod], 40, 235); scene.background = null; return () => { scene.fog = null; }; }, [scene, theme.tod]);
   useFrame((_, dt) => {
     tickAtmo(dt);
-    mix.current = TOD_MIX[theme.tod];
-    const m = mix.current, L = atmo.look, deep = atmo.deep * (theme.tod === 'night' ? 1 : 0);
+    // a sunset drive takes the sky from golden hour to night over the run; otherwise the time of day is fixed
+    const target = theme.sunset ? 0.18 + 0.82 * smooth(0, 1, clamp((sim.level.endless ? sim.traveled / 1800 : sim.progress) * 1.08, 0, 1)) : TOD_MIX[theme.tod];
+    mix.current += (target - mix.current) * Math.min(1, dt * 2.5);
+    const m = mix.current, L = atmo.look, deep = atmo.deep * smooth(0, 1, clamp((m - 0.8) / 0.2, 0, 1));
     const cl = L.cloud, dim = 1 - 0.5 * cl * (1 - m) - 0.12 * L.storm, flash = atmo.flash * L.storm;
     const fog = scene.fog as THREE.Fog | null;
-    const sun = SUN[theme.tod];
+    const sunK = todAt(m, c.fog, c.sunC);
     if (fog) {
-      fog.color.copy(c.fog).lerp(c.tmp.copy(c.grey).lerp(c.greyN, m), Math.min(1, 0.55 * cl + 0.4 * L.fog) * (theme.tod === 'golden' ? 0.7 : 1));
+      fog.color.copy(c.fog).lerp(c.tmp.copy(c.grey).lerp(c.greyN, m), Math.min(1, 0.55 * cl + 0.4 * L.fog) * (1 - 0.3 * smooth(0, 1, clamp(1 - Math.abs(m - 0.18) / 0.2, 0, 1))));
       if (flash > 0.01) fog.color.lerp(c.tmp.set('#dfe6ff'), flash * 0.5);
       const f = theme.fog;
       fog.near = (46 - 40 * L.fog - 16 * L.rain - 12 * L.snow) * f; fog.far = (240 - 190 * L.fog - 90 * L.rain - 70 * L.snow) * f;
@@ -46,8 +59,8 @@ function Atmosphere({ theme, mix, shadow, sim }: { theme: Theme; mix: { current:
     if (amb.current) amb.current.intensity = (0.5 - 0.3 * m) * (1 - 0.3 * deep) + flash * 1.6;
     if (hemi.current) hemi.current.intensity = (1.0 - 0.66 * m) * (1 - 0.4 * deep) * (0.9 + 0.1 * (1 - cl));
     if (dir.current) {
-      dir.current.color.set(sun.color);
-      dir.current.intensity = sun.k * dim * (1 - 0.55 * deep) * (1 - 0.5 * L.rain * (1 - m)) + flash * 1.4;
+      dir.current.color.copy(c.sunC);
+      dir.current.intensity = sunK * dim * (1 - 0.55 * deep) * (1 - 0.5 * L.rain * (1 - m)) + flash * 1.4;
       // the sun's shadow follows the car
       dir.current.position.set(-10, 17, sim.traveled * 0 + 13); dir.current.target.position.set(0, 0, -6); dir.current.target.updateMatrixWorld();
     }
@@ -96,7 +109,7 @@ function Road({ theme, sim }: { theme: Theme; sim: RunSim }) {
     const T = sim.traveled;
     road.offset.y = mod(T / ROAD_TEX_L, 1);
     walk.offset.y = mod(T / 3, 1); kerbTex.offset.y = mod(T / 3, 1);
-    if (mat.current) { const wet = Math.min(1, atmo.look.rain * 1.2 + atmo.look.snow * 0.2); mat.current.roughness = 0.92 - 0.5 * wet; mat.current.envMapIntensity = 0.5 + 1.1 * wet; }
+    if (mat.current) { const wet = Math.min(1, atmo.look.rain * 1.2 + atmo.look.snow * 0.2); mat.current.roughness = 0.92 - 0.72 * wet; mat.current.metalness = 0.3 * wet; mat.current.envMapIntensity = 0.5 + 1.9 * wet; }
   });
   const zc = -(AHEAD - BEHIND) / 2 - 10;
   return <group>
@@ -354,7 +367,7 @@ function Backdrop({ theme }: { theme: Theme }) {
 }
 
 // ------------------------------------------------------------------ the whole world ---
-export function World({ sim, theme, quality }: { sim: RunSim; theme: Theme; quality: Quality }) {
+export function World({ sim, theme, quality, bloom = false }: { sim: RunSim; theme: Theme; quality: Quality; bloom?: boolean }) {
   const mix = useRef(TOD_MIX[theme.tod]);
   const lite = quality.lite;
   // pin the homepage's weather store to this lesson (and give the homepage its own back afterwards)
@@ -367,7 +380,7 @@ export function World({ sim, theme, quality }: { sim: RunSim; theme: Theme; qual
     <Atmosphere theme={theme} mix={mix} shadow={quality.shadow} sim={sim} />
     <Environment resolution={lite ? 128 : 256}>
       <Lightformer intensity={2.2} position={[0, 8, 4]} scale={[24, 10, 1]} />
-      <Lightformer intensity={1.8} color={theme.tod === 'night' ? '#9db4ff' : '#fff0d8'} position={[-12, 3, 6]} scale={[18, 7, 1]} />
+      <Lightformer intensity={1.8} color={theme.tod === 'night' || theme.sunset ? '#9db4ff' : '#fff0d8'} position={[-12, 3, 6]} scale={[18, 7, 1]} />
       <Lightformer intensity={1.3} color="#ffe2a0" position={[12, 3, 8]} scale={[16, 6, 1]} />
       <Lightformer intensity={1.9} color="#fff0d0" position={[0, 4, 22]} rotation-y={Math.PI} scale={[44, 9, 1]} />
     </Environment>
@@ -377,5 +390,6 @@ export function World({ sim, theme, quality }: { sim: RunSim; theme: Theme; qual
     <Road theme={theme} sim={sim} />
     <Suspense fallback={null}><Town sim={sim} theme={theme} quality={quality} /></Suspense>
     <Weather lite={lite} offline />
+    {bloom && <Bloom sim={sim} mix={mix} />}
   </NightCtx.Provider>;
 }

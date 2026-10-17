@@ -22,6 +22,8 @@ export interface Theme {
   sidewalk: boolean;
   /** how packed the sides are with buildings or trees (0..1) */
   density: number;
+  /** the sky travels from golden hour to night over the run */
+  sunset?: boolean;
 }
 
 const CREAM = ['#f6ede4', '#e9dcc6', '#f2e3c4', '#d9c9ad', '#fbf5ee'];
@@ -62,8 +64,10 @@ export const THEMES: Record<string, Theme> = {
   'everything-at-once': T({ place: 'city', tod: 'dusk', weather: 'rain', walls: GLASS, ground: '#7e8a74', density: 1 }),
 };
 
-export function themeFor(levelId: string): Theme {
-  return THEMES[levelId] ?? T({ place: 'suburb', tod: 'day' });
+export function themeFor(levelId: string, over?: { weather?: WeatherKind | null; tod?: TimeOfDay | null; sunset?: boolean }): Theme {
+  const base = THEMES[levelId] ?? T({ place: 'suburb', tod: 'day' });
+  if (!over) return base;
+  return { ...base, weather: over.weather ?? base.weather, tod: over.tod ?? base.tod, sunset: over.sunset || undefined };
 }
 
 /** 0 = full day, 1 = full night (the homepage's NightCtx scale) for each time of day */

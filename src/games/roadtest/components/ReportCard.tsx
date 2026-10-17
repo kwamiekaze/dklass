@@ -136,9 +136,15 @@ export function ReportCard({ result, aftermath, onRetry, onNext, onMenu }: Props
 
         <ShareScoreButton result={result} />
 
-        <a className="dk-btn dk-btn-black book-cta" href="https://drivingklass.com" target="_blank" rel="noopener noreferrer">
-          Book a Real Driving Lesson
-        </a>
+        <div className="book-block">
+          <p className="book-kicker">{result.passed ? 'You drive like a five star.' : 'Great practice run.'}</p>
+          <h3>Now drive the real thing.</h3>
+          <p className="book-sub">Private, one on one coaching in a spotless ride, built around you.</p>
+          <div className="book-btns">
+            <a className="dk-btn dk-btn-gold book-primary" href="https://drivingklass.com" target="_blank" rel="noopener noreferrer">Book your lesson</a>
+            <a className="dk-btn dk-btn-outline book-call" href="tel:+14044045820">Call 404-404-5820</a>
+          </div>
+        </div>
       </div>
     </div>
   );
