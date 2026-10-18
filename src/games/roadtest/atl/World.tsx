@@ -18,7 +18,8 @@ import type { RunSim } from '../g3d/sim';
 import { Bloom } from '../g3d/Bloom';
 import { bendMaterial, makeBend, PATHS, pathXd, stepBend, type BendUniforms, type PathSpec } from './path';
 import { LANE } from './layout';
-import { ACC, EXIT, accStrip, exitStrip, type Strip } from './ramps';
+import { ACC, ACC_TOTAL, EXIT, accStrip, exitStrip, roadEdge } from './ramps';
+import { buildRamp, type RampGeo } from './rampGeo';
 import { adTexture, ROAD_TILE, roadTexture, skylineTexture } from './textures';
 import type { AtlSim } from './sim';
 import type { AtlStage } from './stageTypes';
@@ -190,36 +191,31 @@ function Edges() {
 }
 
 
-// ------------------------------------------------------------------ exit ramps, on-ramps and side streets ---
-/** A strip of pavement along the road whose centre and width come from a function of the distance, plus its white edge lines. */
-function stripGeometry(fn: (dd: number) => Strip | null, from: number, to: number, y: number, step = 6) {
-  const pos: number[] = [], idx: number[] = []; let n = 0;
-  const lineW = 0.16, linePos: number[] = [], lineIdx: number[] = []; let ln = 0;
-  for (let dd = from; dd <= to + 0.001; dd += step) {
-    const sP = fn(dd); if (!sP) continue;
-    const l = sP.c - sP.w / 2, r = sP.c + sP.w / 2;
-    pos.push(l, y, -dd, r, y, -dd); n++;
-    if (n > 1) { const a = (n - 2) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
-    const w = Math.max(0.0001, sP.w);
-    linePos.push(r - lineW, y + 0.012, -dd, r, y + 0.012, -dd, l, y + 0.012, -dd, l + lineW * Math.min(1, w), y + 0.012, -dd); ln++;
-    if (ln > 1) { const a = (ln - 2) * 4; lineIdx.push(a, a + 1, a + 4, a + 1, a + 5, a + 4, a + 2, a + 3, a + 6, a + 3, a + 7, a + 6); }
-  }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
-  const gl = new THREE.BufferGeometry(); gl.setAttribute('position', new THREE.Float32BufferAttribute(linePos, 3)); gl.setIndex(lineIdx); gl.computeVertexNormals();
-  return { g, gl };
+/** the stretches of road where a ramp lies beside it: trees, billboards and the like keep off the right side here */
+function rampZones(sim: { branches: { kind: string; d: number }[]; merges: number[]; rampStart?: boolean }): [number, number][] {
+  const z: [number, number][] = [];
+  for (const b of sim.branches) if (b.kind === 'exit') z.push([b.d - EXIT.pre - 15, b.d + EXIT.len + 15]);
+  for (const m of sim.merges) z.push([m - ACC_TOTAL - 15, m + ACC.taper + 15]);
+  if (sim.rampStart) z.push([-80, ACC_TOTAL + ACC.taper + 15]);
+  return z;
 }
 
+// ------------------------------------------------------------------ exit ramps, on-ramps and side streets ---
 function Ramps() {
-  const { sim, bend, stage } = useAtl();
+  const { sim, bend } = useAtl();
   const lay = sim.lay;
-  const asphalt = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ color: '#35363b', roughness: 0.92, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), bend), [bend]);
-  const paint = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ color: '#f3f1ea', roughness: 0.7, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), bend), [bend]);
+  const asphalt = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ color: '#34353a', roughness: 0.93, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), bend), [bend]);
+  const paint = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ color: '#f3f1ea', roughness: 0.7, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -5 }), bend), [bend]);
+  const yellow = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ color: '#f0b81c', roughness: 0.7, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 }), bend), [bend]);
   const items = useMemo(() => {
-    if (lay.kind !== 'divided') return [] as { ref: number; geo: ReturnType<typeof stripGeometry>; pre: number; len: number }[];
-    const out: { ref: number; geo: ReturnType<typeof stripGeometry>; pre: number; len: number }[] = [];
-    for (const b of sim.branches) if (b.kind === 'exit') out.push({ ref: b.d, geo: stripGeometry((dd) => exitStrip(lay, dd), -EXIT.pre, EXIT.len, 0.03), pre: EXIT.pre, len: EXIT.len });
-    for (const m of sim.merges) out.push({ ref: m, geo: stripGeometry((dd) => accStrip(lay, dd), -ACC.par, ACC.taper, 0.03), pre: ACC.par, len: ACC.taper });
-    if (sim.rampStart) out.push({ ref: ACC.par, geo: stripGeometry((dd) => accStrip(lay, dd), -ACC.par, ACC.taper, 0.03), pre: ACC.par, len: ACC.taper });
+    type Item = { ref: number; geo: RampGeo; pre: number; len: number };
+    if (lay.kind !== 'divided') return [] as Item[];
+    const edge = roadEdge(lay), out: Item[] = [];
+    const exitGeo = buildRamp((dd) => exitStrip(lay, dd), { from: -EXIT.pre, to: EXIT.len, edge, solid: [-EXIT.solid, 0] });
+    const accGeo = buildRamp((dd) => accStrip(lay, dd), { from: -ACC_TOTAL, to: ACC.taper, edge });
+    for (const b of sim.branches) if (b.kind === 'exit') out.push({ ref: b.d, geo: exitGeo, pre: EXIT.pre, len: EXIT.len });
+    for (const m of sim.merges) out.push({ ref: m, geo: accGeo, pre: ACC_TOTAL, len: ACC.taper });
+    if (sim.rampStart) out.push({ ref: ACC_TOTAL, geo: accGeo, pre: ACC_TOTAL, len: ACC.taper });
     return out;
   }, [sim, lay]);
   const refs = useRef<(THREE.Group | null)[]>([]);
@@ -227,10 +223,10 @@ function Ramps() {
     const T = sim.traveled;
     items.forEach((it, i) => { const g = refs.current[i]; if (!g) return; g.position.z = T - it.ref; const rel = it.ref - T; g.visible = rel - it.pre < AHEAD + 40 && rel > -it.len - 60; });
   });
-  void stage;
   return <>{items.map((it, i) => <group key={i} ref={(g) => { refs.current[i] = g; }}>
-    <mesh geometry={it.geo.g} material={asphalt} receiveShadow renderOrder={2} frustumCulled={false} />
-    <mesh geometry={it.geo.gl} material={paint} renderOrder={3} frustumCulled={false} />
+    <mesh geometry={it.geo.asphalt} material={asphalt} receiveShadow renderOrder={2} frustumCulled={false} />
+    <mesh geometry={it.geo.white} material={paint} renderOrder={3} frustumCulled={false} />
+    <mesh geometry={it.geo.yellow} material={yellow} renderOrder={4} frustumCulled={false} />
   </group>)}</>;
 }
 
@@ -366,11 +362,13 @@ function Scenery() {
   const rampGaps = useMemo(() => {
     const z: [number, number][] = [];
     for (const b of sim.branches) if (b.kind === 'exit') z.push([b.d - EXIT.pre - 10, b.d + EXIT.len * 0.5]);
-    for (const m of sim.merges) z.push([m - ACC.par - 10, m + ACC.taper + 10]);
-    if (sim.rampStart) z.push([-60, ACC.par + ACC.taper + 10]);
+    for (const m of sim.merges) z.push([m - ACC_TOTAL - 10, m + ACC.taper + 10]);
+    if (sim.rampStart) z.push([-60, ACC_TOTAL + ACC.taper + 10]);
     return z;
   }, [sim]);
   const inRamp = (d: number) => rampGaps.some(([a, b]) => d >= a && d <= b);
+  const zones = useMemo(() => (lay.kind === 'divided' ? rampZones(sim) : []), [sim, lay]);
+  const nearRamp = (d: number) => zones.some(([a, b]) => d >= a && d <= b);
   const rightOff = lay.sidewalks ? 3 : inter ? 1.8 : 1.4, leftOff = lay.sidewalks ? 3 : inter ? 1.8 : 1.4;
   const treeProb = stage.trees === 'none' ? 0 : inter ? 0.6 : 0.7;
   const pines = stage.trees === 'pine' || (stage.trees === 'mixed' && false);
@@ -385,6 +383,7 @@ function Scenery() {
   // trees must sit outside the road on each side
   const treeSlotFixed = (cell: number, k: number): Slot | null => {
     const t = treeSlot(cell, k); if (!t) return null;
+    if (k === 1 && nearRamp(cell * 8 + t.z)) return null;
     const s = k === 0 ? -1 : 1; const off = s > 0 ? right + rightOff + 2.5 : left - leftOff - 2.5;
     return { ...t, x: off + s * (hash(cell, 5 + k) * (inter ? 26 : 14)) };
   };
@@ -417,8 +416,8 @@ function Scenery() {
       <Repeat geometry={G.post} material={M.concreteDark} spacing={3} per={2} make={(c, k) => (k && inRamp(c * 3) ? null : { x: k ? right - 0.15 : left + 0.15, y: 0, z: 0, ry: 0, sx: 1, sy: 1, sz: 1 })} />
     </>}
     {inter && wallsOn && <Repeat geometry={G.wall} material={M.concrete} spacing={8} per={1} make={(c) => (hash(c, 2) < 0.12 || inRamp(c * 8) ? null : { x: right + 0.8, y: 0, z: 0, ry: 0, sx: 1, sy: 0.75 + hash(c, 4) * 0.5, sz: 1 })} />}
-    {inter && <Repeat geometry={G.pole} material={M.pole} spacing={lampSpace * 1.5} per={1} make={(c) => ({ x: right + (wallsOn ? 2.2 : 1.6), y: 0, z: 6 + hash(c, 1) * 0, ry: 0, sx: 0.8, sy: 0.7, sz: 0.8 })} />}
-    {inter && <Repeat geometry={G.head} material={M.lamp} spacing={lampSpace * 1.5} per={1} make={(c) => ({ x: right + (wallsOn ? 2.2 : 1.6), y: 0, z: 6, ry: Math.PI, sx: 0.8, sy: 0.7, sz: 0.8 })} />}
+    {inter && <Repeat geometry={G.pole} material={M.pole} spacing={lampSpace * 1.5} per={1} make={(c) => (nearRamp(c * lampSpace * 1.5) ? null : { x: right + (wallsOn ? 2.2 : 1.6), y: 0, z: 6 + hash(c, 1) * 0, ry: 0, sx: 0.8, sy: 0.7, sz: 0.8 })} />}
+    {inter && <Repeat geometry={G.head} material={M.lamp} spacing={lampSpace * 1.5} per={1} make={(c) => (nearRamp(c * lampSpace * 1.5) ? null : { x: right + (wallsOn ? 2.2 : 1.6), y: 0, z: 6, ry: Math.PI, sx: 0.8, sy: 0.7, sz: 0.8 })} />}
 
     {/* streetlights and poles on city streets */}
     {!inter && [-1, 1].map((s) => {
@@ -459,9 +458,9 @@ function Scenery() {
 
     {/* overpasses: a bridge over the interstate every few hundred metres */}
     {lay.kind === 'divided' && inter && <>
-      <Repeat geometry={G.deck} material={M.concrete} spacing={470} ahead={AHEAD} per={1} make={(c) => (hash(c, 31) < 0.15 ? null : { x: (left + right) / 2, y: 6.9, z: 100 + hash(c, 32) * 200, ry: 0, sx: right - left + 18, sy: 1, sz: 1 })} />
-      <Repeat geometry={G.pier} material={M.concreteDark} spacing={470} per={3} make={(c, k) => (hash(c, 31) < 0.15 ? null : { x: [left - 3, (lay.medianL + lay.medianR) / 2, right + 3][k]!, y: 0, z: 100 + hash(c, 32) * 200, ry: 0, sx: 1, sy: 6.3, sz: 1 })} />
-      <Repeat geometry={G.box} material={M.concreteDark} spacing={470} per={2} make={(c, k) => (hash(c, 31) < 0.15 ? null : { x: (left + right) / 2, y: 7.55, z: 100 + hash(c, 32) * 200 + (k ? 7.2 : -7.2), ry: 0, sx: right - left + 18, sy: 0.9, sz: 0.3 })} />
+      <Repeat geometry={G.deck} material={M.concrete} spacing={470} ahead={AHEAD} per={1} make={(c) => ((hash(c, 31) < 0.15 || nearRamp(c * 470 + 100 + hash(c, 32) * 200)) ? null : { x: (left + right) / 2, y: 6.9, z: 100 + hash(c, 32) * 200, ry: 0, sx: right - left + 18, sy: 1, sz: 1 })} />
+      <Repeat geometry={G.pier} material={M.concreteDark} spacing={470} per={3} make={(c, k) => ((hash(c, 31) < 0.15 || nearRamp(c * 470 + 100 + hash(c, 32) * 200)) ? null : { x: [left - 3, (lay.medianL + lay.medianR) / 2, right + 3][k]!, y: 0, z: 100 + hash(c, 32) * 200, ry: 0, sx: 1, sy: 6.3, sz: 1 })} />
+      <Repeat geometry={G.box} material={M.concreteDark} spacing={470} per={2} make={(c, k) => ((hash(c, 31) < 0.15 || nearRamp(c * 470 + 100 + hash(c, 32) * 200)) ? null : { x: (left + right) / 2, y: 7.55, z: 100 + hash(c, 32) * 200 + (k ? 7.2 : -7.2), ry: 0, sx: right - left + 18, sy: 0.9, sz: 0.3 })} />
     </>}
     {/* the long elevated ramps of the big interchanges */}
     {lay.kind === 'divided' && inter && (city || stage.region === 'airport' || stage.region === 'intown') && <>
@@ -480,6 +479,7 @@ function Billboards() {
   const post = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ color: '#6c7076', roughness: 0.6, metalness: 0.6 }), bend), [bend]);
   const night = useContext(NightCtx);
   const lastCell = useRef<number[]>([]);
+  const zones = useMemo(() => (lay.kind === 'divided' ? rampZones(sim) : []), [sim, lay]);
   useFrame(() => {
     const T = sim.traveled, sp = stage.road === 'interstate' ? 520 : 650;
     const base = Math.floor((T - 40) / sp);
@@ -488,7 +488,7 @@ function Billboards() {
       const d = c * sp + 120 + hash(c, 1) * 160, side = hash(c, 2) > 0.5 ? 1 : -1;
       g.position.set(side > 0 ? lay.edgeR + 7.5 + hash(c, 3) * 6 : lay.edgeL - 7.5 - hash(c, 3) * 6, 0, T - d);
       g.rotation.y = side > 0 ? -0.3 : 0.3;
-      g.visible = d - T < AHEAD && d - T > -BEHIND;
+      g.visible = d - T < AHEAD && d - T > -BEHIND && !(side > 0 && zones.some(([a, b]) => d + 8 >= a && d - 8 <= b));
       if (lastCell.current[i] !== c) { lastCell.current[i] = c; const m = mats[i]!; const t = adTexture(c + (stage.id.length * 3)); m.map = t; m.emissiveMap = t; m.needsUpdate = true; }
       mats[i]!.emissiveIntensity = 0.12 + clamp(night.current * 1.25 - 0.1, 0, 1) * 0.8;
     }

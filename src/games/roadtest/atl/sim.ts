@@ -10,7 +10,7 @@ import { getLevel } from '../game/levels';
 import { MPH_TO_MPS, seeded, type Sfx, type SimEvent } from '../g3d/sim';
 import { layoutFor, LANE, type Layout } from './layout';
 import { getAtlStage, levelOfStage } from './stages';
-import { accStrip, exitStrip, stripMax, ACC, EXIT } from './ramps';
+import { accStrip, exitStrip, stripSpan, ACC, ACC_TOTAL, EXIT } from './ramps';
 import type { AtlStage } from './stageTypes';
 
 export type VehKind = 'sedan' | 'suv' | 'pickup' | 'van' | 'hatch' | 'box' | 'semi' | 'bus' | 'police' | 'wreck' | 'tow' | 'taxi' | 'ambulance';
@@ -57,6 +57,8 @@ export class AtlSim {
   free = false;
   rampStart = false;
   private exitMax = -99; private exitMin = 99;
+  /** x ranges of the ramp lanes beside the road right now (an exit lane, a ramp, an acceleration lane) */
+  private spans: [number, number][] = [];
   vehicles: Veh[] = [];
   props: Prop[] = [];
   closures: Closure[] = [];
@@ -115,7 +117,7 @@ export class AtlSim {
     this.spawnCool = new Array(this.lay.lanes + 2).fill(0);
     if (opts.startMph) this.mph = opts.startMph;
     this.rampStart = !!st.startRamp && this.lay.kind === 'divided';
-    if (this.rampStart) { this.x = this.lay.xs[this.lay.lanes - 1]! + LANE * 1.9; this.laneIdx = this.lay.lanes - 1; this.lastLane = this.laneIdx; this.mph = Math.max(this.mph, 22); }
+    if (this.rampStart) { this.x = accStrip(this.lay, -ACC_TOTAL)!.c; this.laneIdx = this.lay.lanes - 1; this.lastLane = this.laneIdx; this.mph = Math.max(this.mph, 22); }
     this.freeLegs = opts.legNo ?? 0; this.freeMiles = opts.miles ?? 0;
     this.buildEvents();
     if (this.free) this.banner(this.freeLegs === 0 ? 'FREE ROAM' : stageTitle(this.stage), this.freeLegs === 0 ? `${this.stage.roadName} · take any exit or turn. Drive as long as you like` : `${this.stage.place}`, 3200, 'gold');
@@ -161,7 +163,7 @@ export class AtlSim {
         case 'vms': this.evList.push({ at: d - 220, run: () => this.banner('GEORGIA 511', e.text.replace(/\|/g, ' · ').replace(/\s{2,}/g, ' '), 3600, 'white') }); break;
         case 'tip': this.evList.push({ at: d, run: () => { this.banner(e.title, e.sub, 4200, 'gold'); this.prompt = e.sub; } }); break;
         case 'exit': this.evList.push({ at: d - 120, run: () => this.banner(`EXIT ${e.no ?? ''} ${e.name}`.trim(), e.lesson, 3200, 'white') }); break;
-        case 'merge': if (lay.kind === 'divided') { this.merges.push(d + 60); this.evList.push({ at: d + 60 - ACC.par - 40, run: () => this.spawnMerger(d + 60 - ACC.par * 0.6, d + 60) }); } break;
+        case 'merge': if (lay.kind === 'divided') { this.merges.push(d + 60); this.evList.push({ at: d + 60 - ACC_TOTAL - 150, run: () => this.spawnMerger(d + 60 - ACC_TOTAL + 20, d + 60) }); } break;
         case 'work': {
           const lanes = [lay.lanes - 1]; if (lay.lanes >= 5 && e.len >= 600) lanes.push(lay.lanes - 2);
           this.closures.push({ d0: d, d1: d + e.len, lanes, kind: 'work' });
@@ -230,7 +232,8 @@ export class AtlSim {
   }
   private spawnMerger(d: number, mergeAt: number) {
     const lay = this.lay; if (lay.kind !== 'divided') return;
-    const v = this.makeVeh(this.rnd.frac() < 0.2 ? 'pickup' : 'sedan', d, lay.lanes + 0.9, Math.max(14, this.mph * KMPH * 0.85)); v.want = this.stage.limit * KMPH * 0.9; v.tl = lay.lanes - 1; v.lcFrom = lay.lanes + 0.9; v.mergeAt = mergeAt;
+    const s0 = accStrip(lay, d - mergeAt), rl = lay.lanes - 1 + ((s0?.c ?? lay.xs[lay.lanes - 1]! + LANE) - lay.xs[lay.lanes - 1]!) / LANE;
+    const v = this.makeVeh(this.rnd.frac() < 0.2 ? 'pickup' : 'sedan', d, rl, Math.max(14, this.mph * KMPH * 0.85)); v.want = this.stage.limit * KMPH * 0.9; v.tl = lay.lanes - 1; v.lcFrom = rl; v.mergeAt = mergeAt;
     this.vehicles.push(v);
   }
 
@@ -338,6 +341,7 @@ export class AtlSim {
         v.lane = v.lcFrom + (v.tl - v.lcFrom) * s;
         if (f >= 1) { v.lcT = 0; v.lane = v.tl; v.sig = 0; v.lcWait = 4 + this.rnd.frac() * 8; }
       } else if (v.mergeAt !== undefined) {
+        if (v.d < v.mergeAt) { const sp = accStrip(lay, v.d - v.mergeAt); if (sp) v.lane = lay.lanes - 1 + (sp.c - lay.xs[lay.lanes - 1]!) / LANE; }
         if (v.d >= v.mergeAt) {
           // merge only into a real gap: nobody alongside or close behind in the lane it is joining (the ramp ends 70 m on, then it goes anyway)
           const tb = lanes[bucket(v.tl)] ?? [];
@@ -388,10 +392,7 @@ export class AtlSim {
     this.x += this.steerV * dt;
     const lay = this.lay;
     this.updateRampLimits();
-    const minX = Math.min(lay.minX, this.exitMin);
-    if (this.x < minX) { this.x = minX; if (this.steerV < 0) this.steerV = 0; }
-    const maxX = Math.max(lay.maxX, this.maxXNow, this.exitMax);
-    if (this.x > maxX) { this.x = maxX; if (this.steerV > 0) this.steerV = 0; }
+    this.clampX(Math.min(lay.minX, this.exitMin), Math.max(lay.maxX, this.maxXNow, this.exitMax));
     this.yaw += (Math.max(-0.2, Math.min(0.2, (this.steerV / 6.4) * 0.2)) - this.yaw) * (1 - Math.exp(-dt * 10));
     if (this.mph > 35 && (c.left || c.right) && this.mph > this.stage.limit - 8) this.snd.tireScreech?.(Math.min(1, this.mph / this.maxMph));
     this.speedLimitNow = this.zoneLimit(this.traveled);
@@ -417,19 +418,36 @@ export class AtlSim {
   }
 
   // ---- exits, forks and turns
+  /** keep the car on the road or on a ramp lane: the hatched gore between a ramp and the road is not drivable */
+  private clampX(minX: number, maxX: number) {
+    const all: [number, number][] = [[minX, maxX], ...this.spans];
+    all.sort((p, q) => p[0] - q[0]);
+    const iv: [number, number][] = [];
+    for (const q of all) { const last = iv[iv.length - 1]; if (last && q[0] <= last[1]) last[1] = Math.max(last[1], q[1]); else iv.push([q[0], q[1]]); }
+    const x = this.x;
+    if (iv.some((q) => x >= q[0] && x <= q[1])) return;
+    let best = iv[0]![0], bd = Infinity;
+    for (const q of iv) for (const e of q) { const d = Math.abs(x - e); if (d < bd) { bd = d; best = e; } }
+    if ((best < x && this.steerV > 0) || (best > x && this.steerV < 0)) this.steerV = 0;
+    this.x = best;
+  }
+  /** is x on a ramp lane (so the edge line of the road is not the edge of the world there) */
+  onRampLane(x: number) { return this.spans.some((q) => x >= q[0] && x <= q[1]); }
   private updateRampLimits() {
     const lay = this.lay, T = this.traveled; let mx = -99, mn = 99;
+    const spans: [number, number][] = [];
     const ext = (dd: number) => Math.max(0, Math.min(1, (dd + 7) / 9)) * 16;
     for (const b of this.branches) {
       const dd = T - b.d;
-      if (b.kind === 'exit' && lay.kind === 'divided') { const m = stripMax(exitStrip(lay, dd)); if (m !== null) mx = Math.max(mx, m); }
+      if (b.kind === 'exit' && lay.kind === 'divided') { const sp = stripSpan(exitStrip(lay, dd)); if (sp) spans.push(sp); }
       else if (b.kind === 'left' && lay.kind === 'twoway' && dd > -7 && dd < 16) mn = Math.min(mn, lay.minX - ext(dd));
       else if (b.kind === 'right' && dd > -7 && dd < 16) mx = Math.max(mx, lay.maxX + ext(dd));
     }
     if (lay.kind === 'divided') {
-      for (const m of this.merges) { const v = stripMax(accStrip(lay, T - m)); if (v !== null) mx = Math.max(mx, v); }
-      if (this.rampStart) { const v = stripMax(accStrip(lay, T - ACC.par)); if (v !== null) mx = Math.max(mx, v); }
+      for (const m of this.merges) { const sp = stripSpan(accStrip(lay, T - m)); if (sp) spans.push(sp); }
+      if (this.rampStart) { const sp = stripSpan(accStrip(lay, T - ACC_TOTAL)); if (sp) spans.push(sp); }
     }
+    this.spans = spans;
     this.exitMax = mx; this.exitMin = mn;
   }
   private oncomingNear(d: number, within: number) { for (const v of this.vehicles) if (v.dir === -1 && !v.fly && v.d > d - 8 && v.d - d < within) return true; return false; }
@@ -533,7 +551,7 @@ export class AtlSim {
     // double yellow / wrong side on a two-way road
     this.crossCool -= dt;
     if (lay.kind === 'twoway' && this.x - 0.92 < -0.02 && this.mph > 5 && this.crossCool <= 0) { this.crossCool = 3.2; this.award('LANE_CROSS', 'CENTER LINE'); }
-    if (lay.kind === 'divided' && (this.x > lay.maxX - 0.05 || this.x < lay.minX + 0.05) && this.mph > 15 && this.crossCool <= 0) { this.crossCool = 3; this.award('LANE_CROSS', 'EDGE LINE'); }
+    if (lay.kind === 'divided' && (this.x > lay.maxX - 0.05 || this.x < lay.minX + 0.05) && this.mph > 15 && this.crossCool <= 0 && !this.onRampLane(this.x)) { this.crossCool = 3; this.award('LANE_CROSS', 'EDGE LINE'); }
     // HOV: a solo driver stays out
     if (st.hov && this.laneIdx === 0 && this.mph > 5) { this.hovT += dt; if (this.hovT > 2.2 && this.time > this.hovCool) { this.hovCool = this.time + 8; this.award('HOV_SOLO', 'HOV: 2+ RIDERS'); } } else this.hovT = Math.max(0, this.hovT - dt);
     // keep right except to pass
