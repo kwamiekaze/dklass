@@ -285,7 +285,12 @@ export class AtlSim {
     const lay = this.lay, T = this.traveled, own = lay.lanes;
     // buckets of live same-direction cars per lane, sorted by d
     const lanes: Veh[][] = Array.from({ length: own + 2 }, () => []);
-    for (const v of this.vehicles) if (v.dir === 1 && !v.side) { const li = Math.max(0, Math.min(own + 1, Math.round(v.lane))); (lanes[li] ??= []).push(v); }
+    const bucket = (lane: number) => Math.max(0, Math.min(own + 1, Math.round(lane)));
+    for (const v of this.vehicles) if (v.dir === 1 && !v.side) {
+      const li = bucket(v.lane); (lanes[li] ??= []).push(v);
+      // a car that is changing lane (or merging) occupies both lanes until it has finished, so the cars around it can see it
+      if (v.lcT > 0) for (const other of [bucket(v.lcFrom), bucket(v.tl)]) if (other !== li) (lanes[other] ??= []).push(v);
+    }
     for (const b of lanes) b.sort((a, c) => a.d - c.d);
     const playerLane = this.laneIdx, pD = T, pL = 4.7;
     const leaderOf = (v: Veh, lane: number): { gap: number; v: number } | null => {
@@ -309,7 +314,8 @@ export class AtlSim {
       if (v.still) { continue; }
       if (v.dir === -1) { v.d -= v.v * dt; continue; }
       if (v.side) continue;
-      const lead = leaderOf(v, v.lcT > 0 && v.lcT < 0.5 ? v.lcFrom : v.tl);
+      let lead = leaderOf(v, v.lcT > 0 && v.lcT < 0.5 ? v.lcFrom : v.tl);
+      if (v.lcT > 0) { const l2 = leaderOf(v, v.lcT < 0.5 ? v.tl : v.lcFrom); if (l2 && (!lead || l2.gap < lead.gap)) lead = l2; }
       // intelligent driver model
       const a0 = 2.4, b = 3.6, s0 = 2.6, Th = 1.25 + (this.stage.isRush ? 0.2 : 0);
       let a = a0 * (1 - Math.pow(v.v / Math.max(1, v.want), 4));
@@ -332,7 +338,13 @@ export class AtlSim {
         v.lane = v.lcFrom + (v.tl - v.lcFrom) * s;
         if (f >= 1) { v.lcT = 0; v.lane = v.tl; v.sig = 0; v.lcWait = 4 + this.rnd.frac() * 8; }
       } else if (v.mergeAt !== undefined) {
-        if (v.d >= v.mergeAt) { v.mergeAt = undefined; v.lcFrom = v.lane; v.lcT = 0.0001; v.sig = -1; }
+        if (v.d >= v.mergeAt) {
+          // merge only into a real gap: nobody alongside or close behind in the lane it is joining (the ramp ends 70 m on, then it goes anyway)
+          const tb = lanes[bucket(v.tl)] ?? [];
+          const room = tb.every((o) => o === v || Math.abs(o.d - v.d) > (DIM[o.kind].l + DIM[v.kind].l) / 2 + (o.d < v.d ? 6 + Math.max(0, o.v - v.v) * 1.2 : 4));
+          if (room || v.d > v.mergeAt + 70) { v.mergeAt = undefined; v.lcFrom = v.lane; v.lcT = 0.0001; v.sig = -1; }
+          else { v.sig = -1; if (tb.some((o) => o !== v && Math.abs(o.d - v.d) <= (DIM[o.kind].l + DIM[v.kind].l) / 2 + 6)) v.v = Math.max(8, v.v - 1.6 * dt); }
+        }
         else if (v.d > v.mergeAt - 70) v.sig = -1;
       } else {
         v.lcWait -= dt;

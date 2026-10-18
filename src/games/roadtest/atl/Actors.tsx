@@ -63,7 +63,7 @@ export function Traffic() {
       if (v.fly) { y = Math.max(0, 1.1 * v.fly.t - 3.2 * v.fly.t * v.fly.t); rz = Math.min(0.5, v.fly.t * 0.6) * Math.sign(v.fly.vx || 1); ry = v.yaw; }
       else if (v.lcT > 0 && v.v > 2) { const f = Math.min(1, v.lcT), ds = (6 * f * (1 - f) / 2.4) * (v.tl - v.lcFrom) * LANE; ry = v.yaw - Math.atan2(ds, v.v) * 0.9; }
       put(b.paint, i, v.x, y, -v.d, ry, rz); put(b.detail, i, v.x, y, -v.d, ry, rz); put(b.tail, i, v.x, y, -v.d, ry, rz); put(b.head, i, v.x, y, -v.d, ry, rz);
-      b.paint.setColorAt(i, tmpC.setHex(v.kind === 'police' ? 0xf4f6f8 : v.kind === 'taxi' ? 0xf2c14e : v.kind === 'tow' ? 0xf0b81c : v.kind === 'semi' || v.kind === 'bus' ? (v.look % 2 ? 0xf0f1f3 : 0xc23b2f) : v.color));
+      b.paint.setColorAt(i, tmpC.setHex(v.kind === 'police' ? 0xf4f6f8 : v.kind === 'taxi' ? 0xf2c14e : v.kind === 'tow' ? 0xf0b81c : v.kind === 'ambulance' ? 0xf4f6f8 : v.kind === 'bus' ? (v.look % 2 ? 0xf0f1f3 : 0xe3ebf3) : v.kind === 'semi' ? SEMI_COLOURS[v.look % SEMI_COLOURS.length]! : v.color));
       const rear = v.dir === -1 ? 0.0 : v.brake || v.still ? 1.5 : lampBase * 0.55;
       b.tail.setColorAt(i, tmpC.setScalar(v.dir === -1 ? 0.15 : rear));
       b.head.setColorAt(i, tmpC.setScalar(v.dir === -1 ? 0.55 + 0.9 * Math.min(1, nt) : 0.25 + 0.5 * Math.min(1, nt)));
@@ -92,6 +92,7 @@ export function Traffic() {
   return <group ref={root} />;
 }
 import { atmo } from '../g3d/atmo';
+const SEMI_COLOURS = [0xf0f1f3, 0xc23b2f, 0x2b5aa8, 0x2f7a4a];
 const atmo_dark = () => Math.max(0.55 * atmo.look.fog, 0.4 * atmo.look.storm, 0.3 * atmo.look.rain, 0.25 * atmo.look.snow);
 
 // ------------------------------------------------------------------ cones, barrels and the arrow board ---

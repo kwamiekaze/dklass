@@ -45,7 +45,7 @@ const RAW: AtlStage[] = [
       { at: 0.8, no: '245', dests: ['Abernathy Blvd', 'Capitol Ave', 'Turner Field'], quiet: true },
       { at: 0.94, no: '243', shields: [GA('166')], dests: ['Langford Pkwy', 'East Point'] },
     ],
-    events: [{ t: 'merge', at: 0.28 }, { t: 'police', at: 0.5 }, { t: 'merge', at: 0.7 }, { t: 'vms', at: 0.12, text: 'USE  I-285  TO  BYPASS|DOWNTOWN' }],
+    events: [{ t: 'tip', at: 0.12, title: 'Pick your lane early', sub: 'Drivers hunting for the airport and I-20 make late lane changes. Choose your lane early and hold it.' }, { t: 'merge', at: 0.28 }, { t: 'police', at: 0.5 }, { t: 'merge', at: 0.7 }, { t: 'vms', at: 0.12, text: 'USE  I-285  TO  BYPASS|DOWNTOWN' }],
   }),
   base({
     id: 'atl-i20-west', limit: 65, name: 'I-20 West to Douglasville', subtitle: 'I-20 W · Out past the Westside toward Carrollton country', roadName: 'I-20 WEST', region: 'westside', skyline: 'hills', lanes: 4, lengthM: 4600, tod: 'day', traffic: 0.75, trucks: 0.22, curves: 'rolling', trees: 'pine', walls: 'warehouse', par: 1500, place: 'Westside to Douglas County',
@@ -73,7 +73,7 @@ const RAW: AtlStage[] = [
       { at: 0.65, no: '29', dests: ['Ashford Dunwoody Rd', 'Dunwoody'] },
       { at: 0.88, no: '33', shields: [I('85')], dir: 'NORTH', dests: ['Greenville'], also: [{ shields: [I('85')], dir: 'SOUTH', dests: ['Atlanta'], arrows: ['upright'] }] },
     ],
-    events: [{ t: 'merge', at: 0.3 }, { t: 'merge', at: 0.58 }, { t: 'crash', at: 0.82 }],
+    events: [{ t: 'tip', at: 0.18, title: 'The Top End', sub: 'The busiest stretch of I-285. Traffic joins from GA-400 and I-75, so expect weaving. Check your mirrors often.' }, { t: 'merge', at: 0.3 }, { t: 'merge', at: 0.58 }, { t: 'crash', at: 0.82 }],
   }),
   base({
     id: 'atl-i285-west', limit: 65, name: 'West Wall Perimeter', subtitle: 'I-285 N · Cobb Parkway to the Chattahoochee', roadName: 'I-285 NORTH', region: 'cobb', skyline: 'cobb', lanes: 4, lengthM: 4400, tod: 'day', traffic: 0.9, curves: 'rolling', trees: 'hardwood', par: 1500, place: 'Cobb County, west side',
@@ -100,7 +100,7 @@ const RAW: AtlStage[] = [
       { at: 0.66, no: '60', shields: [GA('139')], dests: ['Riverdale Rd'] },
       { at: 0.86, no: '61', shields: [I('85')], dir: 'SOUTH', dests: ['Montgomery'], also: [{ shields: [I('85')], dir: 'NORTH', dests: ['Atlanta'], arrows: ['upright'] }] },
     ],
-    events: [{ t: 'vms', at: 0.1, text: 'AIRPORT  TRAFFIC|EXPECT  DELAYS' }, { t: 'merge', at: 0.4 }, { t: 'merge', at: 0.7 }, { t: 'police', at: 0.78 }],
+    events: [{ t: 'tip', at: 0.18, title: 'Airport traffic', sub: 'Rental cars and shuttles brake late. Keep a longer gap and watch the signs for the airport exits.' }, { t: 'vms', at: 0.1, text: 'AIRPORT  TRAFFIC|EXPECT  DELAYS' }, { t: 'merge', at: 0.4 }, { t: 'merge', at: 0.7 }, { t: 'police', at: 0.78 }],
   }),
   base({
     id: 'atl-i285-east', limit: 65, name: 'East Side Perimeter', subtitle: 'I-285 S · DeKalb County and the Stone Mountain Freeway', roadName: 'I-285 SOUTH', region: 'intown', skyline: 'suburb', lanes: 4, lengthM: 4300, tod: 'golden', traffic: 0.85, curves: 'gentle', trees: 'hardwood', walls: 'retail', par: 1500, place: 'DeKalb County',
@@ -113,7 +113,7 @@ const RAW: AtlStage[] = [
       { at: 0.76, no: '43', shields: [US('278')], dests: ['Covington Hwy'] },
       { at: 0.94, no: '46', shields: [I('20')], dir: 'EAST', dests: ['Augusta'], also: [{ shields: [I('20')], dir: 'WEST', dests: ['Atlanta'], arrows: ['upright'] }] },
     ],
-    events: [{ t: 'merge', at: 0.3 }, { t: 'crash', at: 0.55 }, { t: 'merge', at: 0.8 }],
+    events: [{ t: 'tip', at: 0.18, title: 'Stone Mountain Freeway', sub: 'US-78 splits off the Perimeter here. Read the green signs early, not at the gore.' }, { t: 'merge', at: 0.3 }, { t: 'crash', at: 0.55 }, { t: 'merge', at: 0.8 }],
   }),
   base({
     id: 'atl-i75-cobb', limit: 65, name: 'I-75 to Marietta', subtitle: 'I-75 N · Cobb County and the Chattahoochee bridge', roadName: 'I-75 NORTH', region: 'cobb', skyline: 'cobb', lanes: 4, lengthM: 4600, tod: 'day', traffic: 0.95, curves: 'rolling', trees: 'pine', walls: 'retail', par: 1550, place: 'Cobb Parkway corridor',
@@ -127,7 +127,7 @@ const RAW: AtlStage[] = [
       { at: 0.8, no: '268', shields: [I('575')], dir: 'NORTH', dests: ['Canton', 'Ball Ground'] },
       { at: 0.94, no: '269', shields: [GA('5')], dests: ['Barrett Pkwy', 'Kennesaw'] },
     ],
-    events: [{ t: 'merge', at: 0.28 }, { t: 'work', at: 0.5, len: 600 }, { t: 'merge', at: 0.78 }],
+    events: [{ t: 'tip', at: 0.18, title: 'Chattahoochee bridge', sub: 'The river bridge leaves no room to swerve. Hold your lane and keep your space.' }, { t: 'merge', at: 0.28 }, { t: 'work', at: 0.5, len: 600 }, { t: 'merge', at: 0.78 }],
   }),
   base({
     id: 'atl-i75-henry', limit: 65, name: 'I-75 South to McDonough', subtitle: 'I-75 S · Clayton and Henry counties', roadName: 'I-75 SOUTH', region: 'henry', skyline: 'hills', lanes: 4, lengthM: 4800, tod: 'day', traffic: 0.7, trucks: 0.25, curves: 'gentle', trees: 'pine', walls: 'warehouse', par: 1450, place: 'Henry County',
@@ -182,7 +182,7 @@ const RAW: AtlStage[] = [
       { at: 0.76, no: '5', dests: ['Abernathy Rd', 'Dunwoody'] },
       { at: 0.92, no: '7', shields: [GA('140')], dests: ['Holcomb Bridge Rd', 'Roswell'] },
     ],
-    events: [{ t: 'merge', at: 0.36 }, { t: 'police', at: 0.58 }, { t: 'merge', at: 0.78 }],
+    events: [{ t: 'tip', at: 0.18, title: 'GA-400', sub: 'The toll booth is long gone, but merges come fast around Buckhead. Signal early and match speed.' }, { t: 'merge', at: 0.36 }, { t: 'police', at: 0.58 }, { t: 'merge', at: 0.78 }],
   }),
   base({
     id: 'atl-rush-hour', limit: 55, name: 'Connector Rush Hour', subtitle: 'I-75/85 · Stop and go at 5 pm. Stay calm', roadName: 'I-75/85 NORTH', region: 'midtown', skyline: 'midtown', lanes: 5, lengthM: 3400, tod: 'dusk', traffic: 1.5, flow: 0.45, trucks: 0.1, curves: 'rolling', par: 1600, place: 'Midtown Atlanta', isRush: true,
@@ -247,7 +247,7 @@ const RAW: AtlStage[] = [
       { at: 0.55, no: '224', dests: ['Hudson Bridge Rd', 'Eagles Landing Pkwy'] },
       { at: 0.82, no: '221', dests: ['Jonesboro Rd', 'Lovejoy'] },
     ],
-    events: [{ t: 'work', at: 0.3, len: 700 }, { t: 'work', at: 0.7, len: 500 }, { t: 'merge', at: 0.5 }],
+    events: [{ t: 'tip', at: 0.18, title: 'Georgia work zones', sub: 'Fines are doubled where crews are working. Slow down, merge early and never tailgate.' }, { t: 'work', at: 0.3, len: 700 }, { t: 'work', at: 0.7, len: 500 }, { t: 'merge', at: 0.5 }],
     lessons: ['Fines are doubled in work zones in Georgia. The workers are real people.', 'Merge early. Do not wait for the cones.', 'Watch for sudden stops. Look over the car ahead.'],
   }),
   base({
@@ -259,7 +259,7 @@ const RAW: AtlStage[] = [
       { at: 0.55, no: '27', shields: [GA('400')], dir: 'NORTH', dests: ['Alpharetta', 'Cumming'], also: [{ shields: [GA('400')], dir: 'SOUTH', dests: ['Atlanta'], arrows: ['upright'] }] },
       { at: 0.88, no: '33', shields: [I('85')], dir: 'NORTH', dests: ['Greenville'], also: [{ shields: [I('85')], dir: 'SOUTH', dests: ['Atlanta'], arrows: ['upright'] }] },
     ],
-    events: [{ t: 'police', at: 0.2 }, { t: 'police', at: 0.45 }, { t: 'crash', at: 0.62 }, { t: 'police', at: 0.82 }],
+    events: [{ t: 'tip', at: 0.18, title: 'Move Over, Georgia', sub: 'Change lanes if you can, or slow down, for stopped police, tow and highway-help trucks.' }, { t: 'police', at: 0.2 }, { t: 'police', at: 0.45 }, { t: 'crash', at: 0.62 }, { t: 'police', at: 0.82 }],
     lessons: ['Georgia law: move over one lane for emergency vehicles on the shoulder, or slow down if you cannot.', 'Signal first, check the mirror, then move.', 'Slow to 20 under the limit if you cannot change lanes.'],
   }),
   base({
@@ -271,7 +271,7 @@ const RAW: AtlStage[] = [
       { at: 0.5, no: '44', shields: [GA('6')], dests: ['Thornton Rd', 'Lithia Springs'] },
       { at: 0.8, no: '41', dests: ['Lee Rd', 'Lithia Springs'] },
     ],
-    events: [{ t: 'vms', at: 0.05, text: 'DENSE  FOG|SLOW  DOWN  LOW  BEAMS' }, { t: 'crash', at: 0.55 }],
+    events: [{ t: 'tip', at: 0.18, title: 'Valley fog', sub: 'Fog settles low near the river. Use low beams, never high beams, and slow down.' }, { t: 'vms', at: 0.05, text: 'DENSE  FOG|SLOW  DOWN  LOW  BEAMS' }, { t: 'crash', at: 0.55 }],
     lessons: ['Low beams in fog, never high beams. They bounce back at you.', 'Slow down enough to stop within what you can see.', 'Use the white edge line to stay on the road.'],
   }),
 
@@ -285,7 +285,7 @@ const RAW: AtlStage[] = [
   base({
     id: 'atl-carrollton-circle', name: 'Maple Street Roundabout', subtitle: '30117 · Yield, look left, then go', roadName: 'MAPLE ST', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 2200, limit: 30, maxSpeed: 45, tod: 'golden', traffic: 0.5, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'houses', par: 1000, place: 'Carrollton, Georgia',
     guide: [sign(0.14, undefined, undefined, ['Roundabout ahead'], { arrows: ['up'] }), sign(0.55, [GA('166')], undefined, ['Bankhead Hwy', 'Lovvorn Rd'], { arrows: ['right'] })],
-    events: [{ t: 'circle', at: 0.3 }, { t: 'ped', at: 0.45 }, { t: 'circle', at: 0.7 }],
+    events: [{ t: 'tip', at: 0.07, title: 'Yield at the entry', sub: 'Traffic already in the circle goes first. Look left, enter when clear, signal your exit.' }, { t: 'circle', at: 0.3 }, { t: 'ped', at: 0.45 }, { t: 'circle', at: 0.7 }],
     lessons: ['Slow down, look left, yield to traffic already in the circle.', 'Never stop inside a roundabout.', 'Signal right when you leave.'],
   }),
   base({
@@ -297,7 +297,7 @@ const RAW: AtlStage[] = [
   base({
     id: 'atl-bankhead-hwy', name: 'Bankhead Highway', subtitle: 'US-78 · Four lanes of Georgia strip road', roadName: 'BANKHEAD HWY', road: 'arterial', region: 'carrollton', skyline: 'carrollton', lanes: 2, lengthM: 3000, limit: 45, maxSpeed: 62, tod: 'day', traffic: 0.7, flow: 0.95, curves: 'gentle', trees: 'mixed', walls: 'retail', par: 1200, place: 'Carrollton to Villa Rica',
     guide: [sign(0.1, [US('78')], undefined, ['Bankhead Hwy', 'Villa Rica'], { arrows: ['up'] }), sign(0.5, [GA('61')], undefined, ['Villa Rica', 'Carrollton'], { arrows: ['upright'] }), sign(0.8, [GA('8')], undefined, ['Douglasville', 'Temple'], { arrows: ['up'] })],
-    events: [{ t: 'light', at: 0.2 }, { t: 'light', at: 0.45 }, { t: 'rail', at: 0.62, train: true, gates: true, name: 'Bankhead' }, { t: 'light', at: 0.85 }],
+    events: [{ t: 'tip', at: 0.18, title: 'Bankhead Highway', sub: 'One of the first paved cross-country routes. Today it is full of driveways, so watch for turning cars.' }, { t: 'light', at: 0.2 }, { t: 'light', at: 0.45 }, { t: 'rail', at: 0.62, train: true, gates: true, name: 'Bankhead' }, { t: 'light', at: 0.85 }],
     lessons: ['Yellow means stop if you safely can.', 'Watch for cars turning into driveways.', 'Left lane on a four-lane road is for passing.'],
   }),
   base({
@@ -308,38 +308,38 @@ const RAW: AtlStage[] = [
   base({
     id: 'atl-douglasville', name: 'Chapel Hill Road', subtitle: 'Douglasville · Railroad crossings and four lanes', roadName: 'CHAPEL HILL RD', road: 'arterial', region: 'douglasville', skyline: 'suburb', lanes: 2, lengthM: 2800, limit: 40, maxSpeed: 58, tod: 'day', traffic: 0.75, flow: 0.95, curves: 'gentle', trees: 'mixed', walls: 'retail', par: 1200, place: 'Douglasville, Georgia',
     guide: [sign(0.1, [GA('5')], undefined, ['Douglasville', 'Dallas'], { arrows: ['up'] }), sign(0.55, [I('20')], 'EAST', ['Atlanta'], { arrows: ['upright'] })],
-    events: [{ t: 'light', at: 0.2 }, { t: 'rail', at: 0.38, train: true, gates: true, name: 'Chapel Hill' }, { t: 'ped', at: 0.58 }, { t: 'light', at: 0.74 }, { t: 'circle', at: 0.88 }],
+    events: [{ t: 'tip', at: 0.18, title: 'Railroad crossings', sub: 'Stop at least 15 feet from the nearest rail. Never change lanes or stop on the tracks.' }, { t: 'light', at: 0.2 }, { t: 'rail', at: 0.38, train: true, gates: true, name: 'Chapel Hill' }, { t: 'ped', at: 0.58 }, { t: 'light', at: 0.74 }, { t: 'circle', at: 0.88 }],
   }),
   base({
     id: 'atl-peachtree-street', name: 'Peachtree Street', subtitle: 'Midtown · Stoplights, buses and Georgia Tech students', roadName: 'PEACHTREE ST', road: 'arterial', region: 'midtown', skyline: 'midtown', lanes: 2, lengthM: 2600, limit: 35, maxSpeed: 52, tod: 'dusk', traffic: 0.85, flow: 0.9, curves: 'straight', trees: 'hardwood', walls: 'glass', par: 1150, place: 'Midtown Atlanta',
     guide: [sign(0.1, undefined, undefined, ['Peachtree St', 'Midtown'], { arrows: ['up'] }), sign(0.5, undefined, undefined, ['10th Street', 'Piedmont Park'], { arrows: ['right'] })],
-    events: [{ t: 'light', at: 0.14 }, { t: 'ped', at: 0.25 }, { t: 'light', at: 0.42 }, { t: 'ped', at: 0.58 }, { t: 'light', at: 0.74 }, { t: 'stop', at: 0.9 }],
+    events: [{ t: 'tip', at: 0.18, title: 'Midtown crosswalks', sub: 'Buses, students and scooters. Stop for people in the crosswalk and stay stopped until they clear.' }, { t: 'light', at: 0.14 }, { t: 'ped', at: 0.25 }, { t: 'light', at: 0.42 }, { t: 'ped', at: 0.58 }, { t: 'light', at: 0.74 }, { t: 'stop', at: 0.9 }],
     lessons: ['Look both ways even on green. Red-light runners exist.', 'Scooter riders and walkers share Midtown. Slow down.', 'Do not block the box: stay out of an intersection you cannot clear.'],
   }),
   base({
     id: 'atl-buckhead', name: 'Roswell Road, Buckhead', subtitle: 'Buckhead · Busy lanes, valets and rain-slicked brick', roadName: 'ROSWELL RD', road: 'arterial', region: 'buckhead', skyline: 'buckhead', lanes: 2, lengthM: 2600, limit: 35, maxSpeed: 52, tod: 'night', traffic: 0.9, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'glass', par: 1200, place: 'Buckhead',
     guide: [sign(0.1, undefined, undefined, ['Roswell Rd', 'Buckhead'], { arrows: ['up'] }), sign(0.55, undefined, undefined, ['Peachtree Rd', 'Lenox'], { arrows: ['right'] })],
-    events: [{ t: 'light', at: 0.18 }, { t: 'ped', at: 0.3 }, { t: 'light', at: 0.5 }, { t: 'ped', at: 0.66 }, { t: 'light', at: 0.84 }],
+    events: [{ t: 'tip', at: 0.18, title: 'Wet brick', sub: 'Rain on brick pavers is slick. Brake early and gently, and give valets room.' }, { t: 'light', at: 0.18 }, { t: 'ped', at: 0.3 }, { t: 'light', at: 0.5 }, { t: 'ped', at: 0.66 }, { t: 'light', at: 0.84 }],
   }),
   base({
     id: 'atl-ponce', name: 'Ponce de Leon Avenue', subtitle: 'Decatur · Rail crossing and the city streets', roadName: 'PONCE DE LEON AVE', road: 'arterial', region: 'intown', skyline: 'suburb', lanes: 2, lengthM: 2700, limit: 35, maxSpeed: 52, tod: 'golden', traffic: 0.8, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'brick', par: 1200, place: 'Decatur, Georgia',
     guide: [sign(0.1, [US('278')], undefined, ['Decatur', 'Ponce de Leon'], { arrows: ['up'] }), sign(0.55, [GA('155')], undefined, ['Clairmont Rd'], { arrows: ['right'] })],
-    events: [{ t: 'light', at: 0.16 }, { t: 'rail', at: 0.36, train: true, gates: true, name: 'Ponce' }, { t: 'ped', at: 0.54 }, { t: 'circle', at: 0.72 }, { t: 'light', at: 0.88 }],
+    events: [{ t: 'tip', at: 0.18, title: 'Decatur buses', sub: 'MARTA buses stop often. Expect brake lights and watch for people stepping off.' }, { t: 'light', at: 0.16 }, { t: 'rail', at: 0.36, train: true, gates: true, name: 'Ponce' }, { t: 'ped', at: 0.54 }, { t: 'circle', at: 0.72 }, { t: 'light', at: 0.88 }],
   }),
   base({
     id: 'atl-marietta-square', name: 'Marietta Square', subtitle: 'Marietta · Train tracks, circles and Cobb charm', roadName: 'ROSWELL ST', road: 'local', region: 'cobb', skyline: 'cobb', lanes: 1, lengthM: 2300, limit: 25, maxSpeed: 40, tod: 'day', traffic: 0.55, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'brick', par: 1000, place: 'Marietta, Georgia',
     guide: [sign(0.1, undefined, undefined, ['Marietta Square'], { arrows: ['up'] }), sign(0.6, [US('41')], undefined, ['Cobb Pkwy'], { arrows: ['right'] })],
-    events: [{ t: 'circle', at: 0.2 }, { t: 'ped', at: 0.34 }, { t: 'rail', at: 0.5, train: true, gates: true, name: 'Square' }, { t: 'stop', at: 0.7 }, { t: 'school', at: 0.82, len: 220 }],
+    events: [{ t: 'tip', at: 0.18, title: 'Marietta Square', sub: 'Train tracks, circles and angle parking. Slow down, look twice, yield in the circle.' }, { t: 'circle', at: 0.2 }, { t: 'ped', at: 0.34 }, { t: 'rail', at: 0.5, train: true, gates: true, name: 'Square' }, { t: 'stop', at: 0.7 }, { t: 'school', at: 0.82, len: 220 }],
   }),
   base({
     id: 'atl-stone-mountain', name: 'Stone Mountain Highway', subtitle: 'US-78 · School zones and the granite dome', roadName: 'STONE MOUNTAIN HWY', road: 'arterial', region: 'stonemtn', skyline: 'stonemtn', lanes: 2, lengthM: 2800, limit: 45, maxSpeed: 62, tod: 'day', traffic: 0.7, flow: 0.95, curves: 'rolling', trees: 'pine', walls: 'retail', par: 1200, place: 'Stone Mountain, Georgia',
     guide: [sign(0.1, [US('78')], undefined, ['Stone Mountain', 'Snellville'], { arrows: ['up'] }), sign(0.6, [GA('10')], undefined, ['Memorial Dr'], { arrows: ['upright'] })],
-    events: [{ t: 'school', at: 0.25, len: 300 }, { t: 'light', at: 0.5 }, { t: 'rail', at: 0.66, train: false, gates: false }, { t: 'ped', at: 0.82 }],
+    events: [{ t: 'tip', at: 0.07, title: 'School zones', sub: 'The lower limit applies when the lights flash or children are present. Slow down early.' }, { t: 'school', at: 0.25, len: 300 }, { t: 'light', at: 0.5 }, { t: 'rail', at: 0.66, train: false, gates: false }, { t: 'ped', at: 0.82 }],
   }),
   base({
     id: 'atl-airport-camp-creek', name: 'Camp Creek Parkway', subtitle: 'College Park · Hotels, shuttles and a rail line', roadName: 'CAMP CREEK PKWY', road: 'arterial', region: 'airport', skyline: 'airport', lanes: 2, lengthM: 2700, limit: 45, maxSpeed: 62, tod: 'dusk', traffic: 0.9, flow: 0.95, curves: 'straight', trees: 'none', walls: 'retail', par: 1200, place: 'College Park',
     guide: [sign(0.1, [GA('6')], undefined, ['Camp Creek Pkwy', 'Airport'], { arrows: ['up'] }), sign(0.6, [I('285')], undefined, ['Airport', 'Macon'], { arrows: ['upright'] })],
-    events: [{ t: 'light', at: 0.18 }, { t: 'rail', at: 0.4, train: true, gates: true, name: 'Camp Creek' }, { t: 'ped', at: 0.6 }, { t: 'light', at: 0.8 }],
+    events: [{ t: 'tip', at: 0.18, title: 'Hotels and shuttles', sub: 'Shuttles stop without warning. Keep your gap and cover the brake near driveways.' }, { t: 'light', at: 0.18 }, { t: 'rail', at: 0.4, train: true, gates: true, name: 'Camp Creek' }, { t: 'ped', at: 0.6 }, { t: 'light', at: 0.8 }],
   }),
   // ---- added for the learning path ---
   base({
@@ -351,7 +351,7 @@ const RAW: AtlStage[] = [
   base({
     id: 'atl-lovvorn', name: 'Neighborhood Streets: Lovvorn Road', subtitle: '30117 · School zone, stop signs and a light', roadName: 'LOVVORN RD', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 1900, limit: 30, maxSpeed: 42, tod: 'day', traffic: 0.3, trucks: 0.02, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'houses', par: 850, place: 'Carrollton, Georgia',
     guide: [sign(0.25, undefined, undefined, ['Lovvorn Rd'], { arrows: ['up'] }), sign(0.65, [GA('166')], undefined, ['Bankhead Hwy'], { arrows: ['right'] })],
-    events: [{ t: 'stop', at: 0.2 }, { t: 'school', at: 0.4, len: 220 }, { t: 'ped', at: 0.62 }, { t: 'light', at: 0.82 }],
+    events: [{ t: 'tip', at: 0.18, title: 'Neighborhood streets', sub: 'Kids and bikes appear fast. Stay at or under the limit and cover the brake at driveways.' }, { t: 'stop', at: 0.2 }, { t: 'school', at: 0.4, len: 220 }, { t: 'ped', at: 0.62 }, { t: 'light', at: 0.82 }],
     lessons: ['School zone: 25 while the lights flash. Children can appear from anywhere.', 'Stop before the white line, not on it.', 'A yellow light means stop if you safely can.'],
   }),
   base({

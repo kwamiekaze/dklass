@@ -242,6 +242,14 @@ const ADS: { a: string; b: string; c: string; bg: string; fg: string }[] = [
   { a: 'MAGNOLIA REALTY', b: 'Home is where the porch is', c: 'Call us', bg: '#f4f1ea', fg: '#6a2f2f' },
   { a: 'DRIVINGKLASS', b: 'Parents: your teen is in good hands', c: 'Carrollton 30117 · Book a lesson', bg: '#1a0f33', fg: '#f2c14e' },
   { a: 'GEORGIA 511', b: 'Know before you go', c: 'Traffic · Weather · Cameras', bg: '#101820', fg: '#ffb21a' },
+  { a: 'BOILED PEANUTS', b: 'Hot, salty, Georgia-grown', c: 'Fresh at the next stand', bg: '#6b4a2b', fg: '#fff1d6' },
+  { a: 'SWEET TEA & BISCUITS', b: 'Y\'all come back now', c: 'Family kitchen · Open early', bg: '#b0302a', fg: '#fff3da' },
+  { a: 'BUCKLE UP, GEORGIA', b: 'Click it before you pull out', c: 'Every seat · Every trip', bg: '#0f4c3a', fg: '#ffe08a' },
+  { a: 'FRIDAY NIGHT LIGHTS', b: 'Cheer loud, drive sober', c: 'Go home safe after the game', bg: '#1b2a57', fg: '#ffd166' },
+  { a: 'GEORGIA PEACHES', b: 'Sweet as summer · Roadside stand', c: 'Next right', bg: '#ff8a5b', fg: '#fffaf0' },
+  { a: 'COTTON MILL LOFTS', b: 'Downtown living · Carrollton', c: 'Now leasing', bg: '#3b3f46', fg: '#f4efe6' },
+  { a: 'MOVE OVER, GEORGIA', b: 'Slow down or change lanes', c: 'For police, tow and HERO trucks', bg: '#14224a', fg: '#ffb21a' },
+  { a: 'WEST GEORGIA FARMERS MARKET', b: 'Pecans · Honey · Collards', c: 'Saturdays · Come hungry', bg: '#2e6b3a', fg: '#fff6d8' },
 ];
 function adTexture_raw(i: number): THREE.CanvasTexture {
   const ad = ADS[((i % ADS.length) + ADS.length) % ADS.length]!;
