@@ -1440,3 +1440,26 @@
 .book-btns .dk-btn { flex: 1 1 140px; text-align: center; text-decoration: none; }
 .book-primary { animation: bookPulse 2.2s ease-in-out infinite; }
 @keyframes bookPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(242,193,78,.55); } 50% { box-shadow: 0 0 0 10px rgba(242,193,78,0); } }
+
+/* ---------- The site header, worn by the game ---------- */
+.rt-site-header { position: relative; z-index: 60; width: 100%; font-family: "Cormorant Garamond", Georgia, serif; }
+.rt-site-header .n2-hdr--flow { position: relative; inset: auto; }
+.rt-site-header .n2-hdr--bar.n2-hdr--flow { position: relative; padding-bottom: 14px; }
+.rt-site-header .dk-audio-wrap { position: relative; top: auto; right: auto; z-index: 70; }
+.rt-site-header .dk-audio-btn { width: clamp(38px, 10.6vw, 48px); height: clamp(38px, 10.6vw, 48px); min-width: 0; padding: 0 !important; border-radius: 999px; border: 1px solid rgba(229, 184, 74, .75); color: #ffe08a;
+  background: radial-gradient(circle at 32% 22%, rgba(23, 86, 166, .95), rgba(8, 42, 99, .96) 62%, rgba(6, 27, 72, .98)); box-shadow: inset 0 1px 0 rgba(255, 224, 140, .3), 0 3px 10px rgba(0, 8, 32, .5); font-size: 16px !important; }
+.rt-site-header .dk-audio-popover { right: 0; left: auto; }
+.rt-site-header .rt-quit { height: 38px; padding: 0 14px; font-size: 11px; }
+.game-wrap > .rt-site-header { flex: none; }
+.game-wrap .game-topbar-hint { flex: none; text-align: center; padding: 4px 8px 0; }
+.game-wrap .rt-site-header .n2-hdr--bar .n2-hdr-row { gap: 6px; }
+@media (max-width: 520px) { .game-wrap .rt-site-header .n2-hdr--bar .n2-hdr-word { font-size: clamp(13px, 4vw, 17px); } .rt-site-header .rt-quit { height: 34px; padding: 0 11px; } }
+.rt-audio-float .dk-audio-wrap { top: auto; bottom: calc(14px + env(safe-area-inset-bottom)); right: calc(12px + env(safe-area-inset-right)); }
+.rt-audio-float .dk-audio-btn { border-radius: 999px; width: 46px; height: 46px; padding: 0 !important; background: rgba(8, 28, 70, .88); border: 1px solid rgba(229, 184, 74, .75); }
+.rt-audio-float .dk-audio-popover { top: auto; bottom: 54px; right: 0; left: auto; }
+/* the in-play bar sits in a narrow game column at every screen size: keep the wordmark whole */
+.game-wrap .rt-site-header .n2-hdr--bar .n2-brand { min-width: 0; flex: 1 1 auto; gap: 8px; }
+.game-wrap .rt-site-header .n2-hdr--bar .n2-hdr-sep { display: none; }
+.game-wrap .rt-site-header .n2-hdr--bar .n2-hdr-wheel { width: 44px; }
+.game-wrap .rt-site-header .n2-hdr--bar .n2-hdr-word { font-size: clamp(15px, 4.2vw, 21px); white-space: nowrap; overflow: visible; }
+.rt-site-header .rt-quit { white-space: nowrap; flex: none; }

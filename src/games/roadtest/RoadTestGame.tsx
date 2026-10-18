@@ -12,6 +12,7 @@ import { GuestScoreModal } from './GuestScoreModal';
 import { UsernameModal } from './UsernameModal';
 import { MyStatsModal } from './MyStatsModal';
 import { AudioSettingsButton } from './components/AudioSettingsButton';
+import { SiteHeader } from './components/SiteHeader';
 import { submitScore } from './submitScore';
 import { submitLeaderboard } from './submitLeaderboard';
 import { getPlayerName } from './playerName';
@@ -165,7 +166,8 @@ export default function RoadTestGame({ publicMode }: RoadTestGameProps = {}) {
 
   return (
     <div className="dk-game" ref={rootRef}>
-      <AudioSettingsButton />
+      {screen !== 'playing' && <SiteHeader />}
+      {screen !== 'playing' && <div className="rt-audio-float"><AudioSettingsButton /></div>}
       {trackToast && (
         <div className="dk-track-toast" role="status">♪ {trackToast}</div>
       )}

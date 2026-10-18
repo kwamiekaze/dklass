@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { LEVELS } from '../game/levels';
 import { ATL_STAGES, PHASES } from '../atl/stages';
@@ -57,7 +56,6 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
   const [signedIn, setSignedIn] = useState(false);
   const [showInstall, setShowInstall] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
-  const navigate = useNavigate();
 
   useEffect(() => {
     // Auto-show the install tutorial once for mobile browsers where the
@@ -80,7 +78,9 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
       setSignedIn(true);
       // the student's own report cards decide which Atlanta stages get a "recommended" tag
       try {
-        const { data: rc } = await supabase.from('report_cards').select(`id, created_at, overall, ${SKILL_KEYS.join(', ')}`).eq('student_id', data.user.id).eq('report_card_status', 'completed').order('created_at', { ascending: true });
+        let sid: string = data.user.id;
+        try { const { data: canon } = await supabase.rpc('canonical_user_id', { _uid: sid }); if (typeof canon === 'string' && canon) sid = canon; } catch { /* keep own id */ }
+        const { data: rc } = await supabase.from('report_cards').select(`id, created_at, overall, ${SKILL_KEYS.join(', ')}`).eq('student_id', sid).eq('report_card_status', 'completed').order('created_at', { ascending: true });
         const rows = (rc || []) as unknown as ReportCardRatings[];
         if (rows.length) {
           const rated = computeRadarData(rows).filter((r) => r.average > 0).sort((a, b) => a.average - b.average);
@@ -107,32 +107,9 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
   const weakLabels = weak.map((k) => SKILL_LABELS[k] ?? k);
   const startLevel = (id: string) => { clickTick(); onStart(id); };
 
-  const goHome = async () => {
-    clickTick();
-    if (publicMode) { navigate('/'); return; }
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) { navigate('/'); return; }
-    const { data: roleRow } = await supabase
-      .from('user_roles').select('role').eq('user_id', data.user.id).maybeSingle();
-    const role = roleRow?.role;
-    if (role === 'admin') navigate('/admin');
-    else if (role === 'instructor') navigate('/instructor');
-    else navigate('/student');
-  };
 
   return (
     <div className="screen start-screen">
-      <header className="brand-header">
-        <button
-          type="button"
-          onClick={goHome}
-          className="brand-mark brand-mark-link"
-          aria-label={publicMode ? 'Back to homepage' : 'Go to dashboard'}
-        >
-          DRIVING<span>KLASS</span>
-        </button>
-        <div className="brand-stars">★★★★★</div>
-      </header>
 
       <div className="hero-card">
         <img

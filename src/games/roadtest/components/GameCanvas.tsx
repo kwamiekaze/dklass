@@ -6,6 +6,9 @@ import { resetTouchControls } from '../game/controls';
 import { sound } from '../sound';
 import { TouchControls } from './TouchControls';
 import { FeedbackModal } from './FeedbackModal';
+import { SiteHeader } from './SiteHeader';
+import { AudioSettingsButton } from './AudioSettingsButton';
+import { Star } from 'lucide-react';
 import { Game3D } from '../g3d/Game3D';
 import { useGameScene, type SceneHandle } from '../g3d/GameScene';
 
@@ -181,24 +184,20 @@ export function GameCanvas({ levelId, difficulty, onComplete, onQuit }: Props) {
     }
   };
 
+  const askQuit = () => { if (handle3d.current) handle3d.current.paused.current = true; setShowQuitPrompt(true); };
+
   return (
     <div className={`game-wrap${use3d ? ' rt3d-on' : ''}`}>
-      <div className="game-topbar">
-        <button
-          className="dk-btn dk-btn-ghost dk-btn-small"
-          onClick={() => { if (handle3d.current) handle3d.current.paused.current = true; setShowQuitPrompt(true); }}
-        >
-          ← Quit lesson
-        </button>
-        <span className="game-topbar-hint">{levelId.startsWith('atl-') ? '↑ gas · ↓ brake · ←→ steer · Q/E signal' : '↑ gas · ↓ brake · ←→ steer'}</span>
-        <button
-          className="dk-btn dk-btn-gold-outline dk-btn-small"
-          onClick={() => setShowFeedback(true)}
-          aria-label="Send feedback"
-        >
-          ★ Feedback
-        </button>
-      </div>
+      <SiteHeader
+        bar
+        onBrand={askQuit}
+        actions={<>
+          <button type="button" className="n2-book rt-quit" onClick={askQuit} aria-label="Quit lesson">← Quit</button>
+          <button type="button" className="n2-hdr-btn" onClick={() => setShowFeedback(true)} aria-label="Send feedback" title="Send feedback"><Star size={20} aria-hidden="true" /></button>
+          <AudioSettingsButton />
+        </>}
+      />
+      <div className="game-topbar-hint">{levelId.startsWith('atl-') ? '↑ gas · ↓ brake · ←→ steer · Q/E signal' : '↑ gas · ↓ brake · ←→ steer'}</div>
       {use3d
         ? <div className="game-host rt3d-host">
             {levelId.startsWith('atl-')

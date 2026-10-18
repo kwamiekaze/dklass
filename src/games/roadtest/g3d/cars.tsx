@@ -63,7 +63,9 @@ function Beams({ id, sim }: { id: GarageId; sim: RunSim }) {
   useFrame((_, dt) => {
     const L = atmo.look;
     const dark = Math.max(night.current, 0.55 * L.fog, 0.35 * L.storm, 0.3 * L.rain, 0.25 * L.snow);
-    const want = clamp((dark - 0.12) / 0.5, 0, 1) * (sim.finished ? 0.35 : 1);
+    // headlights are a switch, not a throttle: on in the dark, dusk, fog, rain, snow and storms (Georgia law with wipers on), steady whatever the pedals do
+    const wet = Math.max(L.rain, L.fog, L.storm, L.snow) > 0.12;
+    const want = (wet || dark > 0.3 ? 1 : clamp((dark - 0.15) / 0.15, 0, 1)) * (sim.finished ? 0.35 : 1);
     const a = damp(cone.uniforms.uA!.value as number, want, 5, dt);
     cone.uniforms.uA!.value = a; poolMat.uniforms.uA!.value = a * (1 + 0.5 * Math.min(1, L.rain + L.storm));
     cone.uniforms.uHaze!.value = Math.min(1, L.fog + 0.6 * L.rain + 0.7 * L.snow + 0.5 * L.storm);
@@ -173,8 +175,8 @@ export function PlayerCar({ sim, carId, lite, rig }: { sim: RunSim; carId: Garag
           <FleetCar specId={carId} color={SWATCH[carId] ?? '#f2b92a'} plate={PLATE[carId] ?? 'DK00GO'} position={[0, 0, 0]} lite={lite} signal={signal} wheels={wheels} />
         </Suspense>
         <BrakeGlow id={carId} brake={brake} />
-        <Beams id={carId} sim={sim} />
       </group>
+      <Beams id={carId} sim={sim} />
     </group>
     <Auras sim={sim} />
   </group>;
