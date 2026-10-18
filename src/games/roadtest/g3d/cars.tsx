@@ -51,14 +51,14 @@ function Beams({ id, sim }: { id: GarageId; sim: RunSim }) {
     uniforms: { uA: { value: 0 }, uHaze: { value: 0 } },
     vertexShader: 'varying vec3 vN; varying vec3 vV; varying float vU; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vU = clamp(position.y / 26., 0., 1.); gl_Position = projectionMatrix * mv; }',
     // narrow and bright at the lamp, wide and faint far ahead; the silhouette fades so the cone reads as light in air, not as a tube
-    fragmentShader: 'varying vec3 vN; varying vec3 vV; varying float vU; uniform float uA; uniform float uHaze; void main(){ float e = pow(abs(dot(normalize(vN), normalize(vV))), 1.1); float core = pow(1. - vU, 1.5) * smoothstep(0., .035, vU); vec3 c = mix(vec3(1., .93, .78), vec3(.72, .84, 1.), smoothstep(.1, .9, vU)); gl_FragColor = vec4(c, e * core * uA * (.85 + uHaze * .6)); }',
+    fragmentShader: 'varying vec3 vN; varying vec3 vV; varying float vU; uniform float uA; uniform float uHaze; void main(){ float e = pow(abs(dot(normalize(vN), normalize(vV))), 1.1); float core = pow(1. - vU, 1.5) * smoothstep(0., .035, vU); vec3 c = mix(vec3(1., .93, .78), vec3(.72, .84, 1.), smoothstep(.1, .9, vU)); gl_FragColor = vec4(c, e * core * uA * (.26 + uHaze * .42)); }',
   }), []);
   const poolMat = useMemo(() => new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false,
     uniforms: { uA: { value: 0 } },
     vertexShader: 'varying vec2 vP; void main(){ vP = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
     // two overlapping soft ellipses on the road, brightest a few metres ahead, with a faint hot spot where the beams cross
-    fragmentShader: 'varying vec2 vP; uniform float uA; void main(){ vec2 p = vP * 2. - 1.; float x = p.x * .5 + .5; float wide = 1. - smoothstep(0., 1., length(vec2(p.x * 1.05, p.y * (.55 + x * .5)))); float hot = 1. - smoothstep(0., 1., length(vec2((x - .3) * 2.4, p.y * 1.6))); float lat = smoothstep(.0, .12, x); float a = (wide * wide * .55 + hot * hot * .45) * lat; gl_FragColor = vec4(vec3(1., .94, .8) * a, a * uA * 2.6); }',
+    fragmentShader: 'varying vec2 vP; uniform float uA; void main(){ vec2 p = vP * 2. - 1.; float x = p.x * .5 + .5; float wide = 1. - smoothstep(0., 1., length(vec2(p.x * 1.05, p.y * (.55 + x * .5)))); float hot = 1. - smoothstep(0., 1., length(vec2((x - .3) * 2.4, p.y * 1.6))); float lat = smoothstep(.0, .12, x); float a = (wide * wide * .5 + hot * hot * .2) * lat; gl_FragColor = vec4(vec3(1., .94, .8) * a, a * uA * .8); }',
   }), []);
   useFrame((_, dt) => {
     const L = atmo.look;
@@ -71,9 +71,9 @@ function Beams({ id, sim }: { id: GarageId; sim: RunSim }) {
     cone.uniforms.uHaze!.value = Math.min(1, L.fog + 0.6 * L.rain + 0.7 * L.snow + 0.5 * L.storm);
     if (grp.current) grp.current.visible = a > 0.02;
     if (pool.current) pool.current.visible = a > 0.02;
-    if (spot.current) spot.current.intensity = a * 34;
+    if (spot.current) spot.current.intensity = a * 9;
     const day = 0.2 * (1 - clamp(want * 3, 0, 1));
-    for (const f of flares.current) if (f) { const m = f.material as THREE.SpriteMaterial; m.opacity = Math.min(0.85, a * 0.8 + day); f.visible = m.opacity > 0.02; }
+    for (const f of flares.current) if (f) { const m = f.material as THREE.SpriteMaterial; m.opacity = Math.min(0.4, a * 0.36 + day * 0.5); f.visible = m.opacity > 0.02; }
   });
   if (!lamps) return null;
   const x = Math.abs(lamps[0]) - 0.1, y = lamps[1], z = lamps[2], dip = 0.05;
@@ -88,10 +88,10 @@ function Beams({ id, sim }: { id: GarageId; sim: RunSim }) {
     <mesh ref={pool} position={[x + 11, 0.035, 0]} rotation-x={-Math.PI / 2} scale={[24, 9, 1]} material={poolMat} renderOrder={4} visible={false}>
       <planeGeometry args={[1, 1]} />
     </mesh>
-    {[-1, 1].map((sd, i) => <sprite key={sd} ref={(s) => { flares.current[i] = s; }} position={[x + 0.05, y, sd * z]} scale={[0.8, 0.8, 1]} visible={false}>
+    {[-1, 1].map((sd, i) => <sprite key={sd} ref={(s) => { flares.current[i] = s; }} position={[x + 0.05, y, sd * z]} scale={[0.5, 0.5, 1]} visible={false}>
       <spriteMaterial map={glow()} color="#ffe9bf" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
     </sprite>)}
-    <spotLight ref={spot} position={[x, y + 0.2, 0]} angle={0.52} penumbra={0.9} distance={48} decay={1.25} intensity={0} color="#fff1d6" />
+    <spotLight ref={spot} position={[x, y + 0.2, 0]} angle={0.52} penumbra={0.9} distance={34} decay={1.4} intensity={0} color="#fff1d6" />
     <object3D ref={tgt} position={[x + 20, 0, 0]} />
   </>;
 }

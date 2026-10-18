@@ -193,8 +193,8 @@ function Board({ d, lines, bend, sim, lay, night }: { d: number; lines: string[]
     <mesh material={steel} position={[lay.padL - 0.7, 3.6, 0]}><boxGeometry args={[0.45, 7.2, 0.45]} /></mesh>
     <mesh material={steel} position={[lay.padR + 0.7, 3.6, 0]}><boxGeometry args={[0.45, 7.2, 0.45]} /></mesh>
     <mesh material={steel} position={[cx, 7.2, 0]}><boxGeometry args={[span, 0.5, 0.6]} /></mesh>
-    <mesh material={mat} position={[cx, 8.5, 0.05]}><planeGeometry args={[7.6, 2.14]} /></mesh>
-    <mesh material={steel} position={[cx, 8.5, -0.05]}><boxGeometry args={[7.9, 2.34, 0.2]} /></mesh>
+    <mesh material={mat} position={[cx, 8.5, 0.32]}><planeGeometry args={[7.6, 2.14]} /></mesh>
+    <mesh material={steel} position={[cx, 8.5, 0.18]}><boxGeometry args={[7.9, 2.34, 0.2]} /></mesh>
     <mesh material={steel} position={[cx, 7.6, 0]}><boxGeometry args={[0.3, 1.0, 0.3]} /></mesh>
   </group>;
 }
@@ -208,12 +208,14 @@ function RoadSign({ s }: { s: RoadSignSpec }) {
   const tex = useMemo(() => regulatoryTexture(s.kind, s.n ?? 70), [s.kind, s.n]);
   const mat = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new THREE.Color('#ffffff'), emissiveIntensity: 0.1, roughness: 0.5, transparent: true, alphaTest: 0.05 }), bend), [tex, bend]);
   const post = useBent(() => new THREE.MeshStandardMaterial({ color: '#8f959b', roughness: 0.5, metalness: 0.7 }));
+  const back = useBent(() => new THREE.MeshStandardMaterial({ color: '#b9bec4', roughness: 0.55, metalness: 0.6 }));
   const lay = sim.lay, w = s.w ?? 0.9, h = w * 1.25, x = s.side > 0 ? lay.edgeR + (lay.sidewalks ? 1.0 : 1.3) : lay.edgeL - (lay.sidewalks ? 1.0 : 1.3);
   const xx = s.kind === 'speed' || s.kind === 'keepright' || s.kind === 'hov' || s.kind === 'handsfree' || s.kind === 'moveover' ? (s.side > 0 ? lay.padR + 1.0 : lay.padL - 1.0) : x;
   useFrame(() => { const m = grp.current; if (!m) return; const rel = s.d - sim.traveled; m.visible = rel < AHEAD && rel > -BEHIND; m.position.z = sim.traveled - s.d; mat.emissiveIntensity = 0.1 + clamp(night.current * 1.3 - 0.1, 0, 1) * 0.35; });
   return <group ref={grp} position={[xx, 0, 0]}>
-    <mesh material={post} position={[0, 1.5, -0.04]}><boxGeometry args={[0.1, 3.0, 0.1]} /></mesh>
-    <mesh material={mat} position={[0, 2.3 + h / 2, 0]}><planeGeometry args={[w, h]} /></mesh>
+    <mesh material={post} position={[0, 1.5, -0.09]}><boxGeometry args={[0.1, 3.0, 0.1]} /></mesh>
+    <mesh material={back} position={[0, 2.3 + h / 2, -0.02]}><boxGeometry args={[w * 0.97, h * 0.97, 0.03]} /></mesh>
+    <mesh material={mat} position={[0, 2.3 + h / 2, 0.005]}><planeGeometry args={[w, h]} /></mesh>
   </group>;
 }
 export function RoadSigns() {
@@ -265,59 +267,167 @@ function Crossing({ d, stopLine = true, zebra = true, street = true }: { d: numb
 }
 
 // ------------------------------------------------------------------ railroad crossings ---
+/** The crossbuck board: RAILROAD on one blade, CROSSING on the other, white with black letters. */
+function crossbuckTexture(word: string) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 80; const g = c.getContext('2d')!;
+  g.fillStyle = '#f6f4ee'; g.fillRect(0, 0, 512, 80); g.strokeStyle = '#15171a'; g.lineWidth = 4; g.strokeRect(4, 4, 504, 72);
+  g.fillStyle = '#15171a'; g.font = '700 54px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(word, 256, 43);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+}
+
+/** One freight train: a diesel with a cab and a nose, then boxcars, tank cars and container flats, on bogies with real wheels. Faces +x. */
+function Train({ bend, group }: { bend: ReturnType<typeof useAtl>['bend']; group: React.RefObject<THREE.Group> }) {
+  const mat = (color: string, o: Partial<THREE.MeshStandardMaterialParameters> = {}) => bendMaterial(new THREE.MeshStandardMaterial({ color, roughness: 0.62, metalness: 0.2, ...o }), bend);
+  const M = useMemo(() => ({
+    blue: mat('#1c3d78'), orange: mat('#f08a1c'), dark: mat('#23252a', { roughness: 0.7, metalness: 0.4 }), glass: mat('#1a2431', { roughness: 0.2, metalness: 0.6 }),
+    gray: mat('#6d7279'), rust: mat('#8a3a28', { roughness: 0.8 }), rust2: mat('#6e3022', { roughness: 0.8 }), tank: mat('#2d3035', { roughness: 0.4, metalness: 0.5 }), tan: mat('#b9a98a', { roughness: 0.8 }),
+    c1: mat('#1f6fb0'), c2: mat('#c8402a'), c3: mat('#2f8f5b'), c4: mat('#e0a82c'), steel: mat('#8d9096', { metalness: 0.7, roughness: 0.4 }),
+    lamp: bendMaterial(new THREE.MeshBasicMaterial({ color: '#fff6d8', toneMapped: false }), bend), white: mat('#e8e6df'),
+  }), [bend]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const wheelGeo = useMemo(() => { const g = new THREE.CylinderGeometry(0.46, 0.46, 0.14, 18); g.rotateX(Math.PI / 2); return g; }, []);
+  const axles = useMemo(() => {
+    const out: number[] = []; // x of each axle along the train
+    for (const dx of [-7.2, -5.4, -3.6, 3.6, 5.4, 7.2]) out.push(dx);
+    for (let k = 0; k < 9; k++) { const cx = -(10 + 8.4 + k * 17.5); for (const dx of [-6.8, -5.1, 5.1, 6.8]) out.push(cx + dx); }
+    return out;
+  }, []);
+  const wheels = useRef<THREE.InstancedMesh>(null);
+  const trucks = useRef<THREE.InstancedMesh>(null);
+  const truckGeo = useMemo(() => new THREE.BoxGeometry(3.9, 0.34, 2.3), []);
+  const truckX = useMemo(() => { const out = [-5.4, 5.4]; for (let k = 0; k < 9; k++) { const cx = -(10 + 8.4 + k * 17.5); out.push(cx - 5.9, cx + 5.9); } return out; }, []);
+  useEffect(() => {
+    const m = wheels.current, t = trucks.current; if (!m || !t) return;
+    const q = new THREE.Matrix4(); let i = 0;
+    for (const x of axles) for (const z of [-0.72, 0.72]) { q.makeTranslation(x, 0.68, z); m.setMatrixAt(i++, q); }
+    m.instanceMatrix.needsUpdate = true;
+    truckX.forEach((x, j) => { q.makeTranslation(x, 0.82, 0); t.setMatrixAt(j, q); }); t.instanceMatrix.needsUpdate = true;
+  }, [axles, truckX]);
+  const cars = Array.from({ length: 9 }, (_, k) => ({ k, x: -(10 + 8.4 + k * 17.5), type: ['box', 'tank', 'cont', 'box', 'box', 'tank', 'cont', 'box', 'cont'][k]! }));
+  return <group ref={group} visible={false} position={[-200, 0, 0]}>
+    <instancedMesh ref={wheels} args={[wheelGeo, M.steel, axles.length * 2]} frustumCulled={false} />
+    <instancedMesh ref={trucks} args={[truckGeo, M.dark, truckX.length]} frustumCulled={false} />
+    {/* the diesel: frame, long hood, cab with windows, short nose, stripe, headlight */}
+    <mesh material={M.dark} position={[0, 1.2, 0]}><boxGeometry args={[20.4, 0.5, 2.9]} /></mesh>
+    <mesh material={M.blue} position={[-3.5, 2.55, 0]}><boxGeometry args={[13, 2.2, 2.9]} /></mesh>
+    <mesh material={M.orange} position={[-3.5, 2.2, 1.46]}><boxGeometry args={[13, 0.42, 0.04]} /></mesh>
+    <mesh material={M.orange} position={[-3.5, 2.2, -1.46]}><boxGeometry args={[13, 0.42, 0.04]} /></mesh>
+    <mesh material={M.gray} position={[-6.4, 3.85, 0]}><boxGeometry args={[3.2, 0.5, 1.9]} /></mesh>
+    <mesh material={M.blue} position={[4.1, 3.0, 0]}><boxGeometry args={[5.4, 3.1, 2.9]} /></mesh>
+    <mesh material={M.dark} position={[4.1, 4.62, 0]}><boxGeometry args={[5.6, 0.2, 3.1]} /></mesh>
+    {[1, -1].map((sd) => <mesh key={sd} material={M.glass} position={[4.0, 3.6, sd * 1.46]}><boxGeometry args={[3.6, 1.05, 0.04]} /></mesh>)}
+    <mesh material={M.glass} position={[6.82, 3.6, 0]}><boxGeometry args={[0.04, 1.05, 2.4]} /></mesh>
+    <mesh material={M.orange} position={[4.1, 2.2, 1.46]}><boxGeometry args={[5.4, 0.42, 0.04]} /></mesh>
+    <mesh material={M.orange} position={[4.1, 2.2, -1.46]}><boxGeometry args={[5.4, 0.42, 0.04]} /></mesh>
+    <mesh material={M.blue} position={[8.4, 2.35, 0]}><boxGeometry args={[3.0, 1.8, 2.7]} /></mesh>
+    <mesh material={M.lamp} position={[9.92, 2.7, 0]}><circleGeometry args={[0.2, 16]} /></mesh>
+    <mesh material={M.lamp} position={[9.92, 1.9, 0.8]}><circleGeometry args={[0.1, 12]} /></mesh>
+    <mesh material={M.lamp} position={[9.92, 1.9, -0.8]}><circleGeometry args={[0.1, 12]} /></mesh>
+    {/* the cars */}
+    {cars.map((c) => <group key={c.k} position={[c.x, 0, 0]}>
+      <mesh material={M.dark} position={[0, 1.2, 0]}><boxGeometry args={[16.4, 0.4, 2.2]} /></mesh>
+      <mesh material={M.steel} position={[8.8, 1.2, 0]}><boxGeometry args={[1.2, 0.25, 0.3]} /></mesh>
+      {c.type === 'box' && <>
+        <mesh material={c.k % 2 ? M.rust : M.rust2} position={[0, 3.2, 0]}><boxGeometry args={[15.6, 3.7, 3.0]} /></mesh>
+        <mesh material={M.gray} position={[0, 5.1, 0]}><boxGeometry args={[15.8, 0.2, 2.5]} /></mesh>
+        {[1, -1].map((sd) => <mesh key={sd} material={M.tan} position={[0, 3.1, sd * 1.52]}><boxGeometry args={[3.4, 3.2, 0.06]} /></mesh>)}
+        {Array.from({ length: 9 }, (_, r) => [1, -1].map((sd) => <mesh key={`${r}${sd}`} material={M.dark} position={[-7 + r * 1.75, 3.2, sd * 1.52]}><boxGeometry args={[0.12, 3.5, 0.05]} /></mesh>))}
+      </>}
+      {c.type === 'tank' && <>
+        <mesh material={M.tank} position={[0, 3.0, 0]} rotation-z={Math.PI / 2}><capsuleGeometry args={[1.55, 12.6, 6, 18]} /></mesh>
+        <mesh material={M.dark} position={[0, 4.65, 0]}><cylinderGeometry args={[0.55, 0.65, 0.35, 10]} /></mesh>
+        <mesh material={M.steel} position={[0, 4.95, 0]}><boxGeometry args={[11, 0.1, 0.5]} /></mesh>
+      </>}
+      {c.type === 'cont' && <>
+        {[-3.9, 3.9].map((ox, j) => <mesh key={ox} material={[M.c1, M.c2, M.c3, M.c4][(c.k + j) % 4]!} position={[ox, 2.75, 0]}><boxGeometry args={[7.4, 2.6, 2.5]} /></mesh>)}
+        {[-3.9, 3.9].flatMap((ox) => Array.from({ length: 7 }, (_, r) => [1, -1].map((sd) => <mesh key={`${ox}${r}${sd}`} material={M.dark} position={[ox - 3 + r, 2.75, sd * 1.27]}><boxGeometry args={[0.1, 2.4, 0.04]} /></mesh>)))}
+      </>}
+    </group>)}
+  </group>;
+}
+
 function RailX({ index }: { index: number }) {
   const { sim, bend, night } = useAtl();
   const r = sim.rails[index]!;
   const lay = sim.lay;
   const grp = useRef<THREE.Group>(null), gateR = useRef<THREE.Group>(null), gateL = useRef<THREE.Group>(null), train = useRef<THREE.Group>(null);
-  const lamps = useRef<(THREE.Mesh | null)[]>([]);
-  const M = useMemo(() => ({
-    red: bendMaterial(new THREE.MeshBasicMaterial({ color: '#ff2a1a', toneMapped: false }), bend), dark: bendMaterial(new THREE.MeshStandardMaterial({ color: '#2b2d31', roughness: 0.6, metalness: 0.5 }), bend),
-    white: bendMaterial(new THREE.MeshStandardMaterial({ color: '#f4f1ea', roughness: 0.7 }), bend), arm: bendMaterial(new THREE.MeshStandardMaterial({ color: '#f4f1ea', roughness: 0.7 }), bend),
-    loco: bendMaterial(new THREE.MeshStandardMaterial({ color: '#1f3a6b', roughness: 0.55, metalness: 0.3 }), bend), car: bendMaterial(new THREE.MeshStandardMaterial({ color: '#8b3a2a', roughness: 0.7 }), bend), car2: bendMaterial(new THREE.MeshStandardMaterial({ color: '#4d5963', roughness: 0.7 }), bend), stripe: bendMaterial(new THREE.MeshStandardMaterial({ color: '#f2c14e', roughness: 0.6 }), bend),
-  }), [bend]);
-  const wBox = lay.edgeR - lay.edgeL + 20;
-  const gateSpan = lay.padR - lay.padL - 0.4;
+  const lampsOn = useRef<(THREE.Mesh | null)[]>([]), gateLamps = useRef<(THREE.Mesh | null)[]>([]);
+  const M = useMemo(() => {
+    const st = (color: string, o: Partial<THREE.MeshStandardMaterialParameters> = {}) => bendMaterial(new THREE.MeshStandardMaterial({ color, roughness: 0.7, ...o }), bend);
+    return {
+      red: bendMaterial(new THREE.MeshBasicMaterial({ color: '#ff3020', toneMapped: false }), bend), redOff: st('#4a1511', { roughness: 0.5 }), dark: st('#24262a', { roughness: 0.6, metalness: 0.5 }),
+      white: st('#f4f1ea'), arm: st('#f4f1ea', { roughness: 0.55 }), armRed: st('#d3221a', { roughness: 0.55 }), pole: st('#9aa0a6', { roughness: 0.5, metalness: 0.7 }),
+      rail: st('#8f8d89', { roughness: 0.35, metalness: 0.85 }), tie: st('#4b3a2b', { roughness: 0.95 }), ballast: st('#8a867e', { roughness: 1 }), panel: st('#2c2d31', { roughness: 0.9 }), panelEdge: st('#9a978f', { roughness: 0.9 }),
+      cbA: bendMaterial(new THREE.MeshStandardMaterial({ map: crossbuckTexture('RAILROAD'), roughness: 0.5 }), bend), cbB: bendMaterial(new THREE.MeshStandardMaterial({ map: crossbuckTexture('CROSSING'), roughness: 0.5 }), bend),
+    };
+  }, [bend]);
+  const span = lay.padR - lay.padL;
+  const sw = lay.sidewalks ? 2.8 : 0.0;
+  const xa = lay.padL - sw - 0.2, xb = lay.padR + sw + 0.2;       // the road between these x
+  const gateSpan = span / 2 + 0.2;
+  const ties = useRef<THREE.InstancedMesh>(null);
+  const tieN = 110;
+  const tieGeo = useMemo(() => new THREE.BoxGeometry(0.26, 0.16, 2.7), []);
+  useEffect(() => {
+    const m = ties.current; if (!m) return; const q = new THREE.Matrix4(); let i = 0;
+    for (const side of [-1, 1]) for (let k = 0; k < tieN / 2; k++) { q.makeTranslation((side > 0 ? xb : xa) + side * (0.5 + k * 0.62), 0.07, 0); m.setMatrixAt(i++, q); }
+    m.instanceMatrix.needsUpdate = true;
+  }, [xa, xb]);
   useFrame(({ clock }) => {
     const g = grp.current; if (!g) return; const rel = r.d - sim.traveled; g.visible = rel < AHEAD && rel > -BEHIND; g.position.z = sim.traveled - r.d;
     const active = r.phase === 'warn' || r.phase === 'down' || r.phase === 'train';
-    const flash = Math.floor(clock.elapsedTime * 2.4) % 2 === 0;
-    lamps.current.forEach((m, i) => { if (m) m.visible = active && (i % 2 === 0 ? flash : !flash); });
+    const flash = Math.floor(clock.elapsedTime * 1.6) % 2 === 0;
+    lampsOn.current.forEach((m, i) => { if (m) m.visible = active && (i % 2 === 0 ? flash : !flash); });
+    gateLamps.current.forEach((m, i) => { if (m) m.visible = active && (i % 2 === 0 ? flash : !flash); });
     const down = r.phase === 'down' || r.phase === 'train' ? 1 : r.phase === 'warn' ? clamp((r.t - 1.0) / 1.5, 0, 1) : r.phase === 'up' ? 1 - clamp(r.t / 1.6, 0, 1) : 0;
-    const ang = (1 - down) * 1.35;
-    if (gateR.current) gateR.current.rotation.z = ang; if (gateL.current) gateL.current.rotation.z = -ang;
+    const ang = (1 - down) * 1.4;
+    if (gateR.current) gateR.current.rotation.z = -ang; if (gateL.current) gateL.current.rotation.z = ang;
     const tr = train.current; if (tr) { tr.visible = r.phase === 'train'; tr.position.x = r.trainX; }
     void night;
   });
-  return <group ref={grp}>
-    <mesh position={[(lay.edgeL + lay.edgeR) / 2, 0.02, 0]} renderOrder={3}><planeGeometry args={[wBox, 6]} /><meshBasicMaterial visible={false} /></mesh>
-    <Decal kind="rail" d={r.d} x={(lay.edgeL + lay.edgeR) / 2} w={wBox} l={4.6} y={0.035} />
-    {/* crossbucks and flasher masts on both sides, gate arms swinging down over the lanes */}
-    {[1, -1].map((s) => {
-      const x = s > 0 ? lay.padR + 0.5 : lay.padL - 0.5; const gate = s > 0 ? gateR : gateL;
-      return <group key={s} position={[x, 0, s > 0 ? -3.1 : -3.1]}>
-        <mesh material={M.white} position={[0, 1.6, 0]}><boxGeometry args={[0.18, 3.2, 0.18]} /></mesh>
-        <mesh material={M.white} position={[0, 3.2, 0]} rotation-z={0.8}><boxGeometry args={[1.5, 0.22, 0.06]} /></mesh>
-        <mesh material={M.white} position={[0, 3.2, 0]} rotation-z={-0.8}><boxGeometry args={[1.5, 0.22, 0.06]} /></mesh>
-        <mesh material={M.dark} position={[0, 2.5, 0.1]}><boxGeometry args={[1.0, 0.5, 0.14]} /></mesh>
-        {[-0.3, 0.3].map((lx, li) => <mesh key={li} ref={(m) => { lamps.current[(s > 0 ? 0 : 2) + li] = m; }} material={M.red} position={[lx, 2.5, 0.2]} visible={false}><sphereGeometry args={[0.15, 12, 8]} /></mesh>)}
-        <group ref={gate} position={[0, 1.05, 0]} rotation-z={1.35 * (s > 0 ? 1 : -1)}>
-          <mesh material={M.arm} position={[(s > 0 ? -1 : 1) * gateSpan / 2, 0, 0]}><boxGeometry args={[gateSpan, 0.12, 0.08]} /></mesh>
-          {Array.from({ length: 6 }, (_, k) => <mesh key={k} material={M.red} position={[(s > 0 ? -1 : 1) * (gateSpan * (0.08 + k * 0.17)), 0, 0.01]}><boxGeometry args={[gateSpan * 0.07, 0.125, 0.09]} /></mesh>)}
-        </group>
-      </group>;
-    })}
-    {/* the train, passing across the road */}
-    <group ref={train} visible={false} position={[-200, 0, 0]}>
-      <mesh material={M.loco} position={[0, 2.1, 0]}><boxGeometry args={[19, 3.8, 3.2]} /></mesh>
-      <mesh material={M.stripe} position={[0, 1.3, 1.62]}><boxGeometry args={[19, 0.3, 0.05]} /></mesh>
-      <mesh material={M.dark} position={[0, 0.5, 0]}><boxGeometry args={[18, 0.8, 2.6]} /></mesh>
-      {Array.from({ length: 9 }, (_, k) => <group key={k} position={[-(19 / 2 + 8 + k * 17.5), 0, 0]}>
-        <mesh material={k % 2 ? M.car : M.car2} position={[0, 2.35, 0]}><boxGeometry args={[16, 4.0, 3.1]} /></mesh>
-        <mesh material={M.dark} position={[0, 0.5, 0]}><boxGeometry args={[14, 0.8, 2.6]} /></mesh>
-      </group>)}
+  const lanesX = lay.xs;
+  return <>
+    {/* road surface across the tracks, markings before them (these sit outside the group: they place themselves) */}
+    <Decal kind="stopbar" d={r.d - 6.6} x={(lanesX[0]! + lanesX[lanesX.length - 1]!) / 2} w={lanesX[lanesX.length - 1]! - lanesX[0]! + LANE} l={0.5} />
+    {lanesX.map((lx, i) => <Decal key={i} kind="rrx" d={r.d - 14} x={lx} w={LANE - 0.5} l={7} />)}
+    <group ref={grp}>
+      {/* ballast, ties and rails: two steel rails running across the road, ties and gravel beyond the pavement */}
+      <mesh material={M.ballast} position={[(xb + 200) / 2 - 0, 0.03, 0]}><boxGeometry args={[200 - xb, 0.08, 3.9]} /></mesh>
+      <mesh material={M.ballast} position={[(xa - 200) / 2 + 0, 0.03, 0]}><boxGeometry args={[xa + 200, 0.08, 3.9]} /></mesh>
+      <instancedMesh ref={ties} args={[tieGeo, M.tie, tieN]} frustumCulled={false} />
+      {[-0.72, 0.72].map((z) => <mesh key={z} material={M.rail} position={[0, 0.12, z]}><boxGeometry args={[400, 0.17, 0.13]} /></mesh>)}
+      {[-0.72, 0.72].map((z) => <mesh key={`b${z}`} material={M.rail} position={[0, 0.045, z]}><boxGeometry args={[400, 0.05, 0.3]} /></mesh>)}
+      {/* the crossing surface: dark panels with a lighter edge, flush with the road */}
+      <mesh material={M.panel} position={[(xa + xb) / 2, 0.026, 0]} renderOrder={3}><boxGeometry args={[xb - xa, 0.03, 3.6]} /></mesh>
+      {[-1.9, 1.9].map((z) => <mesh key={z} material={M.panelEdge} position={[(xa + xb) / 2, 0.029, z]} renderOrder={3}><boxGeometry args={[xb - xa, 0.03, 0.22]} /></mesh>)}
+      {[-1.18, -0.26, 0.26, 1.18].map((z) => <mesh key={`g${z}`} material={M.dark} position={[(xa + xb) / 2, 0.045, z]} renderOrder={4}><boxGeometry args={[xb - xa, 0.012, 0.1]} /></mesh>)}
+      {/* a crossbuck, flashers and a gate on each side, on the near side of the tracks */}
+      {[1, -1].map((s) => {
+        const x = s > 0 ? lay.padR + 0.55 : lay.padL - 0.55; const gate = s > 0 ? gateR : gateL;
+        return <group key={s} position={[x, 0, 5.2]}>
+          <mesh material={M.pole} position={[0, 1.95, 0]}><cylinderGeometry args={[0.09, 0.11, 3.9, 10]} /></mesh>
+          {/* crossbuck: two crossed blades in front of the mast */}
+          <mesh material={M.cbA} position={[0, 3.55, 0.12]} rotation-z={0.62}><boxGeometry args={[1.9, 0.3, 0.05]} /></mesh>
+          <mesh material={M.cbB} position={[0, 3.55, 0.17]} rotation-z={-0.62}><boxGeometry args={[1.9, 0.3, 0.05]} /></mesh>
+          {/* the flasher bar: two red lamps in black hoods */}
+          <mesh material={M.dark} position={[0, 2.55, 0.1]}><boxGeometry args={[1.25, 0.58, 0.1]} /></mesh>
+          {[-0.34, 0.34].map((lx, li) => <group key={li} position={[lx, 2.55, 0.17]}>
+            <mesh material={M.redOff} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.2, 0.2, 0.05, 18]} /></mesh>
+            <mesh ref={(m) => { lampsOn.current[(s > 0 ? 0 : 2) + li] = m; }} material={M.red} rotation-x={Math.PI / 2} position={[0, 0, 0.03]} visible={false}><cylinderGeometry args={[0.19, 0.19, 0.05, 18]} /></mesh>
+            <mesh material={M.dark} rotation-x={Math.PI / 2} position={[0, 0.17, 0.05]}><cylinderGeometry args={[0.24, 0.22, 0.05, 14, 1, true]} /></mesh>
+          </group>)}
+          {/* gate mechanism cabinet and the arm, striped red and white, with three lamps */}
+          <mesh material={M.dark} position={[0, 0.55, -0.1]}><boxGeometry args={[0.45, 1.1, 0.4]} /></mesh>
+          <group ref={gate} position={[0, 1.05, 0.2]}>
+            <mesh material={M.arm} position={[(s > 0 ? -1 : 1) * gateSpan / 2, 0, 0]}><boxGeometry args={[gateSpan, 0.1, 0.06]} /></mesh>
+            {Array.from({ length: 8 }, (_, k) => <mesh key={k} material={M.armRed} position={[(s > 0 ? -1 : 1) * (gateSpan * (0.07 + k * 0.125)), 0, 0.005]}><boxGeometry args={[gateSpan * 0.063, 0.105, 0.065]} /></mesh>)}
+            {[0.3, 0.62, 0.94].map((f, li) => <mesh key={li} ref={(m) => { gateLamps.current[(s > 0 ? 0 : 3) + li] = m; }} material={M.red} position={[(s > 0 ? -1 : 1) * gateSpan * f, 0.1, 0.04]} visible={false}><sphereGeometry args={[0.09, 10, 8]} /></mesh>)}
+            <mesh material={M.dark} position={[(s > 0 ? 1 : -1) * 0.35, 0, 0]}><boxGeometry args={[0.7, 0.3, 0.2]} /></mesh>
+          </group>
+        </group>;
+      })}
+      <Train bend={bend} group={train} />
     </group>
-  </group>;
+  </>;
 }
 export function Rails() { const { sim } = useAtl(); return <>{sim.rails.map((_, i) => <RailX key={i} index={i} />)}</>; }
 
@@ -396,8 +506,8 @@ function StopX({ index }: { index: number }) {
   return <>
     <Crossing d={s.d} />
     <group ref={grp} position={[lay.edgeR + (lay.sidewalks ? 1.1 : 1.4), 0, -3]}>
-      <mesh material={post} position={[0, 1.4, -0.03]}><boxGeometry args={[0.1, 2.8, 0.1]} /></mesh>
-      <mesh material={mat} position={[0, 2.9, 0]}><planeGeometry args={[0.9, 0.9]} /></mesh>
+      <mesh material={post} position={[0, 1.4, -0.09]}><boxGeometry args={[0.1, 2.8, 0.1]} /></mesh>
+      <mesh material={mat} position={[0, 2.9, 0.005]}><planeGeometry args={[0.9, 0.9]} /></mesh>
     </group>
   </>;
 }
@@ -429,7 +539,7 @@ function PedX({ index }: { index: number }) {
       {[-0.1, 0.1].map((lx, i) => <mesh key={i} ref={(m) => { legs.current[i] = m; }} material={dark} position={[lx, 0.4, 0]}><capsuleGeometry args={[0.08, 0.5, 3, 6]} /></mesh>)}
     </group>
     <group ref={signRef} position={[lay.padR + 0.9, 0, 0]}>
-      <mesh material={post} position={[0, 1.5, 0]}><boxGeometry args={[0.1, 3.0, 0.1]} /></mesh>
+      <mesh material={post} position={[0, 1.5, -0.1]}><boxGeometry args={[0.1, 3.0, 0.1]} /></mesh>
       <mesh material={sign} position={[0, 2.9, 0]} rotation-z={Math.PI / 4}><boxGeometry args={[0.9, 0.9, 0.05]} /></mesh>
     </group>
     <group visible={false} position={[cx, 0, 0]} />

@@ -315,6 +315,7 @@ function Scenery() {
       lamp: new THREE.MeshStandardMaterial({ color: '#fff3c4', emissive: new THREE.Color('#ffd98a'), emissiveIntensity: 0.3, roughness: 0.4 }),
       concrete: new THREE.MeshStandardMaterial({ color: '#c3c1ba', roughness: 0.95 }),
       concreteDark: new THREE.MeshStandardMaterial({ color: '#a9a7a0', roughness: 0.95 }),
+      deck: new THREE.MeshStandardMaterial({ color: '#6f6d68', roughness: 0.97 }),
       guard: new THREE.MeshStandardMaterial({ color: '#b9bec4', roughness: 0.5, metalness: 0.75 }),
       brick: new THREE.MeshStandardMaterial({ color: '#9a5a44', roughness: 0.95 }),
       white: new THREE.MeshStandardMaterial({ color: '#f4f1ea', roughness: 0.7 }),
@@ -458,9 +459,9 @@ function Scenery() {
 
     {/* overpasses: a bridge over the interstate every few hundred metres */}
     {lay.kind === 'divided' && inter && <>
-      <Repeat geometry={G.deck} material={M.concrete} spacing={470} ahead={AHEAD} per={1} make={(c) => ((hash(c, 31) < 0.15 || nearRamp(c * 470 + 100 + hash(c, 32) * 200)) ? null : { x: (left + right) / 2, y: 6.9, z: 100 + hash(c, 32) * 200, ry: 0, sx: right - left + 18, sy: 1, sz: 1 })} />
+      <Repeat geometry={G.deck} material={M.deck} spacing={470} ahead={AHEAD} per={1} make={(c) => ((hash(c, 31) < 0.15 || nearRamp(c * 470 + 100 + hash(c, 32) * 200)) ? null : { x: (left + right) / 2, y: 6.9, z: 100 + hash(c, 32) * 200, ry: 0, sx: right - left + 18, sy: 1, sz: 1 })} />
       <Repeat geometry={G.pier} material={M.concreteDark} spacing={470} per={3} make={(c, k) => ((hash(c, 31) < 0.15 || nearRamp(c * 470 + 100 + hash(c, 32) * 200)) ? null : { x: [left - 3, (lay.medianL + lay.medianR) / 2, right + 3][k]!, y: 0, z: 100 + hash(c, 32) * 200, ry: 0, sx: 1, sy: 6.3, sz: 1 })} />
-      <Repeat geometry={G.box} material={M.concreteDark} spacing={470} per={2} make={(c, k) => ((hash(c, 31) < 0.15 || nearRamp(c * 470 + 100 + hash(c, 32) * 200)) ? null : { x: (left + right) / 2, y: 7.55, z: 100 + hash(c, 32) * 200 + (k ? 7.2 : -7.2), ry: 0, sx: right - left + 18, sy: 0.9, sz: 0.3 })} />
+      <Repeat geometry={G.box} material={M.deck} spacing={470} per={2} make={(c, k) => ((hash(c, 31) < 0.15 || nearRamp(c * 470 + 100 + hash(c, 32) * 200)) ? null : { x: (left + right) / 2, y: 7.55, z: 100 + hash(c, 32) * 200 + (k ? 7.2 : -7.2), ry: 0, sx: right - left + 18, sy: 0.9, sz: 0.3 })} />
     </>}
     {/* the long elevated ramps of the big interchanges */}
     {lay.kind === 'divided' && inter && (city || stage.region === 'airport' || stage.region === 'intown') && <>
@@ -495,8 +496,9 @@ function Billboards() {
   });
   return <>{mats.map((m, i) => <group key={i} ref={(g) => { pool.current[i] = g; }}>
     <mesh position={[0, 9.2, 0]} material={m}><planeGeometry args={[14, 5.25]} /></mesh>
-    <mesh position={[0, 4.4, -0.1]} material={post}><boxGeometry args={[0.7, 8.8, 0.7]} /></mesh>
-    <mesh position={[0, 6.6, -0.05]} material={post}><boxGeometry args={[14.4, 0.3, 0.3]} /></mesh>
+    <mesh position={[0, 4.4, -0.55]} material={post}><boxGeometry args={[0.7, 8.8, 0.7]} /></mesh>
+    <mesh position={[0, 6.6, -0.25]} material={post}><boxGeometry args={[14.4, 0.3, 0.3]} /></mesh>
+    <mesh position={[0, 9.2, -0.08]} material={post}><boxGeometry args={[14.4, 5.4, 0.12]} /></mesh>
   </group>)}</>;
 }
 

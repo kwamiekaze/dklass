@@ -704,7 +704,12 @@ export class AtlSim {
     let lane = cands[0] ?? this.laneIdx, best = -1;
     for (const l of cands) { let clear = 1e9; for (const o of this.vehicles) if (o.dir === 1 && !o.cop && Math.abs(o.lane - l) < 0.6) clear = Math.min(clear, Math.abs(o.d - T)); if (clear > best) { best = clear; lane = l; } }
     this.copOff = best < 14 ? (best < 7 ? -9 : -6) : 0;
-    const v = this.makeVeh('police', T - 95, lane, pv + 6);
+    // spawn in a free slot behind you: never inside another car
+    const clearAt = (l: number) => { const probe = this.makeVeh('police', T, l, 0); for (let off = 95; off <= 122; off += 4) if (!this.copBlocker(probe, this.laneX(l), T - off, 5)) return T - off; return null; };
+    let spawnD = clearAt(lane);
+    if (spawnD === null) { for (const l of cands) { const sd = clearAt(l); if (sd !== null) { lane = l; spawnD = sd; break; } } }
+    if (spawnD === null) { this.patrolCool = 3; this.fastT = 0; return; }
+    const v = this.makeVeh('police', spawnD, lane, pv + 6);
     v.still = true; v.siren = true; v.cop = true; v.look = 0; v.x = this.laneX(lane); v.lane = lane; v.tl = lane;
     this.vehicles.push(v); this.cop = v; this.patrolPhase = 'chase'; this.patrolT = 0;
     this.snd.siren?.();
@@ -714,6 +719,36 @@ export class AtlSim {
   private endPatrol(cool: number) {
     if (this.cop) { const i = this.vehicles.indexOf(this.cop); if (i >= 0) this.vehicles.splice(i, 1); }
     this.cop = null; this.patrolPhase = 'none'; this.patrolCool = cool; this.fastT = 0; this.maxXNow = 0;
+  }
+  /** the other car (not the cruiser) that a cruiser at (nx, nd) would overlap, if any */
+  private copBlocker(cop: Veh, nx: number, nd: number, margin = 0.6): Veh | null {
+    const dc = DIM[cop.kind];
+    for (const o of this.vehicles) {
+      if (o === cop || o.fly || o.hit || o.dir !== 1) continue;
+      const dm = DIM[o.kind], ow = o.side ? dm.l : dm.w, ol = o.side ? dm.w : dm.l;
+      if (Math.abs(o.d - nd) < (dc.l + ol) / 2 + margin && Math.abs(o.x - nx) < (dc.w + ow) / 2 + 0.3) return o;
+    }
+    return null;
+  }
+  /** a cruiser is a car: it never drives through the traffic ahead of it, it queues behind it */
+  private copGuard(cop: Veh): boolean {
+    const dc = DIM[cop.kind]; let blocked = false;
+    for (const o of this.vehicles) {
+      if (o === cop || o.fly || o.hit || o.dir !== 1) continue;
+      const dm = DIM[o.kind], ow = o.side ? dm.l : dm.w, ol = o.side ? dm.w : dm.l;
+      if (Math.abs(o.x - cop.x) >= (dc.w + ow) / 2 + (o.lcT > 0 ? 1.8 : 0.3)) continue;
+      const lim = o.d - (dc.l + ol) / 2 - 0.5;
+      if (o.d + ol / 2 > cop.d && cop.d > lim) { cop.d = Math.min(cop.d, lim); cop.v = Math.min(cop.v, o.v); blocked = true; }
+      else if (o.d > cop.d && lim - cop.d < 7 && cop.v > o.v + 0.5) { cop.v = Math.max(o.v, cop.v - 14 * (1 / 30)); blocked = true; }
+    }
+    return blocked;
+  }
+  /** slide a cruiser sideways toward tx, but only into free road: otherwise hold the lane and let the other car pass */
+  private copSteer(cop: Veh, tx: number, rate: number, dt: number) {
+    const nx = cop.x + (tx - cop.x) * Math.min(1, dt * rate);
+    const b = this.copBlocker(cop, nx, cop.d, 1.5);
+    if (!b) { cop.x = nx; return; }
+    cop.d += (cop.d >= b.d ? 1 : -1) * 2.5 * dt;
   }
   private stepPatrol(dt: number) {
     if (this.stage.road !== 'interstate' || this.finished) return;
@@ -732,12 +767,23 @@ export class AtlSim {
     switch (this.patrolPhase) {
       case 'chase': {
         cop.v = pv + 11 + Math.max(0, (T - cop.d)) * 0.1; cop.d += cop.v * dt;
+        if (this.copGuard(cop)) {
+          // stuck behind a slower car: pull into a free neighbouring lane and go around
+          const cl = Math.round(cop.lane);
+          for (const nl of [cl - 1, cl + 1]) {
+            if (nl < 0 || nl >= lay.lanes || nl === this.laneIdx && Math.abs(cop.d - T) < 16) continue;
+            const nx = this.laneX(nl);
+            if (!this.copBlocker(cop, nx, cop.d - 8, 3) && !this.copBlocker(cop, nx, cop.d + 14, 3) && !this.copBlocker(cop, nx, cop.d + 4, 3)) { cop.lane = nl; cop.tl = nl; break; }
+          }
+        }
+        this.copSteer(cop, this.laneX(Math.round(cop.lane)), 1.8, dt);
         if (cop.d >= T + this.copOff - 1.5) { this.patrolPhase = 'beside'; this.patrolT = 0; cop.v = pv; }
         if (this.patrolT > 25) this.endPatrol(10);
         break;
       }
       case 'beside': {
-        cop.v = pv; follow(this.copOff);
+        cop.v = pv; follow(this.copOff); this.copGuard(cop);
+        this.copSteer(cop, this.laneX(Math.round(cop.lane)), 1.8, dt);
         if (this.patrolT > 1.8) {
           this.patrolT = 0;
           if (this.patrolKind === 'ticket') {
@@ -756,7 +802,8 @@ export class AtlSim {
       }
       case 'leave': {
         cop.v = Math.max(0, pv - 9); cop.d += cop.v * dt;
-        if (this.patrolT > 1.6) cop.x += (this.laneX(Math.max(0, Math.min(lay.lanes - 1, Math.round(cop.lane)))) - cop.x) * Math.min(1, dt * 2);
+        this.copGuard(cop);
+        if (this.patrolT > 1.6) this.copSteer(cop, this.laneX(Math.max(0, Math.min(lay.lanes - 1, Math.round(cop.lane)))), 2, dt);
         if (cop.d < T - 120 || this.patrolT > 14) this.endPatrol(14);
         break;
       }
@@ -764,10 +811,10 @@ export class AtlSim {
         this.maxXNow = shoulderX - 0.7;
         // the cruiser moves ahead into your lane, then slides onto the shoulder and slows to a stop
         const t = this.patrolT, targetX = t < 2.5 ? this.x : t < 5 ? this.x + (shoulderX - this.x) * ((t - 2.5) / 2.5) : shoulderX;
-        cop.x += (targetX - cop.x) * Math.min(1, dt * 2.6);
+        this.copSteer(cop, targetX, 2.6, dt);
         const ahead = cop.d - T;
         if (t < 5) cop.v = pv + Math.max(-3, Math.min(7, (24 - ahead) * 0.7)); else cop.v = Math.max(0, cop.v - 3.6 * dt * (t > 6 ? 1 : 0.4));
-        cop.d += cop.v * dt;
+        cop.d += cop.v * dt; this.copGuard(cop);
         // done when you have stopped, ideally on the right
         if (this.mph < 2) { this.stopT += dt; if (this.stopT > 1.1) { this.patrolPhase = 'stop'; this.patrolT = 0; this.onPulledOver(this.x > lastX + LANE * 0.5 - 1.2); } } else this.stopT = 0;
         if (t > 9 && t < 9.1) this.banner('KEEP SLOWING', 'Stop behind the cruiser on the shoulder', 2400, 'red');

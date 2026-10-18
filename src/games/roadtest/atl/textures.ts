@@ -93,7 +93,7 @@ export function roadTexture(lay: Layout, opts: { concrete: boolean; hov: boolean
 }
 
 /** Paint on the road that is not a repeat: crossings, stop bars, yield triangles, rails, the exit-only word. Drawn once, laid out in metres on a plane. */
-function decalTexture_raw(kind: 'crosswalk' | 'stopbar' | 'yield' | 'rail' | 'exitonly' | 'school' | 'gore'): { map: THREE.CanvasTexture; w: number; l: number } {
+function decalTexture_raw(kind: 'crosswalk' | 'stopbar' | 'yield' | 'rail' | 'rrx' | 'exitonly' | 'school' | 'gore'): { map: THREE.CanvasTexture; w: number; l: number } {
   const c = mkCanvas(1024, 512), g = c.getContext('2d')!; g.clearRect(0, 0, 1024, 512);
   const W = '#f3f1ea';
   let w = 14, l = 7;
@@ -110,6 +110,14 @@ function decalTexture_raw(kind: 'crosswalk' | 'stopbar' | 'yield' | 'rail' | 'ex
     const rail = (y: number) => { const gr = g.createLinearGradient(0, y, 0, y + 28); gr.addColorStop(0, '#d9d7d1'); gr.addColorStop(0.5, '#8d8b86'); gr.addColorStop(1, '#4a4946'); g.fillStyle = gr; g.fillRect(0, y, 1024, 28); };
     rail(150); rail(334);
     w = 14; l = 4.6;
+  } else if (kind === 'rrx') {
+    // the yellow advance warning on the road: a ring around an X with an R on each side, stretched along the lane
+    const Y = '#f0c02a'; g.strokeStyle = Y; g.fillStyle = Y; g.lineCap = 'butt';
+    g.lineWidth = 18; g.beginPath(); g.ellipse(512, 256, 400, 224, 0, 0, Math.PI * 2); g.stroke();
+    g.lineWidth = 26; g.beginPath(); g.moveTo(330, 90); g.lineTo(694, 422); g.moveTo(694, 90); g.lineTo(330, 422); g.stroke();
+    g.font = '700 260px "Arial Black", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.save(); g.translate(190, 256); g.fillText('R', 0, 0); g.restore(); g.save(); g.translate(834, 256); g.fillText('R', 0, 0); g.restore();
+    w = 3.0; l = 7;
   } else if (kind === 'exitonly') {
     g.fillStyle = W; g.font = '700 220px "Arial Black", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.save(); g.translate(512, 256); g.scale(1, 1.9); g.fillText('EXIT', 0, -60); g.font = '700 150px "Arial Black", Arial, sans-serif'; g.fillText('ONLY', 0, 90); g.restore(); w = 3.4; l = 9;
