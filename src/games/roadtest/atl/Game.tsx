@@ -97,7 +97,7 @@ const shake = { amp: 0, t: 0, dur: 0.01, punch: 0 };
 function Driver({ handle, onComplete, onReady }: { handle: AtlHandle; onComplete: (r: LevelResult) => void; onReady: () => void }) {
   const { sim, hud } = handle;
   const { camera, size } = useThree();
-  const intro = useRef(0), frames = useRef(0), ready = useRef(false), waited = useRef(0);
+  const intro = useRef(0), frames = useRef(0), ready = useRef(false), waited = useRef(0), errs = useRef(0), endWait = useRef(0);
   const prog = useProgress();
   const v = useMemo(() => new THREE.Vector3(), []);
   useEffect(() => bindKeys(), []);
@@ -138,13 +138,20 @@ function Driver({ handle, onComplete, onReady }: { handle: AtlHandle; onComplete
         sim.step(0, { gas: false, brake: false, left: false, right: false });
       } else { hud.countdown = -1; handle.introT = 1; sim.step(dt, readControls()); }
       for (const e of sim.drain()) dispatch(e);
+      // the run is over but the popup has not come: bring it up anyway
+      if (sim.finished && !sim.isComplete) { if (!endWait.current) endWait.current = performance.now(); if (performance.now() - endWait.current > 2600) { sim.forceComplete(); for (const e of sim.drain()) dispatch(e); } }
     }
+    errs.current = 0;
     hud.score = sim.tracker.score;
     const diff = hud.score - hud.display;
     if (diff !== 0) { const step = Math.sign(diff) * Math.max(1, Math.ceil(Math.abs(diff) * Math.min(1, dt * 6))); hud.display = Math.abs(step) >= Math.abs(diff) ? hud.score : hud.display + step; }
     hud.mph = sim.mph; hud.over = sim.speeding; hud.combo = sim.tracker.combo; hud.maxCombo = sim.tracker.maxCombo; hud.stars = sim.tracker.starsCollected;
     hud.progress = sim.progress; hud.strikes = sim.strikes; hud.limit = sim.speedLimitNow; hud.distance = sim.travelPx;
-    } catch (err) { if (import.meta.env.DEV) console.error('atl frame', err); }
+    } catch (err) {
+      if (import.meta.env.DEV) console.error('atl frame', err);
+      // a frame that keeps failing would freeze the game with no way out: end the run and show the options
+      if (++errs.current > 24 && !sim.isComplete) { errs.current = 0; try { sim.forceComplete(); for (const e of sim.drain()) dispatch(e); } catch { /* ignore */ } }
+    }
   }, -5);
   return null;
 }
@@ -288,7 +295,7 @@ export function AtlGame({ handle, onComplete, onLost }: { handle: AtlHandle; onC
     return () => { window.removeEventListener('keydown', skip); window.removeEventListener('pointerdown', skip); };
   }, [handle]);
   const onCompleteCb = useCallback((r: LevelResult) => { addLifetimeStars(handle.sim.tracker.starsCollected); done.current(r); }, [handle]);
-  const bloom = tierName === 'high' && (typeof window === 'undefined' || new URLSearchParams(window.location.search).get('bloom') !== '0');
+  const bloom = tierName === 'high' && (typeof window === 'undefined' || (window.innerWidth >= 900 && new URLSearchParams(window.location.search).get('bloom') !== '0'));
   const st = handle.sim.stage;
   return <div className="rt3d-root atl-root">
     <Canvas

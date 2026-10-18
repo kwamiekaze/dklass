@@ -14,6 +14,7 @@ import type { RunSim } from './sim';
  */
 export function Bloom({ sim, mix }: { sim: RunSim; mix: { current: number } }) {
   const { gl, scene, camera, size } = useThree();
+  const dpr = useThree((st) => st.viewport.dpr);
   const composer = useMemo(() => {
     const c = new EffectComposer(gl);
     c.addPass(new RenderPass(scene, camera));
@@ -22,12 +23,12 @@ export function Bloom({ sim, mix }: { sim: RunSim; mix: { current: number } }) {
     c.addPass(new OutputPass());
     return { c, b };
   }, [gl, scene, camera]);   // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { composer.c.setPixelRatio(gl.getPixelRatio()); composer.c.setSize(size.width, size.height); composer.b.resolution.set(size.width, size.height); }, [composer, gl, size]);
+  useEffect(() => { composer.c.setPixelRatio(gl.getPixelRatio()); composer.c.setSize(size.width, size.height); composer.b.resolution.set(size.width, size.height); }, [composer, gl, size, dpr]);   // dpr: the adaptive resolution changes it, and a stale pixel ratio would crop and blow up the picture
   useEffect(() => () => { composer.c.dispose(); }, [composer]);
   useFrame(() => {
     const m = mix.current, L = atmo.look;
-    composer.b.strength = 0.28 + 0.55 * m + 0.9 * atmo.flash * L.storm + 0.25 * Math.min(1, sim.mph / Math.max(1, sim.maxMph)) * (0.4 + m);
-    composer.b.threshold = 0.9 - 0.18 * m;
+    composer.b.strength = 0.22 + 0.5 * m + 0.9 * atmo.flash * L.storm + 0.25 * Math.min(1, sim.mph / Math.max(1, sim.maxMph)) * (0.4 + m);
+    composer.b.threshold = 1.5 - 0.5 * m;
     composer.c.render();
   }, 1);
   return null;

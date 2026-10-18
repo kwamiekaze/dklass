@@ -39,35 +39,57 @@ function BrakeGlow({ id, brake }: { id: GarageId; brake: { current: number } }) 
 }
 
 
-/** Headlight beams: soft cones of light that show up in the dark, in fog, rain and snow, plus a real light that paints the road ahead. */
+/** Headlight beams: each lamp throws a soft, tapering cone (hot and warm at the lamp, cool and faint far away), a pool of light on the road ahead, and a lens flare. They fade up in the dark, fog, rain and snow. */
 function Beams({ id, sim }: { id: GarageId; sim: RunSim }) {
   const night = useContext(NightCtx);
   const lamps = fleetFiles(id)?.lamps?.front;
-  const grp = useRef<THREE.Group>(null), spot = useRef<THREE.SpotLight>(null), tgt = useRef<THREE.Object3D>(null);
+  const grp = useRef<THREE.Group>(null), spot = useRef<THREE.SpotLight>(null), tgt = useRef<THREE.Object3D>(null), pool = useRef<THREE.Mesh>(null);
+  const flares = useRef<(THREE.Sprite | null)[]>([]);
   useEffect(() => { if (spot.current && tgt.current) spot.current.target = tgt.current; });
-  const mat = useMemo(() => new THREE.ShaderMaterial({
+  const cone = useMemo(() => new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false, fog: false,
+    uniforms: { uA: { value: 0 }, uHaze: { value: 0 } },
+    vertexShader: 'varying vec3 vN; varying vec3 vV; varying float vU; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vU = clamp(position.y / 26., 0., 1.); gl_Position = projectionMatrix * mv; }',
+    // narrow and bright at the lamp, wide and faint far ahead; the silhouette fades so the cone reads as light in air, not as a tube
+    fragmentShader: 'varying vec3 vN; varying vec3 vV; varying float vU; uniform float uA; uniform float uHaze; void main(){ float e = pow(abs(dot(normalize(vN), normalize(vV))), 1.1); float core = pow(1. - vU, 1.5) * smoothstep(0., .035, vU); vec3 c = mix(vec3(1., .93, .78), vec3(.72, .84, 1.), smoothstep(.1, .9, vU)); gl_FragColor = vec4(c, e * core * uA * (.85 + uHaze * .6)); }',
+  }), []);
+  const poolMat = useMemo(() => new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false,
     uniforms: { uA: { value: 0 } },
-    vertexShader: 'varying vec3 vN; varying vec3 vV; varying float vU; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vU = clamp((position.y + 12.) / 24., 0., 1.); gl_Position = projectionMatrix * mv; }',
-    fragmentShader: 'varying vec3 vN; varying vec3 vV; varying float vU; uniform float uA; void main(){ float e = pow(abs(dot(normalize(vN), normalize(vV))), 1.6); float along = pow(vU, 1.7); gl_FragColor = vec4(vec3(1., .93, .78), e * along * uA * .5); }',
+    vertexShader: 'varying vec2 vP; void main(){ vP = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+    // two overlapping soft ellipses on the road, brightest a few metres ahead, with a faint hot spot where the beams cross
+    fragmentShader: 'varying vec2 vP; uniform float uA; void main(){ vec2 p = vP * 2. - 1.; float x = p.x * .5 + .5; float wide = 1. - smoothstep(0., 1., length(vec2(p.x * 1.05, p.y * (.55 + x * .5)))); float hot = 1. - smoothstep(0., 1., length(vec2((x - .3) * 2.4, p.y * 1.6))); float lat = smoothstep(.0, .12, x); float a = (wide * wide * .55 + hot * hot * .45) * lat; gl_FragColor = vec4(vec3(1., .94, .8) * a, a * uA * 2.6); }',
   }), []);
   useFrame((_, dt) => {
     const L = atmo.look;
     const dark = Math.max(night.current, 0.55 * L.fog, 0.35 * L.storm, 0.3 * L.rain, 0.25 * L.snow);
-    const want = clamp((dark - 0.15) / 0.5, 0, 1) * (sim.finished ? 0.3 : 1);
-    mat.uniforms.uA!.value = damp(mat.uniforms.uA!.value as number, want, 5, dt);
-    if (grp.current) grp.current.visible = (mat.uniforms.uA!.value as number) > 0.02;
-    if (spot.current) spot.current.intensity = (mat.uniforms.uA!.value as number) * 38;
+    const want = clamp((dark - 0.12) / 0.5, 0, 1) * (sim.finished ? 0.35 : 1);
+    const a = damp(cone.uniforms.uA!.value as number, want, 5, dt);
+    cone.uniforms.uA!.value = a; poolMat.uniforms.uA!.value = a * (1 + 0.5 * Math.min(1, L.rain + L.storm));
+    cone.uniforms.uHaze!.value = Math.min(1, L.fog + 0.6 * L.rain + 0.7 * L.snow + 0.5 * L.storm);
+    if (grp.current) grp.current.visible = a > 0.02;
+    if (pool.current) pool.current.visible = a > 0.02;
+    if (spot.current) spot.current.intensity = a * 34;
+    const day = 0.2 * (1 - clamp(want * 3, 0, 1));
+    for (const f of flares.current) if (f) { const m = f.material as THREE.SpriteMaterial; m.opacity = Math.min(0.85, a * 0.8 + day); f.visible = m.opacity > 0.02; }
   });
   if (!lamps) return null;
-  const x = Math.abs(lamps[0]) - 0.1, y = lamps[1], z = lamps[2];
+  const x = Math.abs(lamps[0]) - 0.1, y = lamps[1], z = lamps[2], dip = 0.05;
   return <>
     <group ref={grp} visible={false}>
-      {[-1, 1].map((sd) => <mesh key={sd} position={[x + 12, y - 0.05, sd * z]} rotation-z={-Math.PI / 2} material={mat} renderOrder={5}>
-        <cylinderGeometry args={[0.12, 2.5, 24, 20, 1, true]} />
-      </mesh>)}
+      {[-1, 1].map((sd) => <group key={sd} position={[x, y, sd * z]} rotation-z={-Math.PI / 2 - dip}>
+        <mesh position={[0, 13, 0]} rotation-y={0} material={cone} renderOrder={5}>
+          <cylinderGeometry args={[3.1, 0.06, 26, 24, 1, true]} />
+        </mesh>
+      </group>)}
     </group>
-    <spotLight ref={spot} position={[x, y + 0.2, 0]} angle={0.5} penumbra={0.85} distance={46} decay={1.2} intensity={0} color="#fff1d6" />
+    <mesh ref={pool} position={[x + 11, 0.035, 0]} rotation-x={-Math.PI / 2} scale={[24, 9, 1]} material={poolMat} renderOrder={4} visible={false}>
+      <planeGeometry args={[1, 1]} />
+    </mesh>
+    {[-1, 1].map((sd, i) => <sprite key={sd} ref={(s) => { flares.current[i] = s; }} position={[x + 0.05, y, sd * z]} scale={[0.8, 0.8, 1]} visible={false}>
+      <spriteMaterial map={glow()} color="#ffe9bf" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+    </sprite>)}
+    <spotLight ref={spot} position={[x, y + 0.2, 0]} angle={0.52} penumbra={0.9} distance={48} decay={1.25} intensity={0} color="#fff1d6" />
     <object3D ref={tgt} position={[x + 20, 0, 0]} />
   </>;
 }

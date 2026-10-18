@@ -228,7 +228,7 @@ export function GameScene({ handle, carId, onComplete, onReady, onLost }: GameSc
   >
     <Dpr cap={cap} onDecline={() => setDpr(-1)} onIncline={() => setDpr(1)} />
     <Suspense fallback={null}>
-      <World sim={sim} theme={theme} quality={quality} bloom={tierName === 'high' && new URLSearchParams(window.location.search).get('bloom') !== '0'} />
+      <World sim={sim} theme={theme} quality={quality} bloom={tierName === 'high' && window.innerWidth >= 900 && new URLSearchParams(window.location.search).get('bloom') !== '0'} />
       <Actors sim={sim} carId={carId} lite={quality.lite} playerRig={playerRig} />
       <Player sim={sim} carId={carId} lite={quality.lite} rig={playerRig} />
       <Sparks sim={sim} />

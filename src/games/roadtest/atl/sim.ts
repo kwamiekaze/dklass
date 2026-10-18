@@ -118,6 +118,8 @@ export class AtlSim {
     if (pts > 0) this.snd.checkpoint?.(); return pts;
   }
   private after(sec: number, fn: () => void) { this.timers.push({ at: this.time + sec, fn }); }
+  /** Runs due timers. It also runs after the run is over, because the end-of-run popup is itself a timer. */
+  private runTimers() { for (let i = this.timers.length - 1; i >= 0; i--) if (this.timers[i]!.at <= this.time) { const t = this.timers.splice(i, 1)[0]!; t.fn(); } }
   setSignal(dir: -1 | 0 | 1) { this.signalDir = this.signalDir === dir ? 0 : dir; this.signalAt = this.time; this.snd.uiTick?.(); }
   get signalOn() { return this.signalDir !== 0; }
   endEarly() { this.finish(); }
@@ -319,7 +321,7 @@ export class AtlSim {
 
   // -------------------------------------------------------------------- the player
   step(dt: number, c: { gas: boolean; brake: boolean; left: boolean; right: boolean }) {
-    if (this.finished) { this.time += dt; return; }
+    if (this.finished) { this.time += dt; this.runTimers(); return; }
     if (dt <= 0) { return; }
     this.time += dt; this.prevMph = this.mph;
     if (this.locked) c = { gas: false, brake: true, left: false, right: false };
@@ -342,7 +344,7 @@ export class AtlSim {
     this.snd.updateEngine?.(Math.min(1, this.mph / this.maxMph));
 
     // timers and staged events
-    for (let i = this.timers.length - 1; i >= 0; i--) if (this.timers[i]!.at <= this.time) { const t = this.timers.splice(i, 1)[0]!; t.fn(); }
+    this.runTimers();
     while (this.evList.length && this.evList[0]!.at <= this.traveled) this.evList.shift()!.run();
     for (const s of this.signs) if (!s.shown && this.traveled > s.d - 12) s.shown = true;
 
@@ -661,8 +663,14 @@ export class AtlSim {
     const result = buildResult(this.level, this.tracker, this.difficulty);
     if (this.cited) result.passed = false;
     result.feedback = this.feedback(result);
-    this.after(0.9, () => this.emit({ k: 'complete', result }));
+    this.result = result;
+    this.after(0.9, () => this.emitComplete());
   }
+  private result: LevelResult | null = null; private completed = false;
+  private emitComplete() { if (this.completed || !this.result) return; this.completed = true; this.emit({ k: 'complete', result: this.result }); }
+  /** Safety net: the renderer calls this if the end popup has not appeared a moment after the run ended. */
+  forceComplete() { if (!this.finished) this.finish(); this.emitComplete(); }
+  get isComplete() { return this.completed; }
   private feedback(r: LevelResult): string[] {
     const t = this.tracker, out: string[] = [];
     if (t.voided) { out.push('Instant fail: always stop for people in a crosswalk and never cross railroad tracks with gates down.'); }

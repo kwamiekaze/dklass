@@ -103,8 +103,10 @@ export default function RoadTestGame({ publicMode }: RoadTestGameProps = {}) {
 
   const handleComplete = useCallback((r: LevelResult) => {
     setBestScores((prev) => ({ ...prev, [r.levelId]: Math.max(prev[r.levelId] ?? 0, r.score) }));
-    const after = processRunResult(r);
-    setAftermath(after);
+    // the report card must always come up, even if saving the run is slow or fails
+    setResult(r);
+    setScreen('report');
+    try { setAftermath(processRunResult(r)); } catch (e) { console.error(e); }
 
     // Public leaderboard submission for endless mode + daily challenge.
     const level = LEVELS.find((l) => l.id === r.levelId);
