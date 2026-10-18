@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { LEVELS } from '../game/levels';
-import { ATL_STAGES } from '../atl/stages';
+import { ATL_STAGES, PHASES } from '../atl/stages';
+import { SKILL_LABELS, computeRadarData, SKILL_KEYS, type ReportCardRatings } from '@/lib/reportCardGraphData';
 import '../atl/atl.css';
 import { DIFFICULTIES, type Difficulty } from '../game/types';
 import { sound } from '../sound';
@@ -67,6 +68,7 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
     }
   }, []);
 
+  const [weak, setWeak] = useState<string[]>([]);
   useEffect(() => {
     (async () => {
       const { data } = await supabase.auth.getUser();
@@ -76,6 +78,15 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
         return;
       }
       setSignedIn(true);
+      // the student's own report cards decide which Atlanta stages get a "recommended" tag
+      try {
+        const { data: rc } = await supabase.from('report_cards').select(`id, created_at, overall, ${SKILL_KEYS.join(', ')}`).eq('student_id', data.user.id).eq('report_card_status', 'completed').order('created_at', { ascending: true });
+        const rows = (rc || []) as unknown as ReportCardRatings[];
+        if (rows.length) {
+          const rated = computeRadarData(rows).filter((r) => r.average > 0).sort((a, b) => a.average - b.average);
+          setWeak(rated.filter((r) => r.average < 8.5).slice(0, 4).map((r) => r.skill));
+        }
+      } catch { /* the path works without report cards */ }
       const { data: profile } = await supabase
         .from('profiles')
         .select('current_streak, best_streak, last_played_on')
@@ -90,11 +101,10 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
   const clickTick = () => { sound.init(); sound.uiTick(); };
   const endless = LEVELS.find((l) => l.endless);
   const lessons = LEVELS.filter((l) => !l.endless && !l.id.startsWith('atl-'));
-  const atlGroups = [
-    { title: 'Interstates and freeways', note: 'Speed limit 70', items: ATL_STAGES.filter((x) => x.road === 'interstate') },
-    { title: 'Carrollton and west Georgia', note: '30117 and neighbors', items: ATL_STAGES.filter((x) => x.road !== 'interstate' && ['carrollton', 'rural', 'villarica', 'douglasville'].includes(x.region)) },
-    { title: 'Metro Atlanta streets', note: 'Lights, rail and circles', items: ATL_STAGES.filter((x) => x.road !== 'interstate' && !['carrollton', 'rural', 'villarica', 'douglasville'].includes(x.region)) },
-  ];
+  const atlGroups = PHASES.map((ph) => ({ title: ph.title, note: ph.note, items: ATL_STAGES.filter((x) => x.phase === ph.n) }));
+  const recommended = ATL_STAGES.filter((x) => (x.skills ?? []).some((k) => weak.includes(k)));
+  const nextUp = ATL_STAGES.find((x) => !bestScores[x.id]);
+  const weakLabels = weak.map((k) => SKILL_LABELS[k] ?? k);
   const startLevel = (id: string) => { clickTick(); onStart(id); };
 
   const goHome = async () => {
@@ -193,23 +203,33 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
           <div className="atl-menu-badge" aria-hidden="true"><b>I</b><i>75 85</i></div>
           <div>
             <h2>Atlanta Drive</h2>
-            <p>The real roads of Georgia: the Downtown Connector, I-285, I-20, Carrollton 30117 and the streets around Metro Atlanta. Learn to signal, merge, keep your distance and cross the tracks the right way.</p>
+            <p>The real roads of Georgia: the Downtown Connector, I-285, I-20, Carrollton 30117 and the streets around Metro Atlanta. Learn to signal, merge, keep your distance and cross the tracks the right way. It starts quiet and gets harder phase by phase, with rougher weather as you go.</p>
           </div>
         </div>
+        {weak.length > 0 && (
+          <div className="atl-rec">
+            <b>Picked from your report cards</b>
+            <span>Your focus skills: {weakLabels.join(', ')}. Stages marked <em>FOR YOU</em> practice them.</span>
+          </div>
+        )}
         {atlGroups.map((g) => (
           <div className="atl-group" key={g.title}>
             <h3>{g.title}<small>{g.note}</small></h3>
-            {g.items.map((st) => (
-              <button key={st.id} className="atl-card" onClick={() => startLevel(st.id)}>
-                <span className="atl-lim"><small>LIMIT</small><b>{st.limit}</b></span>
-                <span className="atl-info">
-                  <strong>{st.name}</strong>
-                  <small>{st.subtitle}</small>
-                  <em>{st.roadName}</em>
-                </span>
-                <span className="atl-best">{bestScores[st.id] ? `Best ${bestScores[st.id]}` : 'Drive →'}</span>
-              </button>
-            ))}
+            {g.items.map((st) => {
+              const mine = (st.skills ?? []).filter((k) => weak.includes(k));
+              return (
+                <button key={st.id} className={`atl-card${mine.length ? ' rec' : ''}${nextUp?.id === st.id ? ' next' : ''}`} onClick={() => startLevel(st.id)}>
+                  <span className="atl-lim"><small>LIMIT</small><b>{st.limit}</b></span>
+                  <span className="atl-info">
+                    <strong>{st.name}{nextUp?.id === st.id && <i className="atl-tag next">NEXT UP</i>}{mine.length > 0 && <i className="atl-tag rec">FOR YOU</i>}</strong>
+                    <small>{st.subtitle}</small>
+                    <em>{st.roadName}{st.weather ? ` · ${st.weather.toUpperCase()}` : ''}</em>
+                    <span className="atl-skills">{(st.skills ?? []).slice(0, 3).map((k) => <u key={k} className={weak.includes(k) ? 'w' : ''}>{SKILL_LABELS[k] ?? k}</u>)}</span>
+                  </span>
+                  <span className="atl-best">{bestScores[st.id] ? `Best ${bestScores[st.id]}` : 'Drive →'}</span>
+                </button>
+              );
+            })}
           </div>
         ))}
       </section>

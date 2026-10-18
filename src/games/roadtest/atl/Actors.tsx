@@ -37,7 +37,7 @@ export function Traffic() {
     const make = (geo: THREE.BufferGeometry, mat: THREE.Material, n: number, colored: boolean) => { const m = new THREE.InstancedMesh(geo, mat, n); m.frustumCulled = false; if (colored) m.setColorAt(0, new THREE.Color(1, 1, 1)); hide(m, 0, n); return m; };
     const byKind = ALL_KINDS.map((k) => { const g = vehicleGeo(k), n = MAX_PER_KIND[k]; return { k, paint: make(g.paint, paint, n, true), detail: make(g.detail, detail, n, false), tail: make(g.tail, tail, n, true), head: make(g.head, head, n, true), n }; });
     const sg = new THREE.BoxGeometry(0.5, 0.18, 0.28);
-    const sirens = make(sg, siren, 24, true);
+    const sirens = make(sg, siren, 56, true);
     return { byKind, sirens };
   }, [bend]);
   useEffect(() => {
@@ -67,9 +67,19 @@ export function Traffic() {
       const rear = v.dir === -1 ? 0.0 : v.brake || v.still ? 1.5 : lampBase * 0.55;
       b.tail.setColorAt(i, tmpC.setScalar(v.dir === -1 ? 0.15 : rear));
       b.head.setColorAt(i, tmpC.setScalar(v.dir === -1 ? 0.55 + 0.9 * Math.min(1, nt) : 0.25 + 0.5 * Math.min(1, nt)));
-      if (v.siren && si < 22) {
-        const H = v.kind === 'police' ? 1.9 : v.kind === 'tow' ? 2.9 : 2.2, ph = Math.floor(t * 7) % 2;
-        for (const s of [-1, 1]) { put(parts.sirens, si, v.x + s * 0.3, H, -v.d, v.yaw); parts.sirens.setColorAt(si, tmpC.set((s > 0) === (ph === 0) ? 0xff2a1a : 0x2a6bff)); si++; }
+      if (v.siren && si < 50) {
+        const ph = Math.floor(t * 7) % 2, red = 0xff2a1a, blue = 0x2a6bff, cs = Math.cos(v.yaw), sn = Math.sin(v.yaw);
+        const lamp = (dx: number, y: number, dz: number, c: number, sc: number) => { put(parts.sirens, si, v.x + dx * cs + dz * sn, y, -v.d - dx * sn + dz * cs, v.yaw, 0, sc); parts.sirens.setColorAt(si, tmpC.set(c)); si++; };
+        if (v.kind === 'police') {
+          // light bar domes, grille and windshield strobes, rear deck strobes: they trade red and blue
+          const a = ph === 0 ? red : blue, b2 = ph === 0 ? blue : red;
+          lamp(-0.34, 1.6, -0.05, a, 0.9); lamp(0.34, 1.6, -0.05, b2, 0.9);
+          lamp(-0.6, 0.58, -2.5, a, 0.4); lamp(0.6, 0.58, -2.5, b2, 0.4); lamp(-0.5, 1.2, -0.95, b2, 0.34); lamp(0.5, 1.2, -0.95, a, 0.34);
+          lamp(-0.55, 1.18, 1.25, a, 0.34); lamp(0.55, 1.18, 1.25, b2, 0.34);
+        } else {
+          const H = v.kind === 'tow' ? 2.9 : 2.2;
+          for (const s2 of [-1, 1]) lamp(s2 * 0.3, H, 0, (s2 > 0) === (ph === 0) ? red : blue, 1);
+        }
       }
     }
     for (const b of parts.byKind) {
@@ -77,7 +87,7 @@ export function Traffic() {
       hide(b.paint, n, b.n); hide(b.detail, n, b.n); hide(b.tail, n, b.n); hide(b.head, n, b.n);
       for (const m of [b.paint, b.detail, b.tail, b.head]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
     }
-    hide(parts.sirens, si, 24); parts.sirens.instanceMatrix.needsUpdate = true; if (parts.sirens.instanceColor) parts.sirens.instanceColor.needsUpdate = true;
+    hide(parts.sirens, si, 56); parts.sirens.instanceMatrix.needsUpdate = true; if (parts.sirens.instanceColor) parts.sirens.instanceColor.needsUpdate = true;
   });
   return <group ref={root} />;
 }

@@ -85,4 +85,10 @@ export interface AtlStage {
   /** where the player is, in the words of the stage: used on the loading screen */
   place: string;
   isRush?: boolean;
+  /** curriculum phase 1..9, set by the course table in stages.ts */
+  phase?: number;
+  /** report card skill keys this stage trains (same keys as the portal report card) */
+  skills?: string[];
+  /** worst weather a random roll may give on this stage: 0 clear, 1 cloudy, 2 rain, 3 fog, 4 storm, 5 anything */
+  wxCap?: number;
 }

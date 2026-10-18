@@ -14,7 +14,7 @@ const base = (s: Partial<AtlStage> & Pick<AtlStage, 'id' | 'name' | 'subtitle' |
   road: 'interstate', lanes: 4, limit: 70, maxSpeed: 86, tod: 'day', traffic: 0.8, trucks: 0.14, flow: 0.98, curves: 'gentle', lessons: LESS_HW, par: 1500, trees: 'mixed', walls: 'glass', ...s,
 });
 
-export const ATL_STAGES: AtlStage[] = [
+const RAW: AtlStage[] = [
   base({
     id: 'atl-connector-north', name: 'Downtown Connector North', subtitle: 'I-75/85 N · Five lanes through the heart of Atlanta', roadName: 'I-75/85 NORTH', region: 'downtown', skyline: 'downtown', lanes: 5, lengthM: 4200, tod: 'dusk', traffic: 1.0, curves: 'rolling', par: 1700, walls: 'glass', place: 'Downtown Atlanta',
     guide: [
@@ -265,7 +265,113 @@ export const ATL_STAGES: AtlStage[] = [
     guide: [sign(0.1, [GA('6')], undefined, ['Camp Creek Pkwy', 'Airport'], { arrows: ['up'] }), sign(0.6, [I('285')], undefined, ['Airport', 'Macon'], { arrows: ['upright'] })],
     events: [{ t: 'light', at: 0.18 }, { t: 'rail', at: 0.4, train: true, gates: true, name: 'Camp Creek' }, { t: 'ped', at: 0.6 }, { t: 'light', at: 0.8 }],
   }),
+  // ---- added for the learning path ---
+  base({
+    id: 'atl-first-drive', name: 'First Drive: Hays Mill Road', subtitle: '30117 · Quiet streets, your first stop sign', roadName: 'HAYS MILL RD', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 1500, limit: 25, maxSpeed: 35, tod: 'day', traffic: 0.15, trucks: 0, flow: 0.85, curves: 'straight', trees: 'hardwood', walls: 'houses', par: 700, place: 'Carrollton, Georgia',
+    guide: [sign(0.3, undefined, undefined, ['Hays Mill Rd'], { arrows: ['up'] }), sign(0.72, undefined, undefined, ['Downtown Carrollton'], { arrows: ['right'] })],
+    events: [{ t: 'tip', at: 0.04, title: 'Your first drive', sub: 'Hands at 9 and 3. Ease the gas, stay right of the yellow line.' }, { t: 'stop', at: 0.42 }, { t: 'ped', at: 0.72 }],
+    lessons: ['Look where you want to go. The car follows your eyes.', 'Ease onto the gas and ease onto the brake.', 'Stay inside the lane and a little right of center.'],
+  }),
+  base({
+    id: 'atl-lovvorn', name: 'Neighborhood Streets: Lovvorn Road', subtitle: '30117 · School zone, stop signs and a light', roadName: 'LOVVORN RD', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 1900, limit: 30, maxSpeed: 42, tod: 'day', traffic: 0.3, trucks: 0.02, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'houses', par: 850, place: 'Carrollton, Georgia',
+    guide: [sign(0.25, undefined, undefined, ['Lovvorn Rd'], { arrows: ['up'] }), sign(0.65, [GA('166')], undefined, ['Bankhead Hwy'], { arrows: ['right'] })],
+    events: [{ t: 'stop', at: 0.2 }, { t: 'school', at: 0.4, len: 220 }, { t: 'ped', at: 0.62 }, { t: 'light', at: 0.82 }],
+    lessons: ['School zone: 25 while the lights flash. Children can appear from anywhere.', 'Stop before the white line, not on it.', 'A yellow light means stop if you safely can.'],
+  }),
+  base({
+    id: 'atl-onramp-i20', name: 'On-Ramp and Merge', subtitle: 'I-20 W · Speed up on the ramp, then blend in', roadName: 'I-20 WEST', region: 'westside', skyline: 'hills', lanes: 3, lengthM: 3000, tod: 'day', traffic: 0.4, trucks: 0.1, flow: 0.98, curves: 'gentle', trees: 'pine', par: 1100, place: 'West Atlanta',
+    guide: [sign(0.1, [I('20')], 'WEST', ['Douglasville', 'Birmingham'], { arrows: ['up'] }), sign(0.55, [I('285')], undefined, ['Cobb', 'Airport'], { arrows: ['up'] })],
+    events: [{ t: 'tip', at: 0.04, title: 'Merging', sub: 'Match the speed of traffic on the ramp, signal, check your mirror, then slide in.' }, { t: 'merge', at: 0.2 }, { t: 'merge', at: 0.45 }, { t: 'merge', at: 0.7 }],
+    lessons: ['Use the whole ramp to match highway speed.', 'Never stop on a ramp unless traffic forces you.', 'Signal early and find a gap, do not force one.'],
+  }),
+  base({
+    id: 'atl-rain-ponce', name: 'Ponce in the Rain', subtitle: 'Decatur · Wet brick, slick rails and long stops', roadName: 'PONCE DE LEON AVE', road: 'arterial', region: 'intown', skyline: 'suburb', lanes: 2, lengthM: 2600, limit: 35, maxSpeed: 52, tod: 'dusk', weather: 'rain', traffic: 0.7, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'brick', par: 1200, place: 'Decatur, Georgia, rainy',
+    guide: [sign(0.2, undefined, undefined, ['Decatur', 'Clairmont Rd'], { arrows: ['up'] }), sign(0.6, [US('78')], undefined, ['Stone Mountain'], { arrows: ['up'] })],
+    events: [{ t: 'tip', at: 0.04, title: 'Wet roads', sub: 'Double your following distance. Brake early and gently, especially on rails.' }, { t: 'light', at: 0.2 }, { t: 'rail', at: 0.4, train: true, gates: true, name: 'Ponce' }, { t: 'ped', at: 0.6 }, { t: 'light', at: 0.82 }],
+    lessons: ['Wet roads double stopping distance.', 'Painted lines and steel rails are slick in rain.', 'Headlights on whenever wipers are on.'],
+  }),
+  base({
+    id: 'atl-fog-villa-rica', name: 'Foggy Backroads: Villa Rica', subtitle: 'GA-61 · Low beams and slow curves', roadName: 'GA-61', road: 'rural', region: 'villarica', skyline: 'hills', lanes: 1, lengthM: 2800, limit: 45, maxSpeed: 62, tod: 'day', weather: 'fog', traffic: 0.3, trucks: 0.08, flow: 0.85, curves: 'winding', trees: 'pine', walls: 'houses', par: 1150, place: 'Villa Rica, Georgia, foggy',
+    guide: [sign(0.2, [GA('61')], undefined, ['Villa Rica', 'Carrollton'], { arrows: ['up'] })],
+    events: [{ t: 'tip', at: 0.05, title: 'Fog', sub: 'Low beams, slow down and use the right edge line as your guide.' }, { t: 'rail', at: 0.5, train: false, gates: false }],
+    lessons: ['Never use high beams in fog.', 'Slow until you can stop inside what you can see.', 'Do not stop on the road. Pull completely off.'],
+  }),
+  base({
+    id: 'atl-snow-285', name: 'Rare Snow Day on I-285', subtitle: 'I-285 · Georgia roads when the flakes fall', roadName: 'I-285 EAST', region: 'perimeter', skyline: 'perimeter', lanes: 4, lengthM: 3600, tod: 'day', weather: 'snow', traffic: 0.45, flow: 0.6, trucks: 0.08, curves: 'gentle', par: 1400, place: 'North Atlanta, snowy',
+    guide: [sign(0.08, [I('285')], 'EAST', ['Dunwoody', 'Chamblee'], { arrows: ['up'] }), sign(0.55, [I('85')], 'NORTH', ['Gainesville'], { arrows: ['upright'], tab: 'EXIT' })],
+    events: [{ t: 'vms', at: 0.04, text: 'ICY  ROADS|BRIDGES  FREEZE  FIRST' }, { t: 'tip', at: 0.15, title: 'Snow and ice', sub: 'Smooth inputs only. Triple your following distance. Bridges freeze first.' }, { t: 'crash', at: 0.6 }],
+    lessons: ['Triple your following distance on ice.', 'If it is not safe, stay home. Georgia roads are not ready for snow.', 'Brake gently. Steer gently. Do everything slowly.'],
+  }),
+  base({
+    id: 'atl-master-storm', name: 'Master Class: Night Storm Rush', subtitle: 'I-75/85 · Everything at once. The final exam', roadName: 'I-75/85 NORTH', region: 'midtown', skyline: 'midtown', lanes: 5, lengthM: 5200, tod: 'night', weather: 'storm', traffic: 1.35, flow: 0.55, trucks: 0.2, curves: 'rolling', par: 2000, place: 'Atlanta, midnight storm',
+    guide: [sign(0.08, [I('75'), I('85')], 'NORTH', ['Midtown', '14th Street'], { arrows: ['up'] }), sign(0.4, [I('85')], 'NORTH', ['Greenville', 'Spaghetti Junction'], { arrows: ['upleft'], tab: 'LEFT EXIT' }), sign(0.78, [I('75')], 'NORTH', ['Marietta', 'Chattanooga'], { arrows: ['up'] })],
+    events: [{ t: 'vms', at: 0.04, text: 'SEVERE  STORM|REDUCE  SPEED' }, { t: 'merge', at: 0.18 }, { t: 'work', at: 0.3, len: 600 }, { t: 'police', at: 0.55 }, { t: 'merge', at: 0.62 }, { t: 'crash', at: 0.74 }, { t: 'tip', at: 0.92, title: 'Almost there', sub: 'Keep calm, keep your space, keep your signal on.' }],
+    lessons: ['Calm hands, soft eyes, early signals.', 'Leave space and the road does half the work.', 'The best drivers are the ones nobody notices.'],
+  }),
 ];
+
+/**
+ * The learning path. Easy first, then harder and harder, and the weather gets rougher as you go.
+ * `skills` are report card keys, so the menu can point a student at what their own report cards say to practice.
+ */
+const PATH: { id: string; phase: number; skills: string[]; wxCap: number }[] = [
+  { id: 'atl-first-drive', phase: 1, skills: ['acceleration', 'braking', 'lane_maintenance', 'speed_maintenance'], wxCap: 0 },
+  { id: 'atl-lovvorn', phase: 1, skills: ['braking', 'road_sign_awareness', 'speed_maintenance'], wxCap: 0 },
+  { id: 'atl-carrollton-square', phase: 2, skills: ['road_sign_awareness', 'braking', 'distractions', 'right_turns', 'left_turns'], wxCap: 1 },
+  { id: 'atl-carrollton-circle', phase: 2, skills: ['right_turns', 'left_turns', 'signal_usage', 'blind_spots'], wxCap: 1 },
+  { id: 'atl-us27-carrollton', phase: 2, skills: ['speed_maintenance', 'lane_maintenance', 'road_sign_awareness'], wxCap: 1 },
+  { id: 'atl-villa-rica', phase: 2, skills: ['lane_maintenance', 'speed_maintenance', 'acceleration'], wxCap: 1 },
+  { id: 'atl-bankhead-hwy', phase: 3, skills: ['changing_lanes', 'following_distance', 'signal_usage', 'braking'], wxCap: 2 },
+  { id: 'atl-marietta-square', phase: 3, skills: ['right_turns', 'left_turns', 'signal_usage', 'road_sign_awareness'], wxCap: 2 },
+  { id: 'atl-douglasville', phase: 3, skills: ['following_distance', 'changing_lanes', 'blind_spots', 'signal_usage'], wxCap: 2 },
+  { id: 'atl-stone-mountain', phase: 3, skills: ['speed_maintenance', 'braking', 'road_sign_awareness', 'distractions'], wxCap: 2 },
+  { id: 'atl-airport-camp-creek', phase: 4, skills: ['changing_lanes', 'following_distance', 'blind_spots', 'merging'], wxCap: 2 },
+  { id: 'atl-ponce', phase: 4, skills: ['braking', 'left_turns', 'right_turns', 'signal_usage'], wxCap: 2 },
+  { id: 'atl-rain-ponce', phase: 4, skills: ['following_distance', 'braking', 'speed_maintenance'], wxCap: 2 },
+  { id: 'atl-peachtree-street', phase: 4, skills: ['distractions', 'blind_spots', 'changing_lanes', 'following_distance'], wxCap: 2 },
+  { id: 'atl-fog-villa-rica', phase: 4, skills: ['speed_maintenance', 'lane_maintenance', 'following_distance'], wxCap: 3 },
+  { id: 'atl-buckhead', phase: 4, skills: ['blind_spots', 'changing_lanes', 'distractions', 'following_distance'], wxCap: 3 },
+  { id: 'atl-onramp-i20', phase: 5, skills: ['merging', 'interstate', 'acceleration', 'signal_usage', 'blind_spots'], wxCap: 1 },
+  { id: 'atl-i75-henry', phase: 5, skills: ['interstate', 'speed_maintenance', 'lane_maintenance'], wxCap: 2 },
+  { id: 'atl-i20-west', phase: 5, skills: ['interstate', 'changing_lanes', 'following_distance'], wxCap: 2 },
+  { id: 'atl-i285-east', phase: 6, skills: ['interstate', 'changing_lanes', 'blind_spots', 'signal_usage'], wxCap: 3 },
+  { id: 'atl-i75-cobb', phase: 6, skills: ['interstate', 'merging', 'following_distance'], wxCap: 3 },
+  { id: 'atl-i285-west', phase: 6, skills: ['interstate', 'changing_lanes', 'following_distance'], wxCap: 3 },
+  { id: 'atl-i20-east', phase: 6, skills: ['interstate', 'speed_maintenance', 'road_sign_awareness'], wxCap: 3 },
+  { id: 'atl-ga400', phase: 6, skills: ['interstate', 'merging', 'speed_maintenance'], wxCap: 3 },
+  { id: 'atl-i85-gwinnett', phase: 6, skills: ['interstate', 'road_sign_awareness', 'changing_lanes'], wxCap: 3 },
+  { id: 'atl-i285-top-end', phase: 7, skills: ['interstate', 'changing_lanes', 'blind_spots', 'following_distance'], wxCap: 5 },
+  { id: 'atl-i285-airport', phase: 7, skills: ['interstate', 'merging', 'road_sign_awareness', 'distractions'], wxCap: 5 },
+  { id: 'atl-connector-south', phase: 7, skills: ['interstate', 'changing_lanes', 'following_distance', 'merging'], wxCap: 5 },
+  { id: 'atl-connector-north', phase: 7, skills: ['interstate', 'changing_lanes', 'road_sign_awareness', 'blind_spots'], wxCap: 5 },
+  { id: 'atl-move-over', phase: 8, skills: ['blind_spots', 'signal_usage', 'changing_lanes', 'interstate'], wxCap: 5 },
+  { id: 'atl-work-zone', phase: 8, skills: ['speed_maintenance', 'merging', 'following_distance', 'distractions'], wxCap: 5 },
+  { id: 'atl-sunset-20', phase: 8, skills: ['speed_maintenance', 'distractions', 'following_distance'], wxCap: 5 },
+  { id: 'atl-fog-i20', phase: 8, skills: ['following_distance', 'speed_maintenance', 'lane_maintenance'], wxCap: 5 },
+  { id: 'atl-night-285', phase: 8, skills: ['distractions', 'following_distance', 'blind_spots'], wxCap: 5 },
+  { id: 'atl-snow-285', phase: 8, skills: ['following_distance', 'braking', 'speed_maintenance', 'acceleration'], wxCap: 5 },
+  { id: 'atl-storm-connector', phase: 8, skills: ['following_distance', 'speed_maintenance', 'braking', 'interstate'], wxCap: 5 },
+  { id: 'atl-rush-hour', phase: 9, skills: ['following_distance', 'distractions', 'braking', 'changing_lanes'], wxCap: 5 },
+  { id: 'atl-master-storm', phase: 9, skills: ['interstate', 'following_distance', 'merging', 'blind_spots', 'signal_usage', 'distractions'], wxCap: 5 },
+];
+
+export const PHASES: { n: number; title: string; note: string }[] = [
+  { n: 1, title: 'Phase 1 · First drive', note: 'Quiet streets, clear skies' },
+  { n: 2, title: 'Phase 2 · Carrollton and country roads', note: 'Roundabouts, signs and curves' },
+  { n: 3, title: 'Phase 3 · Town driving', note: 'Lights, rail crossings, school zones' },
+  { n: 4, title: 'Phase 4 · Busy Atlanta streets', note: 'Rain, fog and night in the city' },
+  { n: 5, title: 'Phase 5 · Meet the interstate', note: 'Ramps, merging and 70 mph' },
+  { n: 6, title: 'Phase 6 · Metro interstates', note: 'I-285, I-75, I-85, I-20 and GA-400' },
+  { n: 7, title: 'Phase 7 · Big Atlanta interstates', note: 'The Connector, the airport, the Perimeter' },
+  { n: 8, title: 'Phase 8 · Hazards and weather', note: 'Work zones, Move Over, fog, snow and storms' },
+  { n: 9, title: 'Phase 9 · Master class', note: 'Rush hour and a night storm' },
+];
+
+export const ATL_STAGES: AtlStage[] = PATH.map((p) => {
+  const st = RAW.find((r) => r.id === p.id);
+  if (!st) throw new Error(`atl path: missing stage ${p.id}`);
+  return { ...st, phase: p.phase, skills: p.skills, wxCap: p.wxCap };
+});
 
 export const ATL_PREFIX = 'atl-';
 export const isAtlId = (id: string) => id.startsWith(ATL_PREFIX);

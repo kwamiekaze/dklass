@@ -20,7 +20,7 @@ export const DIM: Record<VehKind, { l: number; w: number; h: number }> = {
 
 export interface Veh {
   id: number; kind: VehKind; d: number; x: number; lane: number; tl: number; v: number; want: number; color: number; dir: 1 | -1;
-  brake: boolean; sig: -1 | 0 | 1; lcT: number; lcFrom: number; lcWait: number; think: number; siren: boolean; still: boolean; hit: boolean; fly?: { t: number; vx: number; vd: number; spin: number }; side: boolean; yaw: number; look: number;
+  brake: boolean; sig: -1 | 0 | 1; lcT: number; lcFrom: number; lcWait: number; think: number; siren: boolean; still: boolean; hit: boolean; cop?: boolean; fly?: { t: number; vx: number; vd: number; spin: number }; side: boolean; yaw: number; look: number;
 }
 export interface Closure { d0: number; d1: number; lanes: number[]; kind: 'work' | 'crash' }
 export interface Zone { d0: number; d1: number; limit: number; kind: 'work' | 'school' | 'circle' }
@@ -48,6 +48,9 @@ export class AtlSim {
   props: Prop[] = [];
   closures: Closure[] = [];
   zones: Zone[] = [];
+  // ---- speed patrol: over 80 mph for more than 5 seconds on an interstate brings a cruiser
+  cop: Veh | null = null; patrolPhase: 'none' | 'chase' | 'beside' | 'pull' | 'stop' | 'leave' = 'none'; patrolKind: 'ticket' | 'stop' = 'ticket';
+  patrolT = 0; fastT = 0; tickets = 0; patrolCool = 0; stopT = 0; cited = false; maxXNow = 0; copOff = 0;
   rails: Rail[] = []; circles: Circle[] = []; lights: Light[] = []; stops: Stop[] = []; peds: Ped[] = []; polices: Police[] = [];
   speedLimitNow: number;
 
@@ -254,7 +257,7 @@ export class AtlSim {
     const playerLane = this.laneIdx, pD = T, pL = 4.7;
     const leaderOf = (v: Veh, lane: number): { gap: number; v: number } | null => {
       let best: { gap: number; v: number } | null = null;
-      const b = lanes[Math.max(0, Math.min(own + 1, lane))]!;
+      const b = lanes[Math.max(0, Math.min(own + 1, Math.round(lane)))] ?? [];
       for (const o of b) if (o !== v && o.d > v.d) { best = { gap: o.d - o.v * 0 - DIM[o.kind].l / 2 - v.d - DIM[v.kind].l / 2, v: o.v }; break; }
       // the player counts when their body is in the lane
       if (Math.abs(this.x - this.laneX(lane)) < 1.9 && pD > v.d) { const g = pD - pL / 2 - v.d - DIM[v.kind].l / 2; if (!best || g < best.gap) best = { gap: g, v: this.mph * KMPH }; }
@@ -263,7 +266,7 @@ export class AtlSim {
       return best;
     };
     const gapBehind = (v: Veh, lane: number) => {
-      let g = 1e9; const b = lanes[Math.max(0, Math.min(own + 1, lane))]!;
+      let g = 1e9; const b = lanes[Math.max(0, Math.min(own + 1, Math.round(lane)))] ?? [];
       for (const o of b) if (o !== v && o.d <= v.d + 6) g = Math.min(g, v.d - o.d - DIM[o.kind].l / 2 - DIM[v.kind].l / 2 + 6 - Math.max(0, (o.v - v.v)) * 1.6);
       if (Math.abs(this.x - this.laneX(lane)) < 2.2 && pD <= v.d + 6) g = Math.min(g, v.d - pD - pL / 2 - 2 - Math.max(0, this.mph * KMPH - v.v) * 1.6);
       return g;
@@ -331,7 +334,8 @@ export class AtlSim {
     this.x += this.steerV * dt;
     const lay = this.lay;
     if (this.x < lay.minX) { this.x = lay.minX; if (this.steerV < 0) this.steerV = 0; }
-    if (this.x > lay.maxX) { this.x = lay.maxX; if (this.steerV > 0) this.steerV = 0; }
+    const maxX = Math.max(lay.maxX, this.maxXNow);
+    if (this.x > maxX) { this.x = maxX; if (this.steerV > 0) this.steerV = 0; }
     this.yaw += (Math.max(-0.2, Math.min(0.2, (this.steerV / 6.4) * 0.2)) - this.yaw) * (1 - Math.exp(-dt * 10));
     if (this.mph > 35 && (c.left || c.right) && this.mph > this.stage.limit - 8) this.snd.tireScreech?.(Math.min(1, this.mph / this.maxMph));
     this.speedLimitNow = this.zoneLimit(this.traveled);
@@ -349,7 +353,7 @@ export class AtlSim {
     this.laneRules(dt);
     this.followRules(dt);
     this.speedRules(dt);
-    this.stepRails(dt); this.stepCircles(dt); this.stepLights(dt); this.stepStops(); this.stepPeds(dt); this.stepPolice();
+    this.stepRails(dt); this.stepCircles(dt); this.stepLights(dt); this.stepStops(); this.stepPeds(dt); this.stepPolice(); this.stepPatrol(dt);
     // signal cancels itself
     if (this.signalDir !== 0 && this.time - this.signalAt > 6) this.signalDir = 0;
     if (!this.finished && this.traveled >= this.effectiveLength) this.finish();
@@ -373,6 +377,7 @@ export class AtlSim {
     const px = this.x, pd = this.traveled, pw = 1.9, pl = 4.7;
     for (const v of this.vehicles) {
       if (v.fly || v.hit) continue;
+      if (v.cop && this.patrolPhase !== 'pull' && this.patrolPhase !== 'stop') continue;
       const dm = DIM[v.kind], vw = v.side ? dm.l : dm.w, vl = v.side ? dm.w : dm.l;
       if (Math.abs(v.d - pd) < (pl + vl) / 2 - 0.15 && Math.abs(v.x - px) < (pw + vw) / 2 - 0.1) {
         if (lay_isDecor(this.lay, v) ) continue;
@@ -551,6 +556,102 @@ export class AtlSim {
     }
   }
 
+
+  // ------------------------------------------------------------------ speed patrol
+  private startPatrol() {
+    const lay = this.lay, T = this.traveled, pv = this.mph * KMPH;
+    this.patrolKind = this.tickets >= 2 ? 'stop' : 'ticket';
+    // the cruiser comes up the lane next to you that has the most room
+    const cands = [this.laneIdx - 1, this.laneIdx + 1].filter((l) => l >= 0 && l < lay.lanes);
+    let lane = cands[0] ?? this.laneIdx, best = -1;
+    for (const l of cands) { let clear = 1e9; for (const o of this.vehicles) if (o.dir === 1 && !o.cop && Math.abs(o.lane - l) < 0.6) clear = Math.min(clear, Math.abs(o.d - T)); if (clear > best) { best = clear; lane = l; } }
+    this.copOff = best < 14 ? (best < 7 ? -9 : -6) : 0;
+    const v = this.makeVeh('police', T - 95, lane, pv + 6);
+    v.still = true; v.siren = true; v.cop = true; v.look = 0; v.x = this.laneX(lane); v.lane = lane; v.tl = lane;
+    this.vehicles.push(v); this.cop = v; this.patrolPhase = 'chase'; this.patrolT = 0;
+    this.snd.siren?.();
+    this.banner('POLICE BEHIND YOU', this.patrolKind === 'stop' ? 'Third time. Stay calm and follow the officer' : 'Over 80 mph for too long. Ease off the gas', 3200, 'red');
+    this.emit({ k: 'flash', color: 0x3070ff, dur: 0.35 });
+  }
+  private endPatrol(cool: number) {
+    if (this.cop) { const i = this.vehicles.indexOf(this.cop); if (i >= 0) this.vehicles.splice(i, 1); }
+    this.cop = null; this.patrolPhase = 'none'; this.patrolCool = cool; this.fastT = 0; this.maxXNow = 0;
+  }
+  private stepPatrol(dt: number) {
+    if (this.stage.road !== 'interstate' || this.finished) return;
+    const lay = this.lay;
+    if (this.patrolPhase === 'none') {
+      if (this.patrolCool > 0) this.patrolCool -= dt;
+      if (this.mph > 80) this.fastT += dt; else this.fastT = Math.max(0, this.fastT - dt * 1.5);
+      if (this.fastT > 5 && this.patrolCool <= 0 && this.time > 6 && !this.locked) this.startPatrol();
+      return;
+    }
+    const cop = this.cop; if (!cop) { this.patrolPhase = 'none'; return; }
+    const T = this.traveled, pv = this.mph * KMPH, lastX = lay.xs[lay.lanes - 1]!;
+    const shoulderX = lastX + LANE * 0.5 + 1.3;
+    this.patrolT += dt;
+    const follow = (off: number, k = 4) => { cop.d += (cop.v * dt); cop.d += (T + off - cop.d) * Math.min(1, dt * k); };
+    switch (this.patrolPhase) {
+      case 'chase': {
+        cop.v = pv + 11 + Math.max(0, (T - cop.d)) * 0.1; cop.d += cop.v * dt;
+        if (cop.d >= T + this.copOff - 1.5) { this.patrolPhase = 'beside'; this.patrolT = 0; cop.v = pv; }
+        if (this.patrolT > 25) this.endPatrol(10);
+        break;
+      }
+      case 'beside': {
+        cop.v = pv; follow(this.copOff);
+        if (this.patrolT > 1.8) {
+          this.patrolT = 0;
+          if (this.patrolKind === 'ticket') {
+            this.tickets++;
+            this.award('SPEEDING_TICKET', `TICKET ${this.tickets}`);
+            this.banner(`SPEEDING TICKET ${this.tickets} OF 2`, this.tickets >= 2 ? 'One more and you get pulled over. Slow down now' : 'Over 80 mph on the interstate. Hold the limit', 4200, 'red');
+            this.emit({ k: 'shake', amp: 0.5, dur: 0.4 });
+            this.patrolPhase = 'leave';
+          } else {
+            this.patrolPhase = 'pull';
+            this.banner('PULL OVER', 'Signal right, slow down and stop on the shoulder', 5200, 'red');
+            this.signalDir = 0;
+          }
+        }
+        break;
+      }
+      case 'leave': {
+        cop.v = Math.max(0, pv - 9); cop.d += cop.v * dt;
+        if (this.patrolT > 1.6) cop.x += (this.laneX(Math.max(0, Math.min(lay.lanes - 1, Math.round(cop.lane)))) - cop.x) * Math.min(1, dt * 2);
+        if (cop.d < T - 120 || this.patrolT > 14) this.endPatrol(14);
+        break;
+      }
+      case 'pull': {
+        this.maxXNow = shoulderX - 0.7;
+        // the cruiser moves ahead into your lane, then slides onto the shoulder and slows to a stop
+        const t = this.patrolT, targetX = t < 2.5 ? this.x : t < 5 ? this.x + (shoulderX - this.x) * ((t - 2.5) / 2.5) : shoulderX;
+        cop.x += (targetX - cop.x) * Math.min(1, dt * 2.6);
+        const ahead = cop.d - T;
+        if (t < 5) cop.v = pv + Math.max(-3, Math.min(7, (24 - ahead) * 0.7)); else cop.v = Math.max(0, cop.v - 3.6 * dt * (t > 6 ? 1 : 0.4));
+        cop.d += cop.v * dt;
+        // done when you have stopped, ideally on the right
+        if (this.mph < 2) { this.stopT += dt; if (this.stopT > 1.1) { this.patrolPhase = 'stop'; this.patrolT = 0; this.onPulledOver(this.x > lastX + LANE * 0.5 - 1.2); } } else this.stopT = 0;
+        if (t > 9 && t < 9.1) this.banner('KEEP SLOWING', 'Stop behind the cruiser on the shoulder', 2400, 'red');
+        if (t > 24 && this.mph > 8) {
+          this.award('FAILED_TO_YIELD', 'DID NOT STOP'); this.tracker.zeroOut(); this.cited = true; this.locked = true;
+          this.banner('FAILED TO YIELD', 'Always pull over for blue lights', 3600, 'red'); this.emit({ k: 'catastrophe', dog: false }); this.patrolPhase = 'stop'; this.after(2.2, () => this.finish());
+        }
+        break;
+      }
+      case 'stop': {
+        cop.v = 0; this.maxXNow = shoulderX - 0.7;
+        break;
+      }
+    }
+  }
+  private onPulledOver(onShoulder: boolean) {
+    this.cited = true; this.locked = true;
+    this.award('PULLED_OVER', 'PULLED OVER');
+    this.banner('TRAFFIC STOP', onShoulder ? 'You pulled over safely. Hands on the wheel, window down' : 'Stopped in the lane. Next time move fully onto the shoulder', 4200, 'white');
+    this.after(3.4, () => this.finish());
+  }
+
   private finish() {
     if (this.finished) return; this.finished = true;
     this.snd.fanfare?.();
@@ -558,6 +659,7 @@ export class AtlSim {
     const early = this.traveled < this.effectiveLength - 5;
     if (!early && !this.tracker.voided) { this.tracker.add('FINISH_BONUS'); }
     const result = buildResult(this.level, this.tracker, this.difficulty);
+    if (this.cited) result.passed = false;
     result.feedback = this.feedback(result);
     this.after(0.9, () => this.emit({ k: 'complete', result }));
   }
@@ -575,6 +677,8 @@ export class AtlSim {
     if (t.countOf('RAN_RAIL') > 0) out.push('Never go around gates. Stop 15 feet back and wait for the train.'); else if (t.countOf('RAIL_STOP') > 0) out.push('Handled the railroad crossing safely.');
     if (t.countOf('CIRCLE_CUTOFF') > 0) out.push('Yield to traffic already in the roundabout.'); else if (t.countOf('CIRCLE_YIELD') > 0) out.push('You yielded in the roundabout. Slow, look left, go.');
     if (t.countOf('RAN_STOP_SIGN') + t.countOf('RAN_RED_LIGHT') > 0) out.push('Obey every stop sign and signal. A full stop means no movement.');
+    if (this.cited) out.push(this.patrolKind === 'stop' ? 'You were pulled over for speeding on the interstate. Over 80 mph, signal, slow down and stop on the right shoulder.' : 'Tickets end here.');
+    else if (this.tickets > 0) out.push(`${this.tickets} speeding ticket${this.tickets === 1 ? '' : 's'}. The limit is ${this.stage.limit}. Tickets raise insurance and can suspend a license.`);
     out.push(`Weather this run: ${this.weatherLabel}. ${this.stage.lessons[0] ?? ''}`.trim());
     out.push(r.passed ? 'Instructor verdict: PASS. Ready for the next lesson!' : 'Instructor verdict: NEEDS PRACTICE. Book a lesson and try again!');
     return out;

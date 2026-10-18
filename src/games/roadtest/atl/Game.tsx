@@ -7,6 +7,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PerformanceMonitor, useGLTF, useProgress } from '@react-three/drei';
 import { NightCtx } from '../../../components/nuhome2/world/theme';
+import { disposeAtlTextures } from './textures';
 import { detectTier, qualityFor, type Quality } from '../../../components/nuhome2/world/quality';
 import { fleetFiles } from '../../../components/nuhome2/world/Fleet';
 import { touchControls } from '../game/controls';
@@ -65,7 +66,14 @@ export function resolveRun(stageId: string): { weather: WeatherKind; tod: TimeOf
   const pick = c.weather as string;
   if ((KINDS as string[]).includes(pick)) weather = pick as WeatherKind;
   else if ((pick === 'auto' || pick === 'random') && st.weather) weather = st.weather;
-  else weather = rollGeorgiaWeather();
+  else {
+    // random weather, but gentle stages keep it gentle: the path gets rougher as the student improves
+    const RANK: Record<WeatherKind, number> = { clear: 0, cloudy: 1, rain: 2, fog: 3, storm: 4, snow: 5 };
+    const cap = st.wxCap ?? 5;
+    weather = rollGeorgiaWeather();
+    for (let i = 0; i < 24 && RANK[weather] > cap; i++) weather = rollGeorgiaWeather();
+    if (RANK[weather] > cap) weather = cap >= 1 ? 'cloudy' : 'clear';
+  }
   let tod: TimeOfDay | undefined;
   const tp = c.time as string;
   if (tp === 'day' || tp === 'golden' || tp === 'dusk' || tp === 'night') tod = tp;
@@ -115,6 +123,8 @@ function Driver({ handle, onComplete, onReady }: { handle: AtlHandle; onComplete
     }
   };
   useFrame((_, rawDt) => {
+    try {
+    beat.t = performance.now();
     frames.current++;
     const dt = Math.min(rawDt, 0.05); waited.current += dt;
     if (!ready.current) { if (frames.current > 8 && ((!prog.active && waited.current > 1.0) || waited.current > 9)) { ready.current = true; onReady(); } else return; }
@@ -134,9 +144,13 @@ function Driver({ handle, onComplete, onReady }: { handle: AtlHandle; onComplete
     if (diff !== 0) { const step = Math.sign(diff) * Math.max(1, Math.ceil(Math.abs(diff) * Math.min(1, dt * 6))); hud.display = Math.abs(step) >= Math.abs(diff) ? hud.score : hud.display + step; }
     hud.mph = sim.mph; hud.over = sim.speeding; hud.combo = sim.tracker.combo; hud.maxCombo = sim.tracker.maxCombo; hud.stars = sim.tracker.starsCollected;
     hud.progress = sim.progress; hud.strikes = sim.strikes; hud.limit = sim.speedLimitNow; hud.distance = sim.travelPx;
+    } catch (err) { if (import.meta.env.DEV) console.error('atl frame', err); }
   }, -5);
   return null;
 }
+
+/** Last time the scene loop ticked. A watchdog remounts the canvas if a phone's GPU stalls or loses its context. */
+const beat = { t: 0 };
 
 function CameraRig({ handle }: { handle: AtlHandle }) {
   const { sim } = handle;
@@ -150,7 +164,7 @@ function CameraRig({ handle }: { handle: AtlHandle }) {
     c.x = damp(c.x, sim.x, 7, dt);
     c.t = damp(c.t, handle.introT >= 1 ? 1 : clamp(handle.introT * 1.12, 0, 1), 9, dt);
     const e = smooth(0, 1, c.t);
-    let px = c.x * 0.6, py = up, pz = back, lx = c.x * 0.4, ly = lookY, lz = lookZ;
+    const over = Math.max(0, c.x - 5.8); let px = c.x * 0.6 + over * 0.9, py = up, pz = back, lx = c.x * 0.4 + over * 0.8, ly = lookY, lz = lookZ;
     if (e < 0.999) { const a = lerp(2.5, 0, e), R = lerp(6.4, back, e), h = lerp(1.25, up, e); px = sim.x + Math.sin(a) * R * 0.9; pz = Math.cos(a) * R; py = h; lx = lerp(sim.x, c.x * 0.4, e); ly = lerp(0.85, lookY, e); lz = lerp(0, lookZ, e); }
     if (sim.finished) {
       c.fin = Math.min(1.5, c.fin + dt); const a = c.fin * 0.9, R = lerp(back, 7.5, smooth(0, 1.2, c.fin));
@@ -162,6 +176,7 @@ function CameraRig({ handle }: { handle: AtlHandle }) {
     shake.punch = damp(shake.punch, 0, 7, dt);
     const rumble = sp * 0.012 * (sim.mph > 5 ? 1 : 0);
     tmp.p.y += Math.sin(clock.elapsedTime * 41) * rumble; tmp.p.x += Math.sin(clock.elapsedTime * 33) * rumble * 0.6;
+    if (import.meta.env.DEV) { const o = (window as unknown as { __cam?: { p: number[]; l: number[] } }).__cam; if (o) { tmp.p.set(o.p[0]!, o.p[1]!, o.p[2]!); tmp.l.set(o.l[0]!, o.l[1]!, o.l[2]!); } }
     camera.position.copy(tmp.p); camera.lookAt(tmp.l); camera.rotateZ(-sim.steerV * 0.0045 * e);
     c.fov = damp(c.fov, fovB + sp * 11 + shake.punch * 6, 5, dt);
     if (Math.abs(pc.fov - c.fov) > 0.01) { pc.fov = c.fov; pc.updateProjectionMatrix(); }
@@ -206,6 +221,15 @@ function AtlHud({ handle }: { handle: AtlHandle }) {
       q('.atl-sig-l')?.classList.toggle('armed', on === -1); q('.atl-sig-r')?.classList.toggle('armed', on === 1);
       const g = q('.atl-gap');
       if (g) { const s = sim.gapSec; const show = s < 8 && sim.mph > 12; g.style.opacity = show ? '1' : '0.35'; g.dataset.s = !show ? 'none' : s < 1 ? 'bad' : s < 2 ? 'warn' : s < 5 ? 'good' : 'far'; const b = g.querySelector('b'); if (b) b.textContent = show ? `${s.toFixed(1)}s` : '--'; }
+      const rd = q('.atl-radar');
+      if (rd) {
+        const live = sim.stage.road === 'interstate', ph = sim.patrolPhase;
+        rd.dataset.s = !live ? 'off' : ph !== 'none' ? 'cop' : sim.fastT > 0.15 ? 'warn' : sim.tickets > 0 || sim.mph > 74 ? 'idle' : 'off';
+        const u = rd.querySelector('u') as HTMLElement | null; if (u) u.style.width = `${Math.min(100, (ph !== 'none' ? 1 : sim.fastT / 5) * 100)}%`;
+        rd.querySelectorAll('s').forEach((el, i) => el.classList.toggle('on', i < sim.tickets));
+        const t = rd.querySelector('b'); if (t) t.textContent = ph === 'none' ? (sim.fastT > 0.15 ? `OVER 80 · ${Math.max(0, 5 - sim.fastT).toFixed(1)}s` : sim.tickets > 0 ? 'TICKETS' : 'SPEED WATCH') : ph === 'pull' || ph === 'stop' ? 'PULL OVER' : 'POLICE';
+      }
+      const cf = q('.atl-copflash'); if (cf) cf.dataset.on = sim.patrolPhase !== 'none' ? (Math.floor(now / 170) % 2 ? 'a' : 'b') : '';
       if (sim.prompt !== lastPrompt) { lastPrompt = sim.prompt; promptAt = now; const p = q('.atl-prompt'); if (p) { p.textContent = sim.prompt; p.classList.remove('show'); void p.offsetWidth; p.classList.add('show'); } }
       if (now - promptAt > 7500) q('.atl-prompt')?.classList.remove('show');
     };
@@ -220,6 +244,8 @@ function AtlHud({ handle }: { handle: AtlHandle }) {
       <div className="atl-gap" data-s="none"><small>GAP</small><b>--</b></div>
       <button className="atl-sig-r" onPointerDown={press(1)} aria-label="Right signal (E)">▶</button>
     </div>
+    <div className="atl-radar" data-s="off"><small>🚨</small><b>SPEED WATCH</b><i><u /></i><span><s /><s /></span></div>
+    <div className="atl-copflash" data-on="" />
     <div className="atl-prompt" />
   </div>;
 }
@@ -232,8 +258,19 @@ export function AtlGame({ handle, onComplete, onLost }: { handle: AtlHandle; onC
   const tierName = useMemo(() => detectTier(), []);
   const quality: Quality = qualityFor(tierName);
   const [lvl, setLvl] = useState(0);
+  useEffect(() => () => disposeAtlTextures(), []);
+  const [ckey, setCkey] = useState(0);
+  const readyRef = useRef(false); readyRef.current = ready;
+  useEffect(() => {
+    beat.t = performance.now();
+    const id = window.setInterval(() => {
+      if (!readyRef.current || document.hidden) { beat.t = performance.now(); return; }
+      if (performance.now() - beat.t > 6500) { beat.t = performance.now(); setCkey((k) => k + 1); }
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
   const dprQ = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('dpr') : null;
-  const cap = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, window.innerWidth < 900 ? 1.75 : quality.dpr[1]) : 1;
+  const cap = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, window.innerWidth < 900 ? 1.5 : quality.dpr[1]) : 1;
   const dpr = dprQ ? Number(dprQ) : Math.max(1, +(cap * (1 - 0.17 * lvl)).toFixed(2));
   const tip = useMemo(() => handle.sim.stage.lessons[Math.floor(Math.random() * handle.sim.stage.lessons.length)] ?? '', [handle]);
   useEffect(() => { if (import.meta.env.DEV) { (window as unknown as { __atl?: AtlHandle }).__atl = handle; return () => { delete (window as unknown as { __atl?: AtlHandle }).__atl; }; } }, [handle]);
@@ -255,12 +292,13 @@ export function AtlGame({ handle, onComplete, onLost }: { handle: AtlHandle; onC
   const st = handle.sim.stage;
   return <div className="rt3d-root atl-root">
     <Canvas
+      key={ckey}
       className="rt3d-canvas"
       shadows={quality.shadow > 0 && tierName === 'high'}
       dpr={dpr}
-      gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
+      gl={{ antialias: typeof window === 'undefined' || window.innerWidth >= 900, alpha: false, powerPreference: 'high-performance' }}
       camera={{ position: [0, 3.2, 8.6], fov: 56, near: 0.3, far: 360 }}
-      onCreated={({ gl }) => { gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 0.92; gl.setClearColor('#e9dcc2'); gl.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); lost.current(); }, { once: true }); }}
+      onCreated={({ gl }) => { if (import.meta.env.DEV) (window as unknown as { __gl?: unknown }).__gl = gl; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 0.92; gl.setClearColor('#e9dcc2'); gl.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); setCkey((k) => k + 1); }, { once: true }); }}
     >
       <PerformanceMonitor ms={350} iterations={8} flipflops={3} onDecline={() => setLvl((l) => clamp(l + 1, 0, 3))} onIncline={() => setLvl((l) => clamp(l - 1, 0, 3))} />
       <Scene handle={handle} carId={carId} quality={quality} bloom={bloom} onComplete={onCompleteCb} onReady={() => setReady(true)} />

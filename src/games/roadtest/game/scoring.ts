@@ -31,6 +31,9 @@ export const POINTS = {
   RAN_RAIL: -250,
   CIRCLE_CUTOFF: -100,
   BLOCK_PASSING: -15,
+  SPEEDING_TICKET: -150,
+  PULLED_OVER: -300,
+  FAILED_TO_YIELD: -500,
   HIT_PEDESTRIAN: 0, // catastrophic — ends run but preserves earned score
 } as const;
 
@@ -65,6 +68,9 @@ const LABELS: Record<string, string> = {
   RAN_RAIL: 'Crossed with the gates down',
   CIRCLE_CUTOFF: 'Cut off traffic in the circle',
   BLOCK_PASSING: 'Cruised in the passing lane',
+  SPEEDING_TICKET: 'Speeding ticket',
+  PULLED_OVER: 'Pulled over for speeding',
+  FAILED_TO_YIELD: 'Did not pull over for police',
 };
 
 export type PointKey = keyof typeof POINTS;

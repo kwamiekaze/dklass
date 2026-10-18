@@ -7,6 +7,16 @@ import type { Arrow, GuideSign, Shield, Skyline } from './stageTypes';
 import type { Layout } from './layout';
 import { LANE } from './layout';
 
+/** Every canvas texture is cached by key, so a recycled billboard or sign never makes a new one. Phones run out of canvas memory otherwise. */
+const CACHE = new Map<string, unknown>();
+function memo<T>(key: string, make: () => T): T { let v = CACHE.get(key) as T | undefined; if (v === undefined) { v = make(); CACHE.set(key, v); } return v; }
+export function disposeAtlTextures() {
+  for (const v of CACHE.values()) {
+    const o = v as { map?: THREE.Texture; sil?: THREE.Texture; lit?: THREE.Texture; dispose?: () => void };
+    o.dispose?.(); o.map?.dispose?.(); o.sil?.dispose?.(); o.lit?.dispose?.();
+  }
+  CACHE.clear();
+}
 const mkCanvas = (w: number, h: number) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 const tex = (c: HTMLCanvasElement, srgb = true, aniso = 8) => { const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = aniso; return t; };
 function rngOf(seed: number) { let s = seed >>> 0 || 1; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
@@ -83,7 +93,7 @@ export function roadTexture(lay: Layout, opts: { concrete: boolean; hov: boolean
 }
 
 /** Paint on the road that is not a repeat: crossings, stop bars, yield triangles, rails, the exit-only word. Drawn once, laid out in metres on a plane. */
-export function decalTexture(kind: 'crosswalk' | 'stopbar' | 'yield' | 'rail' | 'exitonly' | 'school' | 'gore'): { map: THREE.CanvasTexture; w: number; l: number } {
+function decalTexture_raw(kind: 'crosswalk' | 'stopbar' | 'yield' | 'rail' | 'exitonly' | 'school' | 'gore'): { map: THREE.CanvasTexture; w: number; l: number } {
   const c = mkCanvas(1024, 512), g = c.getContext('2d')!; g.clearRect(0, 0, 1024, 512);
   const W = '#f3f1ea';
   let w = 14, l = 7;
@@ -170,7 +180,7 @@ function drawPanel(g: CanvasRenderingContext2D, p: PanelSpec, x: number, y: numb
 }
 export interface SignTex { map: THREE.CanvasTexture; aspect: number }
 const signCache = new Map<string, SignTex>();
-export function guideSignTexture(s: GuideSign): SignTex {
+function guideSignTexture_raw(s: GuideSign): SignTex {
   const key = JSON.stringify(s); const hit = signCache.get(key); if (hit) return hit;
   const panels: PanelSpec[] = [{ shields: s.shields, dir: s.dir, dests: s.dests, arrows: s.arrows, exitOnly: s.exitOnly }, ...(s.also ?? [])];
   const PW = 640, PH = 500, TAB = 78, W = PW * panels.length, H = PH + TAB;
@@ -182,7 +192,7 @@ export function guideSignTexture(s: GuideSign): SignTex {
 }
 
 /** The amber message board over the road (Georgia 511 style). */
-export function vmsTexture(lines: string[]): THREE.CanvasTexture {
+function vmsTexture_raw(lines: string[]): THREE.CanvasTexture {
   const W = 1280, H = 360, c = mkCanvas(W, H), g = c.getContext('2d')!;
   g.fillStyle = '#07080a'; g.fillRect(0, 0, W, H); g.strokeStyle = '#2a2d33'; g.lineWidth = 10; g.strokeRect(5, 5, W - 10, H - 10);
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = 'rgba(255,170,0,.85)'; g.shadowBlur = 16; g.fillStyle = '#ffb21a';
@@ -192,7 +202,7 @@ export function vmsTexture(lines: string[]): THREE.CanvasTexture {
   return tex(c);
 }
 
-export function regulatoryTexture(kind: 'speed' | 'keepright' | 'hov' | 'noTrucksLeft' | 'handsfree' | 'moveover' | 'trainx' | 'yield' | 'circle' | 'school' | 'workers' | 'rightLaneEnds', n = 70): THREE.CanvasTexture {
+function regulatoryTexture_raw(kind: 'speed' | 'keepright' | 'hov' | 'noTrucksLeft' | 'handsfree' | 'moveover' | 'trainx' | 'yield' | 'circle' | 'school' | 'workers' | 'rightLaneEnds', n = 70): THREE.CanvasTexture {
   const W = 512, H = 640, c = mkCanvas(W, H), g = c.getContext('2d')!; g.clearRect(0, 0, W, H);
   const plate = (bg: string, fg: string) => { g.fillStyle = '#111'; roundRect(g, 8, 8, W - 16, H - 16, 36); g.fill(); g.fillStyle = bg; roundRect(g, 22, 22, W - 44, H - 44, 28); g.fill(); g.strokeStyle = fg; g.lineWidth = 10; roundRect(g, 36, 36, W - 72, H - 72, 20); g.stroke(); };
   g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -218,13 +228,16 @@ function drawDiamond(g: CanvasRenderingContext2D, cx: number, cy: number, s: num
 const ADS: { a: string; b: string; c: string; bg: string; fg: string }[] = [
   { a: 'DRIVINGKLASS', b: 'Where 5 Star Drivers Are Made', c: 'Carrollton · Book a Klass', bg: '#0c1634', fg: '#f2c14e' },
   { a: 'PEACH STATE HOMES', b: 'Move-in ready · Metro Atlanta', c: 'Tour today', bg: '#ff9a5c', fg: '#fff7ec' },
+  { a: 'DRIVINGKLASS.COM', b: 'Learn to drive with confidence', c: 'Book your first lesson today', bg: '#14224a', fg: '#ffe08a' },
   { a: 'PECAN & PEACH DINER', b: 'Biscuits all day', c: 'Next exit', bg: '#7a2d1e', fg: '#ffe9bf' },
   { a: 'HANDS-FREE GEORGIA', b: 'Phone down · Eyes up', c: 'It\'s the law', bg: '#00694a', fg: '#ffffff' },
+  { a: 'DRIVINGKLASS', b: 'Road test prep · Teens and adults', c: 'Georgia lessons · drivingklass.com', bg: '#0c1634', fg: '#f2c14e' },
   { a: 'CHATTAHOOCHEE OUTFITTERS', b: 'Kayaks · Tubes · Trails', c: 'Open daily', bg: '#16466e', fg: '#e8f4ff' },
   { a: 'MAGNOLIA REALTY', b: 'Home is where the porch is', c: 'Call us', bg: '#f4f1ea', fg: '#6a2f2f' },
+  { a: 'DRIVINGKLASS', b: 'Parents: your teen is in good hands', c: 'Carrollton 30117 · Book a lesson', bg: '#1a0f33', fg: '#f2c14e' },
   { a: 'GEORGIA 511', b: 'Know before you go', c: 'Traffic · Weather · Cameras', bg: '#101820', fg: '#ffb21a' },
 ];
-export function adTexture(i: number): THREE.CanvasTexture {
+function adTexture_raw(i: number): THREE.CanvasTexture {
   const ad = ADS[((i % ADS.length) + ADS.length) % ADS.length]!;
   const W = 1536, H = 576, c = mkCanvas(W, H), g = c.getContext('2d')!;
   const gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, ad.bg); gr.addColorStop(1, shade(ad.bg, -0.25)); g.fillStyle = gr; g.fillRect(0, 0, W, H);
@@ -242,7 +255,7 @@ export interface SkylineTex { sil: THREE.CanvasTexture; lit: THREE.CanvasTexture
 type Top = 'flat' | 'spire' | 'pyramid' | 'dome' | 'crown' | 'step' | 'antenna' | 'slant';
 const skyCache = new Map<string, SkylineTex>();
 
-export function skylineTexture(kind: Skyline, seed = 7): SkylineTex {
+function skylineTexture_raw(kind: Skyline, seed = 7): SkylineTex {
   const key = `${kind}:${seed}`; const hit = skyCache.get(key); if (hit) return hit;
   const W = 2048, H = 320, c = mkCanvas(W, H), g = c.getContext('2d')!, c2 = mkCanvas(W, H), l = c2.getContext('2d')!;
   const r = rngOf(seed + strHash(kind));
@@ -323,7 +336,15 @@ export function skylineTexture(kind: Skyline, seed = 7): SkylineTex {
 }
 
 /** a soft round light for lamps and tail lights */
-export function softDot(): THREE.CanvasTexture {
+function softDot_raw(): THREE.CanvasTexture {
   const c = mkCanvas(64, 64), g = c.getContext('2d')!, gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
   gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.3, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return tex(c, true, 1);
 }
+
+export const decalTexture = (kind: Parameters<typeof decalTexture_raw>[0]) => memo(`d:${kind}`, () => decalTexture_raw(kind));
+export const guideSignTexture = (sg: GuideSign) => memo(`g:${JSON.stringify(sg)}`, () => guideSignTexture_raw(sg));
+export const vmsTexture = (lines: string[]) => memo(`v:${lines.join('|')}`, () => vmsTexture_raw(lines));
+export const regulatoryTexture = (kind: Parameters<typeof regulatoryTexture_raw>[0], n = 70) => memo(`r:${kind}:${n}`, () => regulatoryTexture_raw(kind, n));
+export const adTexture = (i: number) => memo(`a:${((i % ADS.length) + ADS.length) % ADS.length}`, () => adTexture_raw(i));
+export const skylineTexture = (kind: Skyline, seed = 7) => memo(`s:${kind}:${seed}`, () => skylineTexture_raw(kind, seed));
+export const softDot = () => memo('dot', () => softDot_raw());

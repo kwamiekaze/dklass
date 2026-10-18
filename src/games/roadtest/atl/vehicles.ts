@@ -52,9 +52,29 @@ function carLike(kind: VehKind) {
   detail.push(box(s.w * 0.6, 0.16, 0.05, 0, s.clear + 0.45, -hl - 0.02, '#0b0b0d'));
   detail.push(box(0.14, 0.14, 0.22, s.cabW / 2 + 0.1, top + 0.12, -s.cabL / 2 + s.cabZ + 0.2, '#16161a'), box(0.14, 0.14, 0.22, -s.cabW / 2 - 0.1, top + 0.12, -s.cabL / 2 + s.cabZ + 0.2, '#16161a'));
   if (kind === 'taxi') detail.push(box(0.5, 0.14, 0.2, 0, top + s.cabH + 0.14, s.cabZ, '#f2c14e'));
-  if (kind === 'police') { detail.push(box(s.w * 0.98, 0.3, 1.5, 0, s.clear + 0.22, -0.1, '#0a0a0c')); detail.push(box(0.7, 0.1, 0.22, 0, top + s.cabH + 0.1, s.cabZ - 0.15, '#2a2a2e')); }
+  if (kind === 'police') {
+    const dark = '#0b1020', gold = '#f2c14e', cabTop = top + s.cabH + 0.02;
+    // black lower doors, gold pinstripe, black hood and trunk: a modern cruiser
+    detail.push(box(s.w + 0.014, 0.34, 2.75, 0, s.clear + 0.26, 0.1, dark));
+    detail.push(box(s.w + 0.018, 0.04, 2.75, 0, s.clear + 0.465, 0.1, gold));
+    detail.push(box(s.w - 0.16, 0.014, 1.2, 0, top + 0.008, -hl + 0.8, dark), box(s.w - 0.2, 0.014, 0.8, 0, top + 0.008, hl - 0.55, dark));
+    for (const sx of [-1, 1]) {
+      for (const [zz, ll] of [[s.cabZ - s.cabL / 2 + 0.06, 0.14], [s.cabZ + 0.08, 0.12], [s.cabZ + s.cabL / 2 - 0.1, 0.24]] as const) paint.push(box(0.07, s.cabH * 0.8, ll, sx * (s.cabW / 2), top + s.cabH * 0.45, zz));
+      detail.push(box(0.03, 0.26, 0.26, sx * (s.w / 2 + 0.012), s.clear + 0.36, -0.55, gold), box(0.035, 0.15, 0.15, sx * (s.w / 2 + 0.014), s.clear + 0.36, -0.55, dark));
+      detail.push(box(0.08, 0.08, 0.2, sx * (s.cabW / 2 + 0.07), top + 0.4, -s.cabL / 2 + s.cabZ + 0.55, '#2a2a2e'));
+      detail.push(box(0.05, 0.3, 0.05, sx * (s.w * 0.28), s.clear + 0.3, -hl - 0.1, '#111114'));
+    }
+    detail.push(box(s.w * 0.62, 0.07, 0.07, 0, s.clear + 0.45, -hl - 0.12, '#111114'), box(s.w * 0.62, 0.07, 0.07, 0, s.clear + 0.2, -hl - 0.12, '#111114'));
+    // roof light bar: housing, red and blue domes, white takedown lights
+    detail.push(box(1.18, 0.07, 0.36, 0, cabTop + 0.04, s.cabZ - 0.1, '#15171c'));
+    detail.push(box(0.46, 0.11, 0.32, -0.34, cabTop + 0.11, s.cabZ - 0.1, '#d3231a'), box(0.46, 0.11, 0.32, 0.34, cabTop + 0.11, s.cabZ - 0.1, '#1e56e0'), box(0.2, 0.09, 0.3, 0, cabTop + 0.1, s.cabZ - 0.1, '#f4f6f8'));
+    detail.push(box(0.02, 0.5, 0.02, 0.55, cabTop + 0.28, hl - 1.05, '#111114'), box(s.w * 0.7, 0.05, 0.22, 0, top + s.cabH * 0.55, hl - 0.95, '#1a1d24'));
+  }
   const wx = s.w / 2 - 0.18, wz = L / 2 - 0.95 - (kind === 'pickup' ? 0.1 : 0);
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) detail.push(wheel(s.wr, 0.26, sx * wx, sz * wz));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    detail.push(wheel(s.wr, 0.26, sx * wx, sz * wz));
+    if (kind === 'police') { const g = new THREE.CylinderGeometry(s.wr * 0.62, s.wr * 0.62, 0.285, 12); g.rotateZ(Math.PI / 2); g.translate(sx * wx, s.wr, sz * wz); detail.push({ g: col(g.toNonIndexed(), '#c8ccd2') }); }
+  }
   const tail: Part[] = [box(0.5, 0.12, 0.04, s.w / 2 - 0.34, s.clear + 0.55, hl + 0.01, '#ffffff'), box(0.5, 0.12, 0.04, -s.w / 2 + 0.34, s.clear + 0.55, hl + 0.01, '#ffffff')];
   const head: Part[] = [box(0.4, 0.12, 0.04, s.w / 2 - 0.3, s.clear + 0.55, -hl - 0.01, '#ffffff'), box(0.4, 0.12, 0.04, -s.w / 2 + 0.3, s.clear + 0.55, -hl - 0.01, '#ffffff')];
   return { paint: merge(paint), detail: merge(detail), tail: merge(tail), head: merge(head) };
