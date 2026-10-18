@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { LEVELS } from '../game/levels';
 import { ATL_STAGES, PHASES } from '../atl/stages';
+import { FREE_ID, FREE_STARTS, getFreeStart, setFreeStart } from '../atl/freeroam';
 import { SKILL_LABELS, computeRadarData, SKILL_KEYS, type ReportCardRatings } from '@/lib/reportCardGraphData';
 import '../atl/atl.css';
 import { DIFFICULTIES, type Difficulty } from '../game/types';
@@ -105,6 +106,7 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
   const recommended = ATL_STAGES.filter((x) => (x.skills ?? []).some((k) => weak.includes(k)));
   const nextUp = ATL_STAGES.find((x) => !bestScores[x.id]);
   const weakLabels = weak.map((k) => SKILL_LABELS[k] ?? k);
+  const [freePick, setFreePick] = useState(getFreeStart());
   const startLevel = (id: string) => { clickTick(); onStart(id); };
 
 
@@ -189,6 +191,19 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
             <span>Your focus skills: {weakLabels.join(', ')}. Stages marked <em>FOR YOU</em> practice them.</span>
           </div>
         )}
+        <div className="atl-group atl-free">
+          <h3>Free Roam<small>Endless · real Atlanta roads · exits, merges and left turns</small></h3>
+          <p className="atl-free-note">No finish line. Take any exit, turn at any cross street, merge from the ramps and keep going. The real exit numbers and street names are on the signs. Three crashes ends the drive; a clean road drops one strike.</p>
+          <div className="atl-free-starts" role="group" aria-label="Where to start">
+            {FREE_STARTS.map((f) => (
+              <button key={f.id} className={`atl-card atl-free-card${freePick === f.id ? ' next' : ''}`} onClick={() => { setFreeStart(f.id); setFreePick(f.id); startLevel(FREE_ID); }}>
+                <span className="atl-lim"><small>START</small><b>GO</b></span>
+                <span className="atl-info"><strong>{f.title}</strong><small>{f.sub}</small></span>
+                <span className="atl-best">{bestScores[FREE_ID] ? `Best ${bestScores[FREE_ID]}` : 'Drive →'}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         {atlGroups.map((g) => (
           <div className="atl-group" key={g.title}>
             <h3>{g.title}<small>{g.note}</small></h3>

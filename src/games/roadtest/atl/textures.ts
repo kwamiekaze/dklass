@@ -162,7 +162,7 @@ function drawArrow(g: CanvasRenderingContext2D, a: Arrow, cx: number, cy: number
   g.beginPath(); g.moveTo(0, -s * 0.5); g.lineTo(s * 0.34, -s * 0.05); g.lineTo(s * 0.12, -s * 0.05); g.lineTo(s * 0.12, s * 0.5); g.lineTo(-s * 0.12, s * 0.5); g.lineTo(-s * 0.12, -s * 0.05); g.lineTo(-s * 0.34, -s * 0.05); g.closePath(); g.fill();
   g.restore();
 }
-type PanelSpec = { shields?: Shield[]; dir?: string; dests: string[]; arrows?: Arrow[]; exitOnly?: boolean };
+type PanelSpec = { shields?: Shield[]; dir?: string; dests: string[]; arrows?: Arrow[]; exitOnly?: boolean; tab?: string; dist?: string };
 function drawPanel(g: CanvasRenderingContext2D, p: PanelSpec, x: number, y: number, w: number, h: number) {
   g.fillStyle = GREEN; g.fillRect(x, y, w, h);
   g.strokeStyle = '#fff'; g.lineWidth = 8; g.strokeRect(x + 10, y + 10, w - 20, h - 20);
@@ -175,19 +175,25 @@ function drawPanel(g: CanvasRenderingContext2D, p: PanelSpec, x: number, y: numb
   g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'top';
   const fs = p.dests.length > 2 ? 52 : 62;
   for (const dline of p.dests) { g.font = `700 ${fs}px "Arial Narrow", "Helvetica Neue", Arial, sans-serif`; let f = fs; while (g.measureText(dline).width > w - 70 && f > 28) { f -= 2; g.font = `700 ${f}px "Arial Narrow", Arial, sans-serif`; } g.fillText(dline, x + w / 2, cy); cy += fs + 8; }
-  if (p.arrows?.length) { const n = p.arrows.length, sp = Math.min(130, (w - 120) / n); p.arrows.forEach((a, i) => drawArrow(g, a, x + w / 2 + (i - (n - 1) / 2) * sp, y + h - 82, 96)); }
+  if (p.dist) { g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '700 46px Arial, sans-serif'; g.fillText(p.dist, x + w / 2, y + h - 50); }
+  else if (p.arrows?.length) { const n = p.arrows.length, sp = Math.min(130, (w - 120) / n); p.arrows.forEach((a, i) => drawArrow(g, a, x + w / 2 + (i - (n - 1) / 2) * sp, y + h - 82, 96)); }
   if (p.exitOnly) { g.fillStyle = '#f2b705'; g.fillRect(x + w / 2 - 110, y + h - 54, 220, 40); g.fillStyle = '#111'; g.font = '700 30px Arial, sans-serif'; g.textBaseline = 'middle'; g.fillText('EXIT ONLY', x + w / 2, y + h - 33); }
 }
 export interface SignTex { map: THREE.CanvasTexture; aspect: number }
 const signCache = new Map<string, SignTex>();
 function guideSignTexture_raw(s: GuideSign): SignTex {
   const key = JSON.stringify(s); const hit = signCache.get(key); if (hit) return hit;
-  const panels: PanelSpec[] = [{ shields: s.shields, dir: s.dir, dests: s.dests, arrows: s.arrows, exitOnly: s.exitOnly }, ...(s.also ?? [])];
+  const panels: PanelSpec[] = [{ shields: s.shields, dir: s.dir, dests: s.dests, arrows: s.arrows, exitOnly: s.exitOnly, tab: s.tab, dist: s.dist }, ...(s.also ?? [])];
   const PW = 640, PH = 500, TAB = 78, W = PW * panels.length, H = PH + TAB;
   const c = mkCanvas(W, H), g = c.getContext('2d')!; g.clearRect(0, 0, W, H);
   panels.forEach((p, i) => { drawPanel(g, p, i * PW, TAB, PW, PH); if (i) { g.fillStyle = '#fff'; g.fillRect(i * PW - 4, TAB + 10, 8, PH - 20); } });
-  if (s.tab) { g.fillStyle = '#f2b705'; g.fillRect(24, 4, Math.min(PW - 48, 280), TAB - 6); g.strokeStyle = '#111'; g.lineWidth = 4; g.strokeRect(24, 4, Math.min(PW - 48, 280), TAB - 6); g.fillStyle = '#111'; g.font = '700 44px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(s.tab, 24 + Math.min(PW - 48, 280) / 2, TAB / 2 + 1); }
-  if (s.dist) { g.fillStyle = '#fff'; g.textAlign = 'right'; g.font = '700 40px Arial, sans-serif'; g.textBaseline = 'middle'; g.fillText(s.dist, W - 30, TAB / 2); }
+  panels.forEach((p, i) => {
+    if (!p.tab) return;
+    const green = /^EXIT/.test(p.tab), tw = Math.min(PW - 48, green ? 270 : 330), tx = i * PW + 24;
+    g.fillStyle = green ? GREEN : '#f2b705'; g.fillRect(tx, 6, tw, TAB - 10);
+    g.strokeStyle = green ? '#fff' : '#111'; g.lineWidth = green ? 5 : 4; g.strokeRect(tx + 2, 8, tw - 4, TAB - 14);
+    g.fillStyle = green ? '#fff' : '#111'; g.font = '700 42px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(p.tab, tx + tw / 2, TAB / 2 + 1);
+  });
   const out = { map: tex(c, true, 8), aspect: W / H }; signCache.set(key, out); return out;
 }
 

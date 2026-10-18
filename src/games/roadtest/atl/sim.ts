@@ -9,7 +9,8 @@ import { getDifficulty, type Difficulty, type DifficultyConfig, type LevelConfig
 import { getLevel } from '../game/levels';
 import { MPH_TO_MPS, seeded, type Sfx, type SimEvent } from '../g3d/sim';
 import { layoutFor, LANE, type Layout } from './layout';
-import { getAtlStage } from './stages';
+import { getAtlStage, levelOfStage } from './stages';
+import { accStrip, exitStrip, stripMax, ACC, EXIT } from './ramps';
 import type { AtlStage } from './stageTypes';
 
 export type VehKind = 'sedan' | 'suv' | 'pickup' | 'van' | 'hatch' | 'box' | 'semi' | 'bus' | 'police' | 'wreck' | 'tow' | 'taxi' | 'ambulance';
@@ -20,7 +21,7 @@ export const DIM: Record<VehKind, { l: number; w: number; h: number }> = {
 
 export interface Veh {
   id: number; kind: VehKind; d: number; x: number; lane: number; tl: number; v: number; want: number; color: number; dir: 1 | -1;
-  brake: boolean; sig: -1 | 0 | 1; lcT: number; lcFrom: number; lcWait: number; think: number; siren: boolean; still: boolean; hit: boolean; cop?: boolean; fly?: { t: number; vx: number; vd: number; spin: number }; side: boolean; yaw: number; look: number;
+  mergeAt?: number; brake: boolean; sig: -1 | 0 | 1; lcT: number; lcFrom: number; lcWait: number; think: number; siren: boolean; still: boolean; hit: boolean; cop?: boolean; fly?: { t: number; vx: number; vd: number; spin: number }; side: boolean; yaw: number; look: number;
 }
 export interface Closure { d0: number; d1: number; lanes: number[]; kind: 'work' | 'crash' }
 export interface Zone { d0: number; d1: number; limit: number; kind: 'work' | 'school' | 'circle' }
@@ -32,6 +33,11 @@ export interface Stop { d: number; done: boolean }
 export interface Ped { d: number; x: number; fromX: number; toX: number; t: number; state: 'wait' | 'walk' | 'done'; look: number; hit: boolean; slowed: boolean }
 export interface Police { d: number; veh: Veh; done: boolean }
 export interface Sign { at: number; d: number; shown: boolean }
+/** an exit, a fork or a turn along the road, with its place in metres */
+export interface Branch { d: number; kind: 'exit' | 'fork' | 'left' | 'right'; no?: string; name: string; to?: string; toLeft?: string; street?: string; nameR?: string; entered: boolean; done: boolean; waited: boolean; checked: boolean; signalOk: boolean }
+/** a free roam run asks the scene to hand on to the next leg */
+export interface LegEnd { kind: 'exit' | 'fork' | 'left' | 'right' | 'end'; to?: string; name: string; no?: string }
+export interface SimOpts { startMph?: number; tracker?: ScoreTracker; free?: boolean; levelId?: string; levelName?: string; seed?: string; strikes?: number; legNo?: number; miles?: number }
 
 const KMPH = MPH_TO_MPS;
 const LOOKS = [0xf4f4f2, 0x1c1d21, 0x9ba0a6, 0x7b1f24, 0x1f3a6b, 0xc9c3b3, 0x2f4a3a, 0x5c6168, 0xd8d8d8, 0x8a5a2e, 0x3a2f55, 0xe0b73a];
@@ -41,9 +47,16 @@ export class AtlSim {
   readonly stage: AtlStage;
   readonly lay: Layout;
   readonly difficulty: DifficultyConfig;
-  readonly tracker = new ScoreTracker();
+  readonly tracker: ScoreTracker;
   readonly effectiveLength: number;
   events: SimEvent[] = [];
+  branches: Branch[] = [];
+  /** merge points of on-ramps beside the road (for the scene) */
+  merges: number[] = [];
+  leg: LegEnd | null = null;
+  free = false;
+  rampStart = false;
+  private exitMax = -99; private exitMin = 99;
   vehicles: Veh[] = [];
   props: Prop[] = [];
   closures: Closure[] = [];
@@ -56,7 +69,7 @@ export class AtlSim {
 
   // player
   x = 0; steerV = 0; yaw = 0; mph = 0; prevMph = 0; traveled = 0; time = 0; finished = false; invulnUntil = 0; braking = false; accel = 0; locked = false; speeding = false; timeScale = 1;
-  strikes = 0; nearMisses = 0;
+  strikes = 0; strikes0 = 0; nearMisses = 0;
   laneIdx = 0; signalDir: -1 | 0 | 1 = 0; signalAt = -99;
   gapSec = 0; leaderGap = 0; leaderV = 0;
   prompt = '';
@@ -83,19 +96,29 @@ export class AtlSim {
   private carry: number[] = [];
   private evList: { at: number; run: () => void }[] = [];
   private catastrophe = false;
+  private exitedLate = false;
+  /** free roam: roads driven so far and miles before this leg */
+  freeLegs = 0; freeMiles = 0;
+  /** dev/test: the last car that hit the player came from behind */
+  lastHitRear = false;
 
-  constructor(levelId: string, difficulty: Difficulty, private snd: Sfx, weather: string, tod?: AtlStage['tod']) {
+  constructor(levelId: string, difficulty: Difficulty, private snd: Sfx, weather: string, tod?: AtlStage['tod'], opts: SimOpts = {}) {
     const st = getAtlStage(levelId); if (!st) throw new Error(`unknown Atlanta stage ${levelId}`);
-    this.stage = tod ? { ...st, tod } : st; this.level = getLevel(levelId); this.difficulty = getDifficulty(difficulty); this.lay = layoutFor(st);
+    this.stage = tod ? { ...st, tod } : st; this.level = getLevel(levelId).id === levelId ? getLevel(levelId) : levelOfStage(st); if (opts.levelId) this.level = { ...this.level, id: opts.levelId, name: opts.levelName ?? this.level.name }; this.tracker = opts.tracker ?? new ScoreTracker(); this.free = !!opts.free; this.difficulty = getDifficulty(difficulty); this.lay = layoutFor(st);
     this.effectiveLength = st.lengthM * this.difficulty.lengthMul;
     this.maxMph = st.maxSpeed * (this.difficulty.speedMul > 1 ? 1 + (this.difficulty.speedMul - 1) * 0.35 : 1);
     this.speedLimitNow = st.limit;
-    this.rnd = seeded(`${levelId}:${difficulty}`);
+    this.rnd = seeded(`${levelId}:${difficulty}${opts.seed ?? ''}`); if (opts.strikes) this.strikes = opts.strikes; this.strikes0 = this.strikes;
     this.weatherKind = weather; this.weatherLabel = weather.charAt(0).toUpperCase() + weather.slice(1);
     this.x = this.lay.xs[Math.min(this.lay.lanes - 1, Math.max(0, Math.floor(this.lay.lanes / 2)))]!;
     this.laneIdx = this.nearest(this.x); this.lastLane = this.laneIdx;
     this.spawnCool = new Array(this.lay.lanes + 2).fill(0);
+    if (opts.startMph) this.mph = opts.startMph;
+    this.rampStart = !!st.startRamp && this.lay.kind === 'divided';
+    if (this.rampStart) { this.x = this.lay.xs[this.lay.lanes - 1]! + LANE * 1.9; this.laneIdx = this.lay.lanes - 1; this.lastLane = this.laneIdx; this.mph = Math.max(this.mph, 22); }
+    this.freeLegs = opts.legNo ?? 0; this.freeMiles = opts.miles ?? 0;
     this.buildEvents();
+    if (this.free) this.banner(this.freeLegs === 0 ? 'FREE ROAM' : stageTitle(this.stage), this.freeLegs === 0 ? `${this.stage.roadName} · take any exit or turn. Drive as long as you like` : `${this.stage.place}`, 3200, 'gold');
     // fill the road around the car before the first frame
     for (let i = 0; i < 40; i++) this.populate(true);
     this.time = 0;
@@ -138,7 +161,7 @@ export class AtlSim {
         case 'vms': this.evList.push({ at: d - 220, run: () => this.banner('GEORGIA 511', e.text.replace(/\|/g, ' · ').replace(/\s{2,}/g, ' '), 3600, 'white') }); break;
         case 'tip': this.evList.push({ at: d, run: () => { this.banner(e.title, e.sub, 4200, 'gold'); this.prompt = e.sub; } }); break;
         case 'exit': this.evList.push({ at: d - 120, run: () => this.banner(`EXIT ${e.no ?? ''} ${e.name}`.trim(), e.lesson, 3200, 'white') }); break;
-        case 'merge': this.evList.push({ at: d - 40, run: () => this.spawnMerger(d + 90) }); break;
+        case 'merge': if (lay.kind === 'divided') { this.merges.push(d + 60); this.evList.push({ at: d + 60 - ACC.par - 40, run: () => this.spawnMerger(d + 60 - ACC.par * 0.6, d + 60) }); } break;
         case 'work': {
           const lanes = [lay.lanes - 1]; if (lay.lanes >= 5 && e.len >= 600) lanes.push(lay.lanes - 2);
           this.closures.push({ d0: d, d1: d + e.len, lanes, kind: 'work' });
@@ -185,6 +208,13 @@ export class AtlSim {
         case 'ped': this.peds.push({ d, x: lay.padR + 1.0, fromX: lay.padR + 1.0, toX: lay.padL - 0.3, t: 0, state: 'wait', look: i, hit: false, slowed: false }); break;
       }
     });
+    for (const e of st.exits ?? []) {
+      const kind = e.kind ?? 'exit', d = D(e.at);
+      this.branches.push({ d, kind, nameR: e.also?.[0]?.dests.join(' · '), no: e.no, name: e.name ?? e.dests.join(' · '), to: e.to, toLeft: e.toLeft, street: e.street, entered: false, done: false, waited: false, checked: false, signalOk: false });
+      if (kind === 'exit') this.evList.push({ at: d - 700, run: () => this.banner(`EXIT ${e.no ?? ''}`.trim(), `${e.dests.join(' · ')} · right lane, signal early`, 3000, 'white') });
+      else if (kind === 'fork') this.evList.push({ at: d - 800, run: () => this.banner('THE ROAD SPLITS', `Left lanes: ${(e.dests[0] ?? '')} · right lanes: ${(e.also?.[0]?.dests[0] ?? '')}`, 3600, 'white') });
+      else this.evList.push({ at: d - 120, run: () => { this.banner(kind === 'left' ? 'LEFT TURN AHEAD' : 'RIGHT TURN AHEAD', kind === 'left' ? `${e.street ?? ''} · signal, slow down and yield to oncoming cars` : `${e.street ?? ''} · signal, slow down, check for people crossing`, 3600, 'white'); this.prompt = kind === 'left' ? 'Left turn: signal early, stop short of the turn and wait for a gap. Never cut across oncoming cars.' : 'Right turn: signal, slow to about 10 mph and turn into the nearest lane.'; } });
+    }
     this.evList.sort((a, b) => a.at - b.at);
   }
 
@@ -198,9 +228,9 @@ export class AtlSim {
     const k = this.rnd.frac();
     return k < 0.34 ? 'sedan' : k < 0.58 ? 'suv' : k < 0.7 ? 'pickup' : k < 0.8 ? 'hatch' : k < 0.88 ? 'van' : k < 0.94 ? 'taxi' : 'sedan';
   }
-  private spawnMerger(d: number) {
+  private spawnMerger(d: number, mergeAt: number) {
     const lay = this.lay; if (lay.kind !== 'divided') return;
-    const v = this.makeVeh('sedan', d, lay.lanes + 0.9, Math.max(10, this.mph * KMPH * 0.8)); v.want = this.stage.limit * KMPH * 0.9; v.tl = lay.lanes - 1; v.lcT = 0.0001; v.lcFrom = lay.lanes + 0.9; v.sig = -1; v.lcWait = 0.5;
+    const v = this.makeVeh(this.rnd.frac() < 0.2 ? 'pickup' : 'sedan', d, lay.lanes + 0.9, Math.max(14, this.mph * KMPH * 0.85)); v.want = this.stage.limit * KMPH * 0.9; v.tl = lay.lanes - 1; v.lcFrom = lay.lanes + 0.9; v.mergeAt = mergeAt;
     this.vehicles.push(v);
   }
 
@@ -223,12 +253,13 @@ export class AtlSim {
       // clear?
       let clear = true; for (const v of this.vehicles) if (Math.abs(v.d - d) < 26 && Math.abs(v.lane - ln) < 0.8) { clear = false; break; }
       if (!clear) continue;
-      if (Math.abs(d - T) < 34 && Math.abs(this.laneX(ln) - this.x) < LANE * 1.6) continue;
+      const nearP = Math.abs(this.laneX(ln) - this.x) < LANE * 1.6;
+      if (nearP && d > T - 110 && d < T + 34) continue;
       if (this.inClosure(ln, d, 60) || this.inClosure(ln, d, 0)) continue;
       const kind = this.pickKind(ln), v = this.makeVeh(kind, d, ln, 0);
       const slow = kind === 'semi' || kind === 'box' || kind === 'bus' ? 0.9 : 1;
       v.want = Math.max(5, flowMph * KMPH * slow * (0.93 + this.rnd.frac() * 0.14));
-      v.v = initial ? v.want : fromBehind ? v.want : Math.min(v.want, Math.max(this.mph * KMPH * 0.9, v.want * 0.7));
+      v.v = initial ? v.want : fromBehind ? (nearP ? Math.min(v.want, this.mph * KMPH + 1.5) : v.want) : Math.min(v.want, Math.max(this.mph * KMPH * 0.9, v.want * 0.7));
       this.vehicles.push(v); this.spawnCool[ln] = this.time + 0.6;
     }
     // oncoming traffic (decor on a divided road, real on a two-way road)
@@ -287,6 +318,12 @@ export class AtlSim {
         a -= a0 * Math.pow(sStar / Math.max(0.5, lead.gap), 2);
       }
       v.v = Math.max(0, v.v + Math.max(-9, a) * dt); v.brake = a < -1.4;
+      // never rear end the player: a car right behind you matches your speed, whatever the driver model says
+      if (v.d < pD && Math.abs(v.x - this.x) < 2.3) {
+        const gp = pD - pL / 2 - v.d - DIM[v.kind].l / 2, pv = this.mph * KMPH;
+        if (gp < 9 && v.v > pv) { v.v = Math.max(pv, v.v - 30 * dt); v.brake = true; }
+        if (gp < 3.2) v.v = Math.min(v.v, pv * 0.92);
+      }
       v.d += v.v * dt;
       // lane change
       if (v.lcT > 0) {
@@ -294,6 +331,9 @@ export class AtlSim {
         const f = Math.min(1, v.lcT), s = f * f * (3 - 2 * f);
         v.lane = v.lcFrom + (v.tl - v.lcFrom) * s;
         if (f >= 1) { v.lcT = 0; v.lane = v.tl; v.sig = 0; v.lcWait = 4 + this.rnd.frac() * 8; }
+      } else if (v.mergeAt !== undefined) {
+        if (v.d >= v.mergeAt) { v.mergeAt = undefined; v.lcFrom = v.lane; v.lcT = 0.0001; v.sig = -1; }
+        else if (v.d > v.mergeAt - 70) v.sig = -1;
       } else {
         v.lcWait -= dt;
         if (v.lcWait <= 0 && this.mph >= 0) {
@@ -335,8 +375,10 @@ export class AtlSim {
     this.steerV += (want - this.steerV) * (1 - Math.exp(-dt * 14));
     this.x += this.steerV * dt;
     const lay = this.lay;
-    if (this.x < lay.minX) { this.x = lay.minX; if (this.steerV < 0) this.steerV = 0; }
-    const maxX = Math.max(lay.maxX, this.maxXNow);
+    this.updateRampLimits();
+    const minX = Math.min(lay.minX, this.exitMin);
+    if (this.x < minX) { this.x = minX; if (this.steerV < 0) this.steerV = 0; }
+    const maxX = Math.max(lay.maxX, this.maxXNow, this.exitMax);
     if (this.x > maxX) { this.x = maxX; if (this.steerV > 0) this.steerV = 0; }
     this.yaw += (Math.max(-0.2, Math.min(0.2, (this.steerV / 6.4) * 0.2)) - this.yaw) * (1 - Math.exp(-dt * 10));
     if (this.mph > 35 && (c.left || c.right) && this.mph > this.stage.limit - 8) this.snd.tireScreech?.(Math.min(1, this.mph / this.maxMph));
@@ -355,10 +397,73 @@ export class AtlSim {
     this.laneRules(dt);
     this.followRules(dt);
     this.speedRules(dt);
+    this.stepBranches(dt);
     this.stepRails(dt); this.stepCircles(dt); this.stepLights(dt); this.stepStops(); this.stepPeds(dt); this.stepPolice(); this.stepPatrol(dt);
     // signal cancels itself
     if (this.signalDir !== 0 && this.time - this.signalAt > 6) this.signalDir = 0;
-    if (!this.finished && this.traveled >= this.effectiveLength) this.finish();
+    if (!this.finished && this.traveled >= this.effectiveLength) { if (this.free) { if (!this.leg) this.leg = { kind: 'end', to: this.stage.next, name: '' }; } else this.finish(); }
+  }
+
+  // ---- exits, forks and turns
+  private updateRampLimits() {
+    const lay = this.lay, T = this.traveled; let mx = -99, mn = 99;
+    const ext = (dd: number) => Math.max(0, Math.min(1, (dd + 7) / 9)) * 16;
+    for (const b of this.branches) {
+      const dd = T - b.d;
+      if (b.kind === 'exit' && lay.kind === 'divided') { const m = stripMax(exitStrip(lay, dd)); if (m !== null) mx = Math.max(mx, m); }
+      else if (b.kind === 'left' && lay.kind === 'twoway' && dd > -7 && dd < 16) mn = Math.min(mn, lay.minX - ext(dd));
+      else if (b.kind === 'right' && dd > -7 && dd < 16) mx = Math.max(mx, lay.maxX + ext(dd));
+    }
+    if (lay.kind === 'divided') {
+      for (const m of this.merges) { const v = stripMax(accStrip(lay, T - m)); if (v !== null) mx = Math.max(mx, v); }
+      if (this.rampStart) { const v = stripMax(accStrip(lay, T - ACC.par)); if (v !== null) mx = Math.max(mx, v); }
+    }
+    this.exitMax = mx; this.exitMin = mn;
+  }
+  private oncomingNear(d: number, within: number) { for (const v of this.vehicles) if (v.dir === -1 && !v.fly && v.d > d - 8 && v.d - d < within) return true; return false; }
+  private stepBranches(dt: number) {
+    const lay = this.lay, T = this.traveled; void dt;
+    for (const b of this.branches) {
+      if (b.done || this.leg) continue;
+      const dd = T - b.d;
+      if (b.kind === 'exit') {
+        const xl = lay.xs[lay.xs.length - 1]!;
+        if (!b.entered && dd > -170 && dd < 130 && this.x > xl + LANE * 0.62) {
+          b.entered = true;
+          if (this.signalDir === 1 && this.time - this.signalAt < 9) { this.award('SIGNALLED', 'SIGNALLED FOR EXIT'); this.signalDir = 0; } else this.award('NO_SIGNAL', 'NO SIGNAL');
+        }
+        if (b.entered && dd > 60 && this.x > xl + LANE * 0.9) this.takeBranch(b);
+        else if (dd > EXIT.len - 12) { b.done = true; if (!b.entered) this.banner(`MISSED EXIT ${b.no ?? ''}`.trim(), 'Never stop or back up. Take the next exit and turn around', 3600, 'red'); }
+      } else if (b.kind === 'fork') {
+        if (dd > 70) this.takeBranch(b);
+      } else if (b.kind === 'left') {
+        if (dd > -48 && dd < -2 && this.mph < 9 && this.oncomingNear(b.d, 120)) b.waited = true;
+        if (!b.checked && dd > -16 && dd < 12 && this.x < -0.3) {
+          b.checked = true;
+          const hz = this.vehicles.find((v) => v.dir === -1 && !v.fly && v.d > b.d - 6 && v.d - b.d < 80 && (v.d - b.d) / Math.max(2, v.v) < 2.7);
+          if (hz) { this.award('LEFT_NO_YIELD', 'CUT OFF ONCOMING'); hz.v *= 0.35; hz.brake = true; this.banner('YIELD TO ONCOMING TRAFFIC', 'Wait for a gap before you cross their lane', 2800, 'red'); }
+          else this.award('LEFT_YIELD', b.waited ? 'YIELDED, THEN TURNED' : 'CLEAR GAP');
+        }
+        if (dd > -7 && this.x < lay.edgeL - 2.5) this.takeBranch(b);
+        else if (dd > 18) b.done = true;
+      } else if (b.kind === 'right') {
+        if (dd > -7 && this.x > lay.edgeR + 2.5) this.takeBranch(b);
+        else if (dd > 18) b.done = true;
+      }
+    }
+  }
+  private takeBranch(b: Branch) {
+    b.done = true;
+    let to = b.to, name = b.name;
+    if (b.kind === 'fork') { const mid = (this.lay.xs[0]! + this.lay.xs[this.lay.xs.length - 1]!) / 2; if (this.x < mid) to = b.toLeft ?? b.to; else name = b.nameR || b.name; if (this.x < mid) name = b.name; }
+    if (b.kind === 'left' || b.kind === 'right') {
+      if (this.mph > 24) this.award('TURN_TOO_FAST', 'TOO FAST'); 
+      if (this.signalDir === (b.kind === 'left' ? -1 : 1) && this.time - this.signalAt < 12) { this.award('SIGNALLED', 'SIGNALLED TURN'); this.signalDir = 0; } else this.award('NO_SIGNAL', 'NO SIGNAL');
+    } else if (b.kind === 'exit') this.award('EXIT_TAKEN', 'EXIT TAKEN');
+    const head = b.kind === 'exit' ? `EXIT ${b.no ?? ''}`.trim() : b.kind === 'fork' ? 'YOU CHOSE' : b.kind === 'left' ? 'LEFT TURN' : 'RIGHT TURN';
+    this.banner(head, name, 2600, 'gold');
+    this.leg = { kind: b.kind, to, name, no: b.no };
+    if (!this.free) { this.exitedLate = this.traveled > this.effectiveLength * 0.6; this.after(1.1, () => this.finish()); }
   }
 
   // ---- collisions
@@ -383,6 +488,7 @@ export class AtlSim {
       const dm = DIM[v.kind], vw = v.side ? dm.l : dm.w, vl = v.side ? dm.w : dm.l;
       if (Math.abs(v.d - pd) < (pl + vl) / 2 - 0.15 && Math.abs(v.x - px) < (pw + vw) / 2 - 0.1) {
         if (lay_isDecor(this.lay, v) ) continue;
+        this.lastHitRear = v.d < pd - 0.5 && v.v > this.mph * KMPH + 1;
         this.crash((px + v.x) / 2, (pd + v.d) / 2, true, v);
       }
     }
@@ -658,7 +764,7 @@ export class AtlSim {
     if (this.finished) return; this.finished = true;
     this.snd.fanfare?.();
     this.emit({ k: 'finish', endless: false });
-    const early = this.traveled < this.effectiveLength - 5;
+    const early = this.traveled < this.effectiveLength - 5 && !this.exitedLate;
     if (!early && !this.tracker.voided) { this.tracker.add('FINISH_BONUS'); }
     const result = buildResult(this.level, this.tracker, this.difficulty);
     if (this.cited) result.passed = false;
@@ -687,11 +793,15 @@ export class AtlSim {
     if (t.countOf('RAN_STOP_SIGN') + t.countOf('RAN_RED_LIGHT') > 0) out.push('Obey every stop sign and signal. A full stop means no movement.');
     if (this.cited) out.push(this.patrolKind === 'stop' ? 'You were pulled over for speeding on the interstate. Over 80 mph, signal, slow down and stop on the right shoulder.' : 'Tickets end here.');
     else if (this.tickets > 0) out.push(`${this.tickets} speeding ticket${this.tickets === 1 ? '' : 's'}. The limit is ${this.stage.limit}. Tickets raise insurance and can suspend a license.`);
+    if (this.free) out.push(`Free roam: ${(this.freeMiles + this.traveled / 1609).toFixed(1)} miles over ${this.freeLegs + 1} road${this.freeLegs ? 's' : ''}.`);
     out.push(`Weather this run: ${this.weatherLabel}. ${this.stage.lessons[0] ?? ''}`.trim());
     out.push(r.passed ? 'Instructor verdict: PASS. Ready for the next lesson!' : 'Instructor verdict: NEEDS PRACTICE. Book a lesson and try again!');
     return out;
   }
   nextHint() { return this.stage.lessons[0] ?? ''; }
 }
+
+/** the title of a banner when a free roam leg begins */
+function stageTitle(st: AtlStage) { return `NOW ON ${st.roadName}`; }
 
 function lay_isDecor(lay: Layout, v: Veh) { return lay.kind === 'divided' && v.dir === -1; }

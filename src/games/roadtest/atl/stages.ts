@@ -8,7 +8,7 @@ import type { AtlStage, GuideSign, Shield, StageEvent } from './stageTypes';
 
 const I = (n: string): Shield => ({ t: 'I', n }), US = (n: string): Shield => ({ t: 'US', n }), GA = (n: string): Shield => ({ t: 'GA', n });
 const sign = (at: number, shields: Shield[] | undefined, dir: string | undefined, dests: string[], extra: Partial<GuideSign> = {}): GuideSign => ({ at, shields, dir, dests, ...extra });
-const LESS_HW = ['Keep up with the flow, but never above 70. The left lane is for passing, not for cruising.', 'Look 12 seconds ahead. At 70 mph that is about a quarter mile.', 'Georgia law: hands-free only. Phone down, eyes up.'];
+const LESS_HW = ['Keep up with the flow, but never above the posted limit. The left lane is for passing, not for cruising.', 'Look 12 seconds ahead. At highway speed that is about a quarter mile.', 'Georgia law: hands-free only. Phone down, eyes up.'];
 
 const base = (s: Partial<AtlStage> & Pick<AtlStage, 'id' | 'name' | 'subtitle' | 'roadName' | 'region' | 'skyline' | 'lengthM' | 'guide' | 'events' | 'place'>): AtlStage => ({
   road: 'interstate', lanes: 4, limit: 70, maxSpeed: 86, tod: 'day', traffic: 0.8, trucks: 0.14, flow: 0.98, curves: 'gentle', lessons: LESS_HW, par: 1500, trees: 'mixed', walls: 'glass', ...s,
@@ -16,118 +16,157 @@ const base = (s: Partial<AtlStage> & Pick<AtlStage, 'id' | 'name' | 'subtitle' |
 
 const RAW: AtlStage[] = [
   base({
-    id: 'atl-connector-north', name: 'Downtown Connector North', subtitle: 'I-75/85 N · Five lanes through the heart of Atlanta', roadName: 'I-75/85 NORTH', region: 'downtown', skyline: 'downtown', lanes: 5, hov: true, lengthM: 4200, tod: 'dusk', traffic: 1.0, curves: 'rolling', par: 1700, walls: 'glass', place: 'Downtown Atlanta',
+    id: 'atl-connector-north', limit: 55, name: 'Downtown Connector North', subtitle: 'I-75/85 N · Five lanes through the heart of Atlanta', roadName: 'I-75/85 NORTH', region: 'downtown', skyline: 'downtown', lanes: 5, hov: true, lengthM: 4200, tod: 'dusk', traffic: 1.0, curves: 'rolling', par: 1700, walls: 'glass', place: 'Downtown Atlanta',
     guide: [
       sign(0.07, [I('75'), I('85')], 'NORTH', ['Chattanooga', 'Greenville'], { arrows: ['up'] }),
-      sign(0.2, undefined, undefined, ['Spring St', 'West Peachtree St'], { tab: 'EXIT 249D', arrows: ['upright'], dist: '1 MILE' }),
-      sign(0.4, undefined, undefined, ['10th St', '14th St', 'Georgia Tech'], { tab: 'EXIT 250', arrows: ['upright'], dist: '1/2 MILE' }),
-      sign(0.56, undefined, undefined, ['17th St', 'Midtown'], { tab: 'EXIT 251A', arrows: ['upright'], dist: '1/2 MILE' }),
-      sign(0.72, [I('75')], 'NORTH', ['Marietta', 'Chattanooga'], { arrows: ['upleft'], tab: 'EXIT 251B', dist: '1 MILE', also: [{ shields: [I('85')], dir: 'NORTH', dests: ['Greenville'], arrows: ['upright'] }] }),
-      sign(0.88, [I('75')], 'NORTH', ['Marietta', 'Chattanooga'], { arrows: ['upleft'], tab: 'EXIT 251B', dist: '1/2 MILE', also: [{ shields: [I('85')], dir: 'NORTH', dests: ['Greenville'], arrows: ['upright'] }] }),
+    ],
+    exits: [
+      { at: 0.4, no: '249B', dests: ['Peachtree St', 'Civic Center'] },
+      { at: 0.52, no: '249D', shields: [US('19'), US('29')], dests: ['Spring St', 'West Peachtree St'] },
+      { at: 0.64, no: '250', dests: ['10th St', '14th St', 'Georgia Tech'] },
+      { at: 0.76, no: '251A', dests: ['17th St', 'Midtown'] },
+      { at: 0.95, kind: 'fork', no: '251B', shields: [I('75')], dir: 'NORTH', dests: ['Marietta', 'Chattanooga'], also: [{ shields: [I('85')], dir: 'NORTH', dests: ['Greenville'], arrows: ['upright'] }], to: 'free-i85n', toLeft: 'free-i75n', name: 'I-75 NORTH · Marietta' },
     ],
     events: [{ t: 'vms', at: 0.04, text: 'CONNECTOR  SLOW  USE  CAUTION' }, { t: 'tip', at: 0.1, title: 'Welcome to the Connector', sub: 'Up to 14 lanes wide near the 14th Street Bridge. The far left lane is HOV, two or more riders only.' }, { t: 'merge', at: 0.3 }, { t: 'merge', at: 0.62 }, { t: 'tip', at: 0.8, title: 'Left exit ahead', sub: 'I-75 North peels off to the left at the Brookwood split. Read the sign early.' }],
     lessons: ['Downtown traffic bunches up. Leave a 3 second gap behind the car ahead.', 'Ramps feed in from the right. Make room if you can do it safely.', 'Never cut across the white gore stripes to catch an exit.'],
   }),
   base({
-    id: 'atl-connector-south', name: 'Downtown Connector South', subtitle: 'I-75/85 S · Skyline in the mirror, airport ahead', roadName: 'I-75/85 SOUTH', region: 'downtown', skyline: 'downtown', lanes: 5, lengthM: 4200, tod: 'golden', traffic: 1.0, curves: 'rolling', par: 1700, place: 'Downtown Atlanta',
+    id: 'atl-connector-south', limit: 55, name: 'Downtown Connector South', subtitle: 'I-75/85 S · Skyline in the mirror, airport ahead', roadName: 'I-75/85 SOUTH', region: 'downtown', skyline: 'downtown', lanes: 5, lengthM: 4200, tod: 'golden', traffic: 1.0, curves: 'rolling', par: 1700, place: 'Downtown Atlanta',
     guide: [
       sign(0.06, [I('75'), I('85')], 'SOUTH', ['Macon', 'Montgomery'], { arrows: ['up'] }),
-      sign(0.24, [I('20')], 'EAST', ['Augusta'], { arrows: ['upright'], tab: 'EXIT 247', dist: '1 MILE', also: [{ shields: [I('20')], dir: 'WEST', dests: ['Birmingham'], arrows: ['upright'] }] }),
-      sign(0.5, [GA('166')], undefined, ['Langford Pkwy', 'East Point'], { tab: 'EXIT 243', arrows: ['upright'], dist: '1/2 MILE' }),
-      sign(0.76, [I('85')], 'SOUTH', ['Montgomery'], { arrows: ['upright'], tab: 'EXIT 242', dist: '1/2 MILE' }),
+      sign(0.42, undefined, undefined, ['Memorial Drive'], { tab: 'LEFT · HOV EXIT', dist: '1 MILE' }),
+      sign(0.5, [I('20')], undefined, ['Augusta', 'Birmingham'], { tab: 'EXIT 247', dist: '1 MILE', also: [{ dests: ['Fulton St', 'Central Ave', 'Ga State Univ'], tab: 'EXIT 246', dist: '3/4 MILE' }, { dests: ['Abernathy Blvd', 'Capitol Ave', 'Turner Field'], tab: 'EXIT 245', dist: '1/4 MILE' }] }),
+    ],
+    exits: [
+      { at: 0.2, no: '250', dests: ['16th St', '14th St', '10th St'] },
+      { at: 0.34, no: '249D', shields: [US('78')], dests: ['North Ave', 'Georgia Tech'] },
+      { at: 0.6, no: '247', shields: [I('20')], dests: ['Augusta', 'Birmingham'], quiet: true },
+      { at: 0.7, no: '246', dests: ['Fulton St', 'Central Ave', 'Ga State Univ'], quiet: true },
+      { at: 0.8, no: '245', dests: ['Abernathy Blvd', 'Capitol Ave', 'Turner Field'], quiet: true },
+      { at: 0.94, no: '243', shields: [GA('166')], dests: ['Langford Pkwy', 'East Point'] },
     ],
     events: [{ t: 'merge', at: 0.28 }, { t: 'police', at: 0.5 }, { t: 'merge', at: 0.7 }, { t: 'vms', at: 0.12, text: 'USE  I-285  TO  BYPASS|DOWNTOWN' }],
   }),
   base({
-    id: 'atl-i20-west', name: 'I-20 West to Douglasville', subtitle: 'I-20 W · Out past the Westside toward Carrollton country', roadName: 'I-20 WEST', region: 'westside', skyline: 'hills', lanes: 4, lengthM: 4600, tod: 'day', traffic: 0.75, trucks: 0.22, curves: 'rolling', trees: 'pine', walls: 'warehouse', par: 1500, place: 'Westside to Douglas County',
+    id: 'atl-i20-west', limit: 65, name: 'I-20 West to Douglasville', subtitle: 'I-20 W · Out past the Westside toward Carrollton country', roadName: 'I-20 WEST', region: 'westside', skyline: 'hills', lanes: 4, lengthM: 4600, tod: 'day', traffic: 0.75, trucks: 0.22, curves: 'rolling', trees: 'pine', walls: 'warehouse', par: 1500, place: 'Westside to Douglas County',
     guide: [
       sign(0.08, [I('20')], 'WEST', ['Birmingham'], { arrows: ['up'] }),
-      sign(0.3, [GA('70')], undefined, ['Fulton Industrial Blvd'], { tab: 'EXIT 49', arrows: ['upright'], dist: '1 MILE' }),
-      sign(0.52, [I('20')], 'WEST', ['Birmingham'], { arrows: ['up'] }),
-      sign(0.74, [GA('6')], undefined, ['Thornton Rd', 'Lithia Springs'], { tab: 'EXIT 44', arrows: ['upright'], dist: '1/2 MILE' }),
-      sign(0.9, [GA('92')], undefined, ['Fairburn Rd', 'Douglasville'], { tab: 'EXIT 37', arrows: ['upright'], dist: '1 MILE' }),
+      sign(0.34, [I('20')], 'WEST', ['Birmingham'], { arrows: ['up'] }),
+    ],
+    exits: [
+      { at: 0.46, no: '49', shields: [GA('70')], dests: ['Fulton Industrial Blvd'] },
+      { at: 0.64, no: '44', shields: [GA('6')], dests: ['Thornton Rd', 'Lithia Springs'] },
+      { at: 0.8, no: '41', dests: ['Lee Rd', 'Lithia Springs'] },
+      { at: 0.95, no: '37', shields: [GA('92')], dests: ['Fairburn Rd', 'Douglasville'] },
     ],
     events: [{ t: 'tip', at: 0.1, title: 'Trucks everywhere', sub: 'Heavy trucks need far more room to stop. Do not cut in front of one.' }, { t: 'merge', at: 0.34 }, { t: 'police', at: 0.62 }],
     lessons: ['Trucks have big blind spots. If you cannot see the driver\'s mirror, they cannot see you.', 'Pass on the left, then return to the right lane.', 'Keep right except to pass is Georgia law.'],
   }),
   base({
-    id: 'atl-i285-top-end', name: 'Top End Perimeter', subtitle: 'I-285 · Sandy Springs to Dunwoody under the office towers', roadName: 'I-285 EAST', region: 'perimeter', skyline: 'perimeter', lanes: 5, lengthM: 4400, tod: 'day', traffic: 1.05, trucks: 0.18, curves: 'gentle', par: 1650, place: 'Sandy Springs and Dunwoody',
+    id: 'atl-i285-top-end', limit: 65, name: 'Top End Perimeter', subtitle: 'I-285 · Sandy Springs to Dunwoody under the office towers', roadName: 'I-285 EAST', region: 'perimeter', skyline: 'perimeter', lanes: 5, lengthM: 4400, tod: 'day', traffic: 1.05, trucks: 0.18, curves: 'gentle', par: 1650, place: 'Sandy Springs and Dunwoody',
     guide: [
       sign(0.06, [I('285')], 'EAST', ['Dunwoody', 'Chamblee'], { arrows: ['up'] }),
-      sign(0.26, [GA('400')], undefined, ['Alpharetta', 'Cumming'], { tab: 'EXIT 27', arrows: ['upright'], dist: '1 MILE' }),
-      sign(0.5, undefined, undefined, ['Ashford Dunwoody Rd', 'Dunwoody'], { tab: 'EXIT 29', arrows: ['upright'], dist: '1/2 MILE' }),
-      sign(0.78, [I('85')], 'NORTH', ['Greenville'], { arrows: ['upright'], tab: 'EXIT 33', dist: '1 MILE', also: [{ shields: [I('85')], dir: 'SOUTH', dests: ['Atlanta'], arrows: ['upright'] }] }),
+      sign(0.3, [I('285')], 'EAST', ['Dunwoody', 'Chamblee'], { arrows: ['up'] }),
+    ],
+    exits: [
+      { at: 0.46, no: '27', shields: [GA('400')], dir: 'NORTH', dests: ['Alpharetta', 'Cumming'], also: [{ shields: [GA('400')], dir: 'SOUTH', dests: ['Atlanta'], arrows: ['upright'] }] },
+      { at: 0.65, no: '29', dests: ['Ashford Dunwoody Rd', 'Dunwoody'] },
+      { at: 0.88, no: '33', shields: [I('85')], dir: 'NORTH', dests: ['Greenville'], also: [{ shields: [I('85')], dir: 'SOUTH', dests: ['Atlanta'], arrows: ['upright'] }] },
     ],
     events: [{ t: 'merge', at: 0.3 }, { t: 'merge', at: 0.58 }, { t: 'crash', at: 0.82 }],
   }),
   base({
-    id: 'atl-i285-west', name: 'West Wall Perimeter', subtitle: 'I-285 N · Cobb Parkway to the Chattahoochee', roadName: 'I-285 NORTH', region: 'cobb', skyline: 'cobb', lanes: 4, lengthM: 4400, tod: 'day', traffic: 0.9, curves: 'rolling', trees: 'hardwood', par: 1500, place: 'Cobb County, west side',
+    id: 'atl-i285-west', limit: 65, name: 'West Wall Perimeter', subtitle: 'I-285 N · Cobb Parkway to the Chattahoochee', roadName: 'I-285 NORTH', region: 'cobb', skyline: 'cobb', lanes: 4, lengthM: 4400, tod: 'day', traffic: 0.9, curves: 'rolling', trees: 'hardwood', par: 1500, place: 'Cobb County, west side',
     guide: [
       sign(0.07, [I('285')], 'NORTH', ['I-75', 'Chattanooga'], { arrows: ['up'] }),
-      sign(0.3, [US('41')], undefined, ['Cobb Pkwy', 'Smyrna'], { tab: 'EXIT 19', arrows: ['upright'], dist: '1 MILE' }),
-      sign(0.58, [I('75')], 'NORTH', ['Chattanooga'], { arrows: ['upright'], tab: 'EXIT 20', dist: '1 MILE', also: [{ shields: [I('75')], dir: 'SOUTH', dests: ['Atlanta'], arrows: ['upright'] }] }),
-      sign(0.82, [I('75')], 'NORTH', ['Chattanooga'], { arrows: ['upright'], tab: 'EXIT 20', dist: '1/2 MILE', also: [{ shields: [I('75')], dir: 'SOUTH', dests: ['Atlanta'], arrows: ['upright'] }] }),
+      sign(0.3, [I('285')], 'NORTH', ['I-75', 'Chattanooga'], { arrows: ['up'] }),
+    ],
+    exits: [
+      { at: 0.46, no: '15', shields: [GA('280')], dests: ['South Cobb Dr', 'Smyrna'] },
+      { at: 0.64, no: '19', shields: [US('41')], dests: ['Cobb Pkwy', 'Dobbins ARB'] },
+      { at: 0.8, no: '20', shields: [I('75')], dir: 'NORTH', dests: ['Chattanooga'], also: [{ shields: [I('75')], dir: 'SOUTH', dests: ['Atlanta'], arrows: ['upright'] }] },
+      { at: 0.94, no: '22', dests: ['Northside Dr', 'Powers Ferry Rd'] },
     ],
     events: [{ t: 'work', at: 0.35, len: 520 }, { t: 'merge', at: 0.7 }, { t: 'tip', at: 0.5, title: 'Crossing the river', sub: 'Bridges ice first and wind pushes light cars. Hold the wheel steady.' }],
   }),
   base({
-    id: 'atl-i285-airport', name: 'Airport Approach', subtitle: 'I-285 W · The busiest airport in the world next door', roadName: 'I-285 WEST', region: 'airport', skyline: 'airport', lanes: 5, lengthM: 4200, tod: 'dusk', traffic: 1.1, trucks: 0.2, curves: 'straight', trees: 'none', walls: 'warehouse', par: 1650, place: 'Hartsfield-Jackson',
+    id: 'atl-i285-airport', limit: 65, name: 'Airport Approach', subtitle: 'I-285 W · The busiest airport in the world next door', roadName: 'I-285 WEST', region: 'airport', skyline: 'airport', lanes: 5, lengthM: 4200, tod: 'dusk', traffic: 1.1, trucks: 0.2, curves: 'straight', trees: 'none', walls: 'warehouse', par: 1650, place: 'Hartsfield-Jackson',
     guide: [
       sign(0.06, [I('285')], 'WEST', ['Atlanta Airport'], { arrows: ['up'] }),
-      sign(0.3, [I('75')], 'SOUTH', ['Macon'], { arrows: ['upright'], tab: 'EXIT 58', dist: '1 MILE', also: [{ shields: [I('75')], dir: 'NORTH', dests: ['Atlanta'], arrows: ['upright'] }] }),
-      sign(0.56, [GA('139')], undefined, ['Riverdale Rd', 'Clayton County'], { tab: 'EXIT 60', arrows: ['upright'], dist: '1/2 MILE' }),
-      sign(0.84, [GA('6')], undefined, ['Camp Creek Pkwy', 'Domestic Terminal'], { arrows: ['upright'], tab: 'EXIT 2', dist: '1 MILE' }),
+      sign(0.3, [I('285')], 'WEST', ['Atlanta Airport'], { arrows: ['up'] }),
+    ],
+    exits: [
+      { at: 0.46, no: '58', shields: [I('75')], dir: 'SOUTH', dests: ['Macon'], also: [{ shields: [I('75')], dir: 'NORTH', dests: ['Atlanta'], arrows: ['upright'] }] },
+      { at: 0.66, no: '60', shields: [GA('139')], dests: ['Riverdale Rd'] },
+      { at: 0.86, no: '61', shields: [I('85')], dir: 'SOUTH', dests: ['Montgomery'], also: [{ shields: [I('85')], dir: 'NORTH', dests: ['Atlanta'], arrows: ['upright'] }] },
     ],
     events: [{ t: 'vms', at: 0.1, text: 'AIRPORT  TRAFFIC|EXPECT  DELAYS' }, { t: 'merge', at: 0.4 }, { t: 'merge', at: 0.7 }, { t: 'police', at: 0.78 }],
   }),
   base({
-    id: 'atl-i285-east', name: 'East Side Perimeter', subtitle: 'I-285 S · DeKalb County and the Stone Mountain Freeway', roadName: 'I-285 SOUTH', region: 'intown', skyline: 'suburb', lanes: 4, lengthM: 4300, tod: 'golden', traffic: 0.85, curves: 'gentle', trees: 'hardwood', walls: 'retail', par: 1500, place: 'DeKalb County',
+    id: 'atl-i285-east', limit: 65, name: 'East Side Perimeter', subtitle: 'I-285 S · DeKalb County and the Stone Mountain Freeway', roadName: 'I-285 SOUTH', region: 'intown', skyline: 'suburb', lanes: 4, lengthM: 4300, tod: 'golden', traffic: 0.85, curves: 'gentle', trees: 'hardwood', walls: 'retail', par: 1500, place: 'DeKalb County',
     guide: [
       sign(0.07, [I('285')], 'SOUTH', ['I-20', 'Macon'], { arrows: ['up'] }),
-      sign(0.34, [US('78')], undefined, ['Stone Mountain Fwy', 'Athens'], { tab: 'EXIT 39', arrows: ['upright'], dist: '1 MILE' }),
-      sign(0.62, [I('20')], 'EAST', ['Augusta'], { arrows: ['upright'], tab: 'EXIT 46', dist: '1 MILE', also: [{ shields: [I('20')], dir: 'WEST', dests: ['Atlanta'], arrows: ['upright'] }] }),
-      sign(0.86, [I('20')], 'EAST', ['Augusta'], { arrows: ['upright'], tab: 'EXIT 46', dist: '1/2 MILE', also: [{ shields: [I('20')], dir: 'WEST', dests: ['Atlanta'], arrows: ['upright'] }] }),
+      sign(0.3, [I('285')], 'SOUTH', ['I-20', 'Macon'], { arrows: ['up'] }),
+    ],
+    exits: [
+      { at: 0.5, no: '39', shields: [US('78')], dests: ['Stone Mountain Fwy', 'Athens'] },
+      { at: 0.76, no: '43', shields: [US('278')], dests: ['Covington Hwy'] },
+      { at: 0.94, no: '46', shields: [I('20')], dir: 'EAST', dests: ['Augusta'], also: [{ shields: [I('20')], dir: 'WEST', dests: ['Atlanta'], arrows: ['upright'] }] },
     ],
     events: [{ t: 'merge', at: 0.3 }, { t: 'crash', at: 0.55 }, { t: 'merge', at: 0.8 }],
   }),
   base({
-    id: 'atl-i75-cobb', name: 'I-75 to Marietta', subtitle: 'I-75 N · Cobb County and the Chattahoochee bridge', roadName: 'I-75 NORTH', region: 'cobb', skyline: 'cobb', lanes: 4, lengthM: 4600, tod: 'day', traffic: 0.95, curves: 'rolling', trees: 'pine', walls: 'retail', par: 1550, place: 'Cobb Parkway corridor',
+    id: 'atl-i75-cobb', limit: 65, name: 'I-75 to Marietta', subtitle: 'I-75 N · Cobb County and the Chattahoochee bridge', roadName: 'I-75 NORTH', region: 'cobb', skyline: 'cobb', lanes: 4, lengthM: 4600, tod: 'day', traffic: 0.95, curves: 'rolling', trees: 'pine', walls: 'retail', par: 1550, place: 'Cobb Parkway corridor',
     guide: [
       sign(0.07, [I('75')], 'NORTH', ['Marietta', 'Chattanooga'], { arrows: ['up'] }),
-      sign(0.3, undefined, undefined, ['Windy Hill Rd', 'Smyrna'], { tab: 'EXIT 260', arrows: ['upright'], dist: '1 MILE' }),
-      sign(0.55, [I('75')], 'NORTH', ['Kennesaw', 'Chattanooga'], { arrows: ['up'] }),
-      sign(0.82, [GA('5')], undefined, ['Barrett Pkwy', 'Kennesaw'], { tab: 'EXIT 269', arrows: ['upright'], dist: '1/2 MILE' }),
+      sign(0.3, [I('75')], 'NORTH', ['Marietta', 'Chattanooga'], { arrows: ['up'] }),
+    ],
+    exits: [
+      { at: 0.46, no: '260', dests: ['Windy Hill Rd', 'Smyrna'] },
+      { at: 0.64, no: '263', shields: [GA('120')], dests: ['Marietta', 'Roswell'] },
+      { at: 0.8, no: '268', shields: [I('575')], dir: 'NORTH', dests: ['Canton', 'Ball Ground'] },
+      { at: 0.94, no: '269', shields: [GA('5')], dests: ['Barrett Pkwy', 'Kennesaw'] },
     ],
     events: [{ t: 'merge', at: 0.28 }, { t: 'work', at: 0.5, len: 600 }, { t: 'merge', at: 0.78 }],
   }),
   base({
-    id: 'atl-i75-henry', name: 'I-75 South to McDonough', subtitle: 'I-75 S · Clayton and Henry counties', roadName: 'I-75 SOUTH', region: 'henry', skyline: 'hills', lanes: 4, lengthM: 4800, tod: 'day', traffic: 0.7, trucks: 0.25, curves: 'gentle', trees: 'pine', walls: 'warehouse', par: 1450, place: 'Henry County',
+    id: 'atl-i75-henry', limit: 65, name: 'I-75 South to McDonough', subtitle: 'I-75 S · Clayton and Henry counties', roadName: 'I-75 SOUTH', region: 'henry', skyline: 'hills', lanes: 4, lengthM: 4800, tod: 'day', traffic: 0.7, trucks: 0.25, curves: 'gentle', trees: 'pine', walls: 'warehouse', par: 1450, place: 'Henry County',
     guide: [
       sign(0.08, [I('75')], 'SOUTH', ['Macon'], { arrows: ['up'] }),
-      sign(0.34, undefined, undefined, ['Jonesboro Rd', 'Lovejoy'], { tab: 'EXIT 221', arrows: ['upright'], dist: '1 MILE' }),
-      sign(0.6, [I('75')], 'SOUTH', ['Macon'], { arrows: ['up'] }),
-      sign(0.86, [GA('20'), GA('81')], undefined, ['McDonough', 'Hampton'], { tab: 'EXIT 218', arrows: ['upright'], dist: '1/2 MILE' }),
+      sign(0.4, [I('75')], 'SOUTH', ['Macon'], { arrows: ['up'] }),
+    ],
+    exits: [
+      { at: 0.5, no: '224', dests: ['Hudson Bridge Rd', 'Eagles Landing Pkwy'] },
+      { at: 0.72, no: '221', dests: ['Jonesboro Rd', 'Lovejoy'] },
+      { at: 0.93, no: '218', shields: [GA('20'), GA('81')], dests: ['McDonough', 'Hampton'] },
     ],
     events: [{ t: 'police', at: 0.4 }, { t: 'merge', at: 0.45 }, { t: 'tip', at: 0.65, title: 'Open road, big trucks', sub: 'Trucks may drift at the edge of their lane. Give them space.' }],
   }),
   base({
-    id: 'atl-i85-gwinnett', name: 'I-85 North to Gwinnett', subtitle: 'I-85 N · Doraville, Norcross and Duluth', roadName: 'I-85 NORTH', region: 'gwinnett', skyline: 'suburb', lanes: 5, lengthM: 4600, tod: 'golden', traffic: 1.0, curves: 'gentle', trees: 'mixed', walls: 'retail', par: 1650, place: 'Gwinnett County',
+    id: 'atl-i85-gwinnett', limit: 65, name: 'I-85 North to Gwinnett', subtitle: 'I-85 N · Doraville, Norcross and Duluth', roadName: 'I-85 NORTH', region: 'gwinnett', skyline: 'suburb', lanes: 5, lengthM: 4600, tod: 'golden', traffic: 1.0, curves: 'gentle', trees: 'mixed', walls: 'retail', par: 1650, place: 'Gwinnett County',
     guide: [
       sign(0.06, [I('85')], 'NORTH', ['Greenville'], { arrows: ['up'] }),
-      sign(0.4, undefined, undefined, ['Pleasant Hill Rd', 'Gwinnett Place'], { tab: 'EXIT 104', arrows: ['upright'], dist: '1 MILE' }),
-      sign(0.64, [I('85')], 'NORTH', ['Greenville'], { arrows: ['up'] }),
-      sign(0.86, undefined, undefined, ['Sugarloaf Pkwy'], { tab: 'EXIT 108', arrows: ['upright'], dist: '1/2 MILE' }),
+      sign(0.3, [I('85')], 'NORTH', ['Greenville'], { arrows: ['up'] }),
+    ],
+    exits: [
+      { at: 0.5, no: '104', dests: ['Pleasant Hill Rd', 'Gwinnett Place'] },
+      { at: 0.7, no: '106', shields: [GA('316')], dir: 'EAST', dests: ['Lawrenceville', 'Athens'] },
+      { at: 0.9, no: '108', dests: ['Sugarloaf Pkwy'] },
     ],
     events: [{ t: 'tip', at: 0.12, title: 'Express lanes', sub: 'The toll lane in the median needs a Peach Pass. Stay in the regular lanes.' }, { t: 'merge', at: 0.38 }, { t: 'merge', at: 0.7 }],
     lessons: ['The median toll lanes are for Peach Pass users. Never cross the double white lines to enter or leave them.', 'Gwinnett traffic compresses fast. Watch brake lights two cars ahead.', 'Keep right except to pass. Move over for faster traffic.'],
   }),
   base({
-    id: 'atl-i20-east', name: 'I-20 East to Stone Mountain', subtitle: 'I-20 E · Past the Capitol, toward the granite dome', roadName: 'I-20 EAST', region: 'stonemtn', skyline: 'stonemtn', lanes: 4, lengthM: 4500, tod: 'dusk', traffic: 0.85, curves: 'rolling', trees: 'hardwood', walls: 'houses', par: 1500, place: 'East Atlanta and DeKalb',
+    id: 'atl-i20-east', limit: 55, name: 'I-20 East to Stone Mountain', subtitle: 'I-20 E · Past the Capitol, toward the granite dome', roadName: 'I-20 EAST', region: 'stonemtn', skyline: 'stonemtn', lanes: 4, lengthM: 4500, tod: 'dusk', traffic: 0.85, curves: 'rolling', trees: 'hardwood', walls: 'houses', par: 1500, place: 'East Atlanta and DeKalb',
     guide: [
       sign(0.07, [I('20')], 'EAST', ['Augusta'], { arrows: ['up'] }),
-      sign(0.3, [US('23')], undefined, ['Moreland Ave'], { tab: 'EXIT 60', arrows: ['upright'], dist: '1 MILE' }),
-      sign(0.56, [I('285')], 'NORTH', ['Greenville'], { arrows: ['upright'], tab: 'EXIT 67', dist: '1 MILE', also: [{ shields: [I('285')], dir: 'SOUTH', dests: ['Macon'], arrows: ['upright'] }] }),
-      sign(0.8, undefined, undefined, ['Evans Mill Rd', 'Lithonia'], { tab: 'EXIT 74', arrows: ['upright'], dist: '1/2 MILE' }),
+      sign(0.3, [I('20')], 'EAST', ['Augusta'], { arrows: ['up'] }),
+    ],
+    exits: [
+      { at: 0.46, no: '60', shields: [US('23')], dests: ['Moreland Ave'] },
+      { at: 0.64, no: '65', shields: [GA('155')], dests: ['Candler Rd', 'Decatur'] },
+      { at: 0.8, no: '67', shields: [I('285')], dir: 'NORTH', dests: ['Greenville'], also: [{ shields: [I('285')], dir: 'SOUTH', dests: ['Macon', 'Atlanta Airport'], arrows: ['upright'] }] },
+      { at: 0.95, no: '74', dests: ['Evans Mill Rd', 'Lithonia'] },
     ],
     events: [{ t: 'merge', at: 0.33 }, { t: 'crash', at: 0.6 }, { t: 'tip', at: 0.82, title: 'Stone Mountain ahead', sub: 'Big and bare, you can see it for miles. Keep your eyes on the road, though.' }],
   }),
@@ -135,75 +174,102 @@ const RAW: AtlStage[] = [
     id: 'atl-ga400', name: 'GA-400 to Alpharetta', subtitle: 'GA-400 N · Buckhead to Roswell, toll free', roadName: 'GA-400 NORTH', region: 'buckhead', skyline: 'buckhead', lanes: 4, lengthM: 4400, tod: 'day', limit: 65, maxSpeed: 82, traffic: 0.95, curves: 'rolling', trees: 'hardwood', walls: 'glass', par: 1500, place: 'Buckhead and North Fulton',
     guide: [
       sign(0.07, [GA('400')], 'NORTH', ['Alpharetta', 'Cumming'], { arrows: ['up'] }),
-      sign(0.3, [GA('141')], undefined, ['Lenox Rd', 'Buckhead'], { tab: 'EXIT 2', arrows: ['upright'], dist: '1 MILE' }),
-      sign(0.56, [I('285')], 'EAST', ['Greenville'], { arrows: ['upright'], tab: 'EXIT 4', dist: '1 MILE', also: [{ shields: [I('285')], dir: 'WEST', dests: ['Chattanooga'], arrows: ['upright'] }] }),
-      sign(0.82, [GA('140')], undefined, ['Holcomb Bridge Rd', 'Roswell'], { tab: 'EXIT 7', arrows: ['upright'], dist: '1/2 MILE' }),
+      sign(0.3, [GA('400')], 'NORTH', ['Alpharetta', 'Cumming'], { arrows: ['up'] }),
+    ],
+    exits: [
+      { at: 0.46, no: '2', shields: [GA('141')], dests: ['Lenox Rd', 'Buckhead'] },
+      { at: 0.6, no: '4', shields: [I('285')], dir: 'EAST', dests: ['Greenville'], also: [{ shields: [I('285')], dir: 'WEST', dests: ['Chattanooga'], arrows: ['upright'] }] },
+      { at: 0.76, no: '5', dests: ['Abernathy Rd', 'Dunwoody'] },
+      { at: 0.92, no: '7', shields: [GA('140')], dests: ['Holcomb Bridge Rd', 'Roswell'] },
     ],
     events: [{ t: 'merge', at: 0.36 }, { t: 'police', at: 0.58 }, { t: 'merge', at: 0.78 }],
   }),
   base({
-    id: 'atl-rush-hour', name: 'Connector Rush Hour', subtitle: 'I-75/85 · Stop and go at 5 pm. Stay calm', roadName: 'I-75/85 NORTH', region: 'midtown', skyline: 'midtown', lanes: 5, lengthM: 3400, tod: 'dusk', traffic: 1.5, flow: 0.45, trucks: 0.1, curves: 'rolling', par: 1600, place: 'Midtown Atlanta', isRush: true,
+    id: 'atl-rush-hour', limit: 55, name: 'Connector Rush Hour', subtitle: 'I-75/85 · Stop and go at 5 pm. Stay calm', roadName: 'I-75/85 NORTH', region: 'midtown', skyline: 'midtown', lanes: 5, lengthM: 3400, tod: 'dusk', traffic: 1.5, flow: 0.45, trucks: 0.1, curves: 'rolling', par: 1600, place: 'Midtown Atlanta', isRush: true,
     guide: [
       sign(0.1, [I('75'), I('85')], 'NORTH', ['Chattanooga', 'Greenville'], { arrows: ['up'] }),
-      sign(0.3, undefined, undefined, ['10th St', '14th St', 'Georgia Tech'], { tab: 'EXIT 250', arrows: ['upright'], dist: '1/2 MILE' }),
-      sign(0.6, [I('75')], 'NORTH', ['Marietta', 'Chattanooga'], { arrows: ['upleft'], tab: 'EXIT 251B', dist: '1 MILE', also: [{ shields: [I('85')], dir: 'NORTH', dests: ['Greenville'], arrows: ['upright'] }] }),
-      sign(0.85, [I('75')], 'NORTH', ['Marietta', 'Chattanooga'], { arrows: ['upleft'], tab: 'EXIT 251B', dist: '1/2 MILE', also: [{ shields: [I('85')], dir: 'NORTH', dests: ['Greenville'], arrows: ['upright'] }] }),
+    ],
+    exits: [
+      { at: 0.42, no: '249D', shields: [US('19'), US('29')], dests: ['Spring St', 'West Peachtree St'] },
+      { at: 0.62, no: '250', dests: ['10th St', '14th St', 'Georgia Tech'] },
+      { at: 0.95, kind: 'fork', no: '251B', shields: [I('75')], dir: 'NORTH', dests: ['Marietta', 'Chattanooga'], also: [{ shields: [I('85')], dir: 'NORTH', dests: ['Greenville'], arrows: ['upright'] }], to: 'free-i85n', toLeft: 'free-i75n', name: 'I-75 NORTH · Marietta' },
     ],
     events: [{ t: 'vms', at: 0.05, text: 'HEAVY  TRAFFIC|EXPECT  DELAYS' }, { t: 'merge', at: 0.3 }, { t: 'tip', at: 0.5, title: 'Stop-and-go', sub: 'Do not tailgate. Roll, do not stab the brakes.' }],
     lessons: ['In slow traffic, keep a full car length at a stop so you can steer around.', 'Keep your eyes moving: mirrors, brake lights, signs.', 'Do not weave. You will not get there faster.'],
   }),
   base({
-    id: 'atl-night-285', name: 'Night Run on the Perimeter', subtitle: 'I-285 · Lights glowing, trucks hauling, eyes open', roadName: 'I-285 NORTH', region: 'perimeter', skyline: 'perimeter', lanes: 4, lengthM: 4400, tod: 'night', traffic: 0.8, trucks: 0.3, curves: 'gentle', par: 1500, place: 'Sandy Springs, after dark',
+    id: 'atl-night-285', limit: 65, name: 'Night Run on the Perimeter', subtitle: 'I-285 · Lights glowing, trucks hauling, eyes open', roadName: 'I-285 NORTH', region: 'perimeter', skyline: 'perimeter', lanes: 4, lengthM: 4400, tod: 'night', traffic: 0.8, trucks: 0.3, curves: 'gentle', par: 1500, place: 'Sandy Springs, after dark',
     guide: [
       sign(0.07, [I('285')], 'NORTH', ['I-75', 'Chattanooga'], { arrows: ['up'] }),
-      sign(0.38, [I('75')], 'NORTH', ['Chattanooga'], { arrows: ['upright'], tab: 'EXIT 20', dist: '1 MILE', also: [{ shields: [I('75')], dir: 'SOUTH', dests: ['Atlanta'], arrows: ['upright'] }] }),
-      sign(0.7, undefined, undefined, ['Northside Dr', 'Powers Ferry Rd'], { tab: 'EXIT 22', arrows: ['upright'], dist: '1/2 MILE' }),
+    ],
+    exits: [
+      { at: 0.5, no: '19', shields: [US('41')], dests: ['Cobb Pkwy', 'Smyrna'] },
+      { at: 0.75, no: '20', shields: [I('75')], dir: 'NORTH', dests: ['Chattanooga'], also: [{ shields: [I('75')], dir: 'SOUTH', dests: ['Atlanta'], arrows: ['upright'] }] },
+      { at: 0.93, no: '22', dests: ['Northside Dr', 'Powers Ferry Rd'] },
     ],
     events: [{ t: 'tip', at: 0.08, title: 'Night driving', sub: 'Headlights on. Do not outdrive them: slow down so you can stop in the light you see.' }, { t: 'police', at: 0.5 }, { t: 'crash', at: 0.75 }],
     lessons: ['Dim your high beams for cars ahead and behind.', 'Look to the right edge of the lane when oncoming lights glare.', 'Tired? Take the next exit and rest.'],
   }),
   base({
-    id: 'atl-sunset-20', name: 'Sunset on I-20', subtitle: 'I-20 W · Glare, long shadows and a golden skyline', roadName: 'I-20 WEST', region: 'westside', skyline: 'downtown', lanes: 4, lengthM: 4300, tod: 'dusk', traffic: 0.8, curves: 'rolling', par: 1450, place: 'West of the Connector',
+    id: 'atl-sunset-20', limit: 55, name: 'Sunset on I-20', subtitle: 'I-20 W · Glare, long shadows and a golden skyline', roadName: 'I-20 WEST', region: 'westside', skyline: 'downtown', lanes: 4, lengthM: 4300, tod: 'dusk', traffic: 0.8, curves: 'rolling', par: 1450, place: 'West of the Connector',
     guide: [
       sign(0.07, [I('20')], 'WEST', ['Birmingham'], { arrows: ['up'] }),
-      sign(0.3, [GA('139')], undefined, ['MLK Jr Dr'], { tab: 'EXIT 53', arrows: ['upright'], dist: '1 MILE' }),
-      sign(0.52, [GA('280')], undefined, ['Hamilton E Holmes Dr'], { tab: 'EXIT 52', arrows: ['upright'], dist: '1/2 MILE' }),
-      sign(0.78, [I('285')], 'SOUTH', ['Macon'], { arrows: ['upright'], tab: 'EXIT 51', dist: '1 MILE', also: [{ shields: [I('285')], dir: 'NORTH', dests: ['Chattanooga'], arrows: ['upright'] }] }),
+    ],
+    exits: [
+      { at: 0.46, no: '53', shields: [GA('139')], dests: ['MLK Jr Dr'] },
+      { at: 0.64, no: '52', shields: [GA('280')], dests: ['Hamilton E Holmes Dr'] },
+      { at: 0.84, no: '51', shields: [I('285')], dir: 'SOUTH', dests: ['Macon'], also: [{ shields: [I('285')], dir: 'NORTH', dests: ['Chattanooga'], arrows: ['upright'] }] },
     ],
     events: [{ t: 'tip', at: 0.1, title: 'Sun glare', sub: 'Sun visor down, sunglasses on, and slow a touch.' }, { t: 'merge', at: 0.5 }],
   }),
   base({
-    id: 'atl-storm-connector', name: 'Storm Over the Connector', subtitle: 'I-75/85 S · Thunder, wipers, hydroplaning risk', roadName: 'I-75/85 SOUTH', region: 'downtown', skyline: 'downtown', lanes: 5, lengthM: 3800, tod: 'dusk', weather: 'storm', traffic: 0.8, flow: 0.8, curves: 'rolling', par: 1500, place: 'Downtown Atlanta, stormy',
+    id: 'atl-storm-connector', limit: 55, name: 'Storm Over the Connector', subtitle: 'I-75/85 S · Thunder, wipers, hydroplaning risk', roadName: 'I-75/85 SOUTH', region: 'downtown', skyline: 'downtown', lanes: 5, lengthM: 3800, tod: 'dusk', weather: 'storm', traffic: 0.8, flow: 0.8, curves: 'rolling', par: 1500, place: 'Downtown Atlanta, stormy',
     guide: [
       sign(0.08, [I('75'), I('85')], 'SOUTH', ['Macon', 'Montgomery'], { arrows: ['up'] }),
-      sign(0.5, [I('20')], 'EAST', ['Augusta'], { arrows: ['upright'], tab: 'EXIT 247', dist: '1/2 MILE', also: [{ shields: [I('20')], dir: 'WEST', dests: ['Birmingham'], arrows: ['upright'] }] }),
+      sign(0.45, [I('20')], undefined, ['Augusta', 'Birmingham'], { tab: 'EXIT 247', dist: '1 MILE', also: [{ dests: ['Fulton St', 'Central Ave', 'Ga State Univ'], tab: 'EXIT 246', dist: '3/4 MILE' }, { dests: ['Abernathy Blvd', 'Capitol Ave', 'Turner Field'], tab: 'EXIT 245', dist: '1/4 MILE' }] }),
+    ],
+    exits: [
+      { at: 0.55, no: '247', shields: [I('20')], dests: ['Augusta', 'Birmingham'], quiet: true },
+      { at: 0.65, no: '246', dests: ['Fulton St', 'Central Ave', 'Ga State Univ'], quiet: true },
+      { at: 0.75, no: '245', dests: ['Abernathy Blvd', 'Capitol Ave', 'Turner Field'], quiet: true },
+      { at: 0.9, no: '243', shields: [GA('166')], dests: ['Langford Pkwy', 'East Point'] },
     ],
     events: [{ t: 'vms', at: 0.05, text: 'FLASH  FLOOD  WARNING|SLOW  DOWN' }, { t: 'tip', at: 0.18, title: 'Hydroplaning', sub: 'Ease off the gas. Do not slam the brakes in standing water.' }, { t: 'crash', at: 0.62 }],
     lessons: ['In heavy rain slow 5 to 10 mph below the limit. Georgia drivers are allowed to.', 'Headlights on in rain. It is Georgia law with wipers.', 'Skip cruise control on wet roads.'],
   }),
   base({
-    id: 'atl-work-zone', name: 'Work Zone on I-75', subtitle: 'I-75 S · Lane closures, cones and doubled fines', roadName: 'I-75 SOUTH', region: 'henry', skyline: 'suburb', lanes: 4, lengthM: 4000, tod: 'day', traffic: 0.8, curves: 'gentle', walls: 'warehouse', par: 1450, place: 'Henry County',
+    id: 'atl-work-zone', limit: 65, name: 'Work Zone on I-75', subtitle: 'I-75 S · Lane closures, cones and doubled fines', roadName: 'I-75 SOUTH', region: 'henry', skyline: 'suburb', lanes: 4, lengthM: 4000, tod: 'day', traffic: 0.8, curves: 'gentle', walls: 'warehouse', par: 1450, place: 'Henry County',
     guide: [
       sign(0.06, [I('75')], 'SOUTH', ['Macon'], { arrows: ['up'] }),
-      sign(0.34, [GA('138')], undefined, ['Jonesboro', 'Stockbridge'], { tab: 'EXIT 228', arrows: ['upright'], dist: '1 MILE' }),
+      sign(0.3, undefined, undefined, ['Road Work', '1 Mile'], { arrows: ['up'] }),
+    ],
+    exits: [
+      { at: 0.55, no: '224', dests: ['Hudson Bridge Rd', 'Eagles Landing Pkwy'] },
+      { at: 0.82, no: '221', dests: ['Jonesboro Rd', 'Lovejoy'] },
     ],
     events: [{ t: 'work', at: 0.3, len: 700 }, { t: 'work', at: 0.7, len: 500 }, { t: 'merge', at: 0.5 }],
     lessons: ['Fines are doubled in work zones in Georgia. The workers are real people.', 'Merge early. Do not wait for the cones.', 'Watch for sudden stops. Look over the car ahead.'],
   }),
   base({
-    id: 'atl-move-over', name: 'Move Over Law', subtitle: 'I-285 · Police and tow trucks on the shoulder', roadName: 'I-285 EAST', region: 'perimeter', skyline: 'perimeter', lanes: 4, lengthM: 4000, tod: 'day', traffic: 0.7, curves: 'gentle', par: 1450, place: 'North Atlanta',
+    id: 'atl-move-over', limit: 65, name: 'Move Over Law', subtitle: 'I-285 · Police and tow trucks on the shoulder', roadName: 'I-285 EAST', region: 'perimeter', skyline: 'perimeter', lanes: 4, lengthM: 4000, tod: 'day', traffic: 0.7, curves: 'gentle', par: 1450, place: 'North Atlanta',
     guide: [
-      sign(0.06, [I('75')], 'SOUTH', ['Macon'], { arrows: ['up'] }),
-      sign(0.34, undefined, undefined, ['Road Work', '1 Mile'], { arrows: ['up'] }),
+      sign(0.06, [I('285')], 'EAST', ['Dunwoody', 'Chamblee'], { arrows: ['up'] }),
+    ],
+    exits: [
+      { at: 0.55, no: '27', shields: [GA('400')], dir: 'NORTH', dests: ['Alpharetta', 'Cumming'], also: [{ shields: [GA('400')], dir: 'SOUTH', dests: ['Atlanta'], arrows: ['upright'] }] },
+      { at: 0.88, no: '33', shields: [I('85')], dir: 'NORTH', dests: ['Greenville'], also: [{ shields: [I('85')], dir: 'SOUTH', dests: ['Atlanta'], arrows: ['upright'] }] },
     ],
     events: [{ t: 'police', at: 0.2 }, { t: 'police', at: 0.45 }, { t: 'crash', at: 0.62 }, { t: 'police', at: 0.82 }],
     lessons: ['Georgia law: move over one lane for emergency vehicles on the shoulder, or slow down if you cannot.', 'Signal first, check the mirror, then move.', 'Slow to 20 under the limit if you cannot change lanes.'],
   }),
   base({
-    id: 'atl-fog-i20', name: 'Foggy Morning on I-20', subtitle: 'I-20 W · Valley fog near the Chattahoochee', roadName: 'I-20 WEST', region: 'douglasville', skyline: 'hills', lanes: 3, lengthM: 3800, tod: 'day', weather: 'fog', traffic: 0.55, flow: 0.8, curves: 'gentle', trees: 'pine', par: 1400, place: 'Douglas County',
+    id: 'atl-fog-i20', limit: 65, name: 'Foggy Morning on I-20', subtitle: 'I-20 W · Valley fog near the Chattahoochee', roadName: 'I-20 WEST', region: 'douglasville', skyline: 'hills', lanes: 3, lengthM: 3800, tod: 'day', weather: 'fog', traffic: 0.55, flow: 0.8, curves: 'gentle', trees: 'pine', par: 1400, place: 'Douglas County',
     guide: [
       sign(0.1, [I('20')], 'WEST', ['Birmingham'], { arrows: ['up'] }),
-      sign(0.55, [GA('6')], undefined, ['Thornton Rd', 'Lithia Springs'], { tab: 'EXIT 44', arrows: ['upright'], dist: '1/2 MILE' }),
+    ],
+    exits: [
+      { at: 0.5, no: '44', shields: [GA('6')], dests: ['Thornton Rd', 'Lithia Springs'] },
+      { at: 0.8, no: '41', dests: ['Lee Rd', 'Lithia Springs'] },
     ],
     events: [{ t: 'vms', at: 0.05, text: 'DENSE  FOG|SLOW  DOWN  LOW  BEAMS' }, { t: 'crash', at: 0.55 }],
     lessons: ['Low beams in fog, never high beams. They bounce back at you.', 'Slow down enough to stop within what you can see.', 'Use the white edge line to stay on the road.'],
@@ -211,49 +277,32 @@ const RAW: AtlStage[] = [
 
   // ---- Carrollton and the west side ---
   base({
-    id: 'atl-carrollton-square', name: 'Downtown Carrollton', subtitle: '30117 · Adamson Square, Maple Street and Newnan Street', roadName: 'MAPLE ST', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 2400, limit: 35, maxSpeed: 52, tod: 'day', traffic: 0.5, trucks: 0.04, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'brick', par: 1000, place: 'Carrollton, Georgia',
-    guide: [
-      sign(0.1, undefined, undefined, ['Adamson Square', 'Downtown'], { arrows: ['up'] }),
-      sign(0.5, [US('27')], undefined, ['Newnan'], { arrows: ['right'] }),
-      sign(0.82, [GA('61')], undefined, ['Villa Rica'], { arrows: ['up'] }),
-    ],
+    id: 'atl-carrollton-square', name: 'Downtown Carrollton', subtitle: '30117 · Adamson Square, Maple Street and Newnan Street', roadName: 'MAPLE ST', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 2400, limit: 25, maxSpeed: 40, tod: 'day', traffic: 0.5, trucks: 0.04, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'brick', par: 1000, place: 'Carrollton, Georgia',
+    guide: [sign(0.1, undefined, undefined, ['Adamson Square', 'Downtown'], { arrows: ['up'] }), sign(0.5, [US('27')], undefined, ['Newnan St', 'Villa Rica'], { arrows: ['right'] }), sign(0.82, [GA('61')], undefined, ['Villa Rica', 'University of West Georgia'], { arrows: ['up'] })],
     events: [{ t: 'ped', at: 0.18 }, { t: 'stop', at: 0.32 }, { t: 'rail', at: 0.48, train: true, gates: true, name: 'Dixie St' }, { t: 'ped', at: 0.62 }, { t: 'light', at: 0.78 }, { t: 'tip', at: 0.05, title: 'Carrollton, 30117', sub: 'Green Belt, brick storefronts, and the Adamson Square courthouse.' }],
     lessons: ['A full stop at a stop sign means the wheels stop moving.', 'Pedestrians in a crosswalk have the right of way.', 'At a railroad crossing with flashing lights, stop at least 15 feet back.'],
   }),
   base({
-    id: 'atl-carrollton-circle', name: 'Maple Street Roundabout', subtitle: '30117 · Yield, look left, then go', roadName: 'MAPLE ST', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 2200, limit: 35, maxSpeed: 52, tod: 'golden', traffic: 0.5, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'houses', par: 1000, place: 'Carrollton, Georgia',
-    guide: [
-      sign(0.14, undefined, undefined, ['Roundabout ahead'], { arrows: ['up'] }),
-      sign(0.55, [GA('166')], undefined, ['Bankhead Hwy'], { arrows: ['right'] }),
-    ],
+    id: 'atl-carrollton-circle', name: 'Maple Street Roundabout', subtitle: '30117 · Yield, look left, then go', roadName: 'MAPLE ST', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 2200, limit: 30, maxSpeed: 45, tod: 'golden', traffic: 0.5, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'houses', par: 1000, place: 'Carrollton, Georgia',
+    guide: [sign(0.14, undefined, undefined, ['Roundabout ahead'], { arrows: ['up'] }), sign(0.55, [GA('166')], undefined, ['Bankhead Hwy', 'Lovvorn Rd'], { arrows: ['right'] })],
     events: [{ t: 'circle', at: 0.3 }, { t: 'ped', at: 0.45 }, { t: 'circle', at: 0.7 }],
     lessons: ['Slow down, look left, yield to traffic already in the circle.', 'Never stop inside a roundabout.', 'Signal right when you leave.'],
   }),
   base({
     id: 'atl-us27-carrollton', name: 'US-27 to Carrollton', subtitle: 'US-27 · Rolling farmland and pines toward town', roadName: 'US-27 SOUTH', road: 'rural', region: 'rural', skyline: 'hills', lanes: 1, lengthM: 3200, limit: 55, maxSpeed: 70, tod: 'day', traffic: 0.45, trucks: 0.14, flow: 0.95, curves: 'winding', trees: 'pine', walls: 'houses', par: 1200, place: 'Carroll County',
-    guide: [
-      sign(0.08, [US('27')], 'SOUTH', ['Carrollton', 'LaGrange'], { arrows: ['up'] }),
-      sign(0.52, [GA('113')], undefined, ['Carrollton'], { arrows: ['upright'] }),
-      sign(0.85, undefined, undefined, ['Carrollton'], { arrows: ['up'] }),
-    ],
+    guide: [sign(0.08, [US('27')], 'SOUTH', ['Carrollton', 'Newnan'], { arrows: ['up'] }), sign(0.52, [GA('113')], undefined, ['Carrollton'], { arrows: ['upright'] }), sign(0.85, undefined, undefined, ['Carrollton 3', 'Villa Rica'], { arrows: ['up'] })],
     events: [{ t: 'rail', at: 0.4, train: false, gates: false }, { t: 'school', at: 0.62, len: 300 }, { t: 'tip', at: 0.08, title: 'Two-lane road', sub: 'No center line crossing. A solid yellow means no passing.' }],
     lessons: ['Solid yellow on your side means do not pass.', 'Slow for curves; the posted speed is a maximum.', 'Deer are active at dusk. Scan the ditches.'],
   }),
   base({
-    id: 'atl-bankhead-hwy', name: 'Bankhead Highway', subtitle: 'SR-166 · Four lanes of Georgia strip road', roadName: 'BANKHEAD HWY', road: 'arterial', region: 'carrollton', skyline: 'carrollton', lanes: 2, lengthM: 3000, limit: 45, maxSpeed: 62, tod: 'day', traffic: 0.7, flow: 0.95, curves: 'gentle', trees: 'mixed', walls: 'retail', par: 1200, place: 'Carrollton to Villa Rica',
-    guide: [
-      sign(0.1, [GA('166')], undefined, ['Bankhead Hwy'], { arrows: ['up'] }),
-      sign(0.5, [GA('61')], undefined, ['Villa Rica', 'Carrollton'], { arrows: ['upright'] }),
-    ],
+    id: 'atl-bankhead-hwy', name: 'Bankhead Highway', subtitle: 'US-78 · Four lanes of Georgia strip road', roadName: 'BANKHEAD HWY', road: 'arterial', region: 'carrollton', skyline: 'carrollton', lanes: 2, lengthM: 3000, limit: 45, maxSpeed: 62, tod: 'day', traffic: 0.7, flow: 0.95, curves: 'gentle', trees: 'mixed', walls: 'retail', par: 1200, place: 'Carrollton to Villa Rica',
+    guide: [sign(0.1, [US('78')], undefined, ['Bankhead Hwy', 'Villa Rica'], { arrows: ['up'] }), sign(0.5, [GA('61')], undefined, ['Villa Rica', 'Carrollton'], { arrows: ['upright'] }), sign(0.8, [GA('8')], undefined, ['Douglasville', 'Temple'], { arrows: ['up'] })],
     events: [{ t: 'light', at: 0.2 }, { t: 'light', at: 0.45 }, { t: 'rail', at: 0.62, train: true, gates: true, name: 'Bankhead' }, { t: 'light', at: 0.85 }],
     lessons: ['Yellow means stop if you safely can.', 'Watch for cars turning into driveways.', 'Left lane on a four-lane road is for passing.'],
   }),
   base({
     id: 'atl-villa-rica', name: 'Villa Rica Backroads', subtitle: 'GA-61 · Curvy two-lane through Carroll County pines', roadName: 'GA-61', road: 'rural', region: 'villarica', skyline: 'hills', lanes: 1, lengthM: 3000, limit: 45, maxSpeed: 62, tod: 'golden', traffic: 0.4, trucks: 0.1, flow: 0.95, curves: 'winding', trees: 'pine', walls: 'houses', par: 1150, place: 'Villa Rica, Georgia',
-    guide: [
-      sign(0.1, [GA('61')], 'NORTH', ['Villa Rica'], { arrows: ['up'] }),
-      sign(0.6, [GA('166')], undefined, ['Bankhead Hwy'], { arrows: ['upright'] }),
-    ],
+    guide: [sign(0.1, [GA('61')], 'NORTH', ['Villa Rica'], { arrows: ['up'] }), sign(0.6, [US('78')], undefined, ['Bankhead Hwy'], { arrows: ['upright'] })],
     events: [{ t: 'rail', at: 0.42, train: true, gates: true, name: 'Villa Rica' }, { t: 'tip', at: 0.1, title: 'Curves ahead', sub: 'Yellow signs suggest a safe speed. Believe them.' }],
   }),
   base({
@@ -301,18 +350,18 @@ const RAW: AtlStage[] = [
   }),
   base({
     id: 'atl-lovvorn', name: 'Neighborhood Streets: Lovvorn Road', subtitle: '30117 · School zone, stop signs and a light', roadName: 'LOVVORN RD', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 1900, limit: 30, maxSpeed: 42, tod: 'day', traffic: 0.3, trucks: 0.02, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'houses', par: 850, place: 'Carrollton, Georgia',
-    guide: [
-      sign(0.25, undefined, undefined, ['Lovvorn Rd'], { arrows: ['up'] }),
-      sign(0.65, [GA('166')], undefined, ['Bankhead Hwy'], { arrows: ['right'] }),
-    ],
+    guide: [sign(0.25, undefined, undefined, ['Lovvorn Rd'], { arrows: ['up'] }), sign(0.65, [GA('166')], undefined, ['Bankhead Hwy'], { arrows: ['right'] })],
     events: [{ t: 'stop', at: 0.2 }, { t: 'school', at: 0.4, len: 220 }, { t: 'ped', at: 0.62 }, { t: 'light', at: 0.82 }],
     lessons: ['School zone: 25 while the lights flash. Children can appear from anywhere.', 'Stop before the white line, not on it.', 'A yellow light means stop if you safely can.'],
   }),
   base({
-    id: 'atl-onramp-i20', name: 'On-Ramp and Merge', subtitle: 'I-20 W · Speed up on the ramp, then blend in', roadName: 'I-20 WEST', region: 'westside', skyline: 'hills', lanes: 3, lengthM: 3000, tod: 'day', traffic: 0.4, trucks: 0.1, flow: 0.98, curves: 'gentle', trees: 'pine', par: 1100, place: 'West Atlanta',
+    id: 'atl-onramp-i20', limit: 65, startRamp: true, name: 'On-Ramp and Merge', subtitle: 'I-20 W · Speed up on the ramp, then blend in', roadName: 'I-20 WEST', region: 'westside', skyline: 'hills', lanes: 3, lengthM: 3000, tod: 'day', traffic: 0.4, trucks: 0.1, flow: 0.98, curves: 'gentle', trees: 'pine', par: 1100, place: 'West Atlanta',
     guide: [
       sign(0.1, [I('20')], 'WEST', ['Birmingham'], { arrows: ['up'] }),
-      sign(0.55, [I('285')], 'NORTH', ['Chattanooga'], { arrows: ['up'], tab: 'EXIT 51' }),
+      sign(0.5, [I('20')], 'WEST', ['Birmingham'], { arrows: ['up'] }),
+    ],
+    exits: [
+      { at: 0.84, no: '49', shields: [GA('70')], dests: ['Fulton Industrial Blvd'] },
     ],
     events: [{ t: 'tip', at: 0.04, title: 'Merging', sub: 'Match the speed of traffic on the ramp, signal, check your mirror, then slide in.' }, { t: 'merge', at: 0.2 }, { t: 'merge', at: 0.45 }, { t: 'merge', at: 0.7 }],
     lessons: ['Use the whole ramp to match highway speed.', 'Never stop on a ramp unless traffic forces you.', 'Signal early and find a gap, do not force one.'],
@@ -330,21 +379,26 @@ const RAW: AtlStage[] = [
     lessons: ['Never use high beams in fog.', 'Slow until you can stop inside what you can see.', 'Do not stop on the road. Pull completely off.'],
   }),
   base({
-    id: 'atl-snow-285', name: 'Rare Snow Day on I-285', subtitle: 'I-285 · Georgia roads when the flakes fall', roadName: 'I-285 EAST', region: 'perimeter', skyline: 'perimeter', lanes: 4, lengthM: 3600, tod: 'day', weather: 'snow', traffic: 0.45, flow: 0.6, trucks: 0.08, curves: 'gentle', par: 1400, place: 'North Atlanta, snowy',
+    id: 'atl-snow-285', limit: 65, name: 'Rare Snow Day on I-285', subtitle: 'I-285 · Georgia roads when the flakes fall', roadName: 'I-285 EAST', region: 'perimeter', skyline: 'perimeter', lanes: 4, lengthM: 3600, tod: 'day', weather: 'snow', traffic: 0.45, flow: 0.6, trucks: 0.08, curves: 'gentle', par: 1400, place: 'North Atlanta, snowy',
     guide: [
-      sign(0.1, undefined, undefined, ['Marietta Square'], { arrows: ['up'] }),
-      sign(0.6, [US('41')], undefined, ['Cobb Pkwy'], { arrows: ['right'] }),
+      sign(0.08, [I('285')], 'EAST', ['Dunwoody', 'Chamblee'], { arrows: ['up'] }),
+    ],
+    exits: [
+      { at: 0.6, no: '33', shields: [I('85')], dir: 'NORTH', dests: ['Greenville'], also: [{ shields: [I('85')], dir: 'SOUTH', dests: ['Atlanta'], arrows: ['upright'] }] },
     ],
     events: [{ t: 'vms', at: 0.04, text: 'ICY  ROADS|BRIDGES  FREEZE  FIRST' }, { t: 'tip', at: 0.15, title: 'Snow and ice', sub: 'Smooth inputs only. Triple your following distance. Bridges freeze first.' }, { t: 'crash', at: 0.6 }],
     lessons: ['Triple your following distance on ice.', 'If it is not safe, stay home. Georgia roads are not ready for snow.', 'Brake gently. Steer gently. Do everything slowly.'],
   }),
   base({
-    id: 'atl-master-storm', name: 'Master Class: Night Storm Rush', subtitle: 'I-75/85 · Everything at once. The final exam', roadName: 'I-75/85 NORTH', region: 'midtown', skyline: 'midtown', lanes: 5, lengthM: 5200, tod: 'night', weather: 'storm', traffic: 1.35, flow: 0.55, trucks: 0.2, curves: 'rolling', par: 2000, place: 'Atlanta, midnight storm',
+    id: 'atl-master-storm', limit: 55, name: 'Master Class: Night Storm Rush', subtitle: 'I-75/85 · Everything at once. The final exam', roadName: 'I-75/85 NORTH', region: 'midtown', skyline: 'midtown', lanes: 5, lengthM: 5200, tod: 'night', weather: 'storm', traffic: 1.35, flow: 0.55, trucks: 0.2, curves: 'rolling', par: 2000, place: 'Atlanta, midnight storm',
     guide: [
       sign(0.08, [I('75'), I('85')], 'NORTH', ['Chattanooga', 'Greenville'], { arrows: ['up'] }),
-      sign(0.3, undefined, undefined, ['10th St', '14th St', 'Georgia Tech'], { tab: 'EXIT 250', arrows: ['upright'], dist: '1/2 MILE' }),
-      sign(0.55, [I('75')], 'NORTH', ['Marietta', 'Chattanooga'], { arrows: ['upleft'], tab: 'EXIT 251B', dist: '1 MILE', also: [{ shields: [I('85')], dir: 'NORTH', dests: ['Greenville'], arrows: ['upright'] }] }),
-      sign(0.8, [I('75')], 'NORTH', ['Marietta', 'Chattanooga'], { arrows: ['upleft'], tab: 'EXIT 251B', dist: '1/2 MILE', also: [{ shields: [I('85')], dir: 'NORTH', dests: ['Greenville'], arrows: ['upright'] }] }),
+    ],
+    exits: [
+      { at: 0.36, no: '249D', shields: [US('19'), US('29')], dests: ['Spring St', 'West Peachtree St'] },
+      { at: 0.5, no: '250', dests: ['10th St', '14th St', 'Georgia Tech'] },
+      { at: 0.64, no: '251A', dests: ['17th St', 'Midtown'] },
+      { at: 0.95, kind: 'fork', no: '251B', shields: [I('75')], dir: 'NORTH', dests: ['Marietta', 'Chattanooga'], also: [{ shields: [I('85')], dir: 'NORTH', dests: ['Greenville'], arrows: ['upright'] }], to: 'free-i85n', toLeft: 'free-i75n', name: 'I-75 NORTH · Marietta' },
     ],
     events: [{ t: 'vms', at: 0.04, text: 'SEVERE  STORM|REDUCE  SPEED' }, { t: 'merge', at: 0.18 }, { t: 'work', at: 0.3, len: 600 }, { t: 'police', at: 0.55 }, { t: 'merge', at: 0.62 }, { t: 'crash', at: 0.74 }, { t: 'tip', at: 0.92, title: 'Almost there', sub: 'Keep calm, keep your space, keep your signal on.' }],
     lessons: ['Calm hands, soft eyes, early signals.', 'Leave space and the road does half the work.', 'The best drivers are the ones nobody notices.'],
@@ -401,22 +455,55 @@ export const PHASES: { n: number; title: string; note: string }[] = [
   { n: 2, title: 'Phase 2 · Carrollton and country roads', note: 'Roundabouts, signs and curves' },
   { n: 3, title: 'Phase 3 · Town driving', note: 'Lights, rail crossings, school zones' },
   { n: 4, title: 'Phase 4 · Busy Atlanta streets', note: 'Rain, fog and night in the city' },
-  { n: 5, title: 'Phase 5 · Meet the interstate', note: 'Ramps, merging and 70 mph' },
+  { n: 5, title: 'Phase 5 · Meet the interstate', note: 'Ramps, merging and highway speed' },
   { n: 6, title: 'Phase 6 · Metro interstates', note: 'I-285, I-75, I-85, I-20 and GA-400' },
   { n: 7, title: 'Phase 7 · Big Atlanta interstates', note: 'The Connector, the airport, the Perimeter' },
   { n: 8, title: 'Phase 8 · Hazards and weather', note: 'Work zones, Move Over, fog, snow and storms' },
   { n: 9, title: 'Phase 9 · Master class', note: 'Rush hour and a night storm' },
 ];
 
+const MILE = 1609;
+/**
+ * Write the green signs for a stage's exits, forks and turns. Real interstates sign an exit three times: a mile out, half a mile out, and at the
+ * gore point where the lane peels off. Everything is built from the one `exits` list so the signs and the ramp in the road can never disagree.
+ */
+export function expandExits(st: AtlStage): AtlStage {
+  if (!st.exits?.length) return st;
+  const L = st.lengthM, D = (at: number) => 40 + at * (L - 90), A = (d: number) => Math.max(0.01, Math.min(0.99, (d - 40) / (L - 90)));
+  const extra: GuideSign[] = [];
+  for (const e of st.exits) {
+    const d = D(e.at), kind = e.kind ?? 'exit', tab = e.no ? `EXIT ${e.no}` : undefined;
+    if (kind === 'exit') {
+      if (e.quiet) { extra.push(sign(A(d - 150), e.shields, e.dir, e.dests, { tab, arrows: ['upright'], exitOnly: true, also: e.also })); continue; }
+      if (d - MILE > 120) extra.push(sign(A(d - MILE), e.shields, e.dir, e.dests, { tab, dist: '1 MILE', also: e.also }));
+      if (d - MILE / 2 > 120) extra.push(sign(A(d - MILE / 2), e.shields, e.dir, e.dests, { tab, dist: '1/2 MILE', also: e.also }));
+      extra.push(sign(A(d - 150), e.shields, e.dir, e.dests, { tab, arrows: ['upright'], exitOnly: true, also: e.also?.map((a) => ({ ...a, arrows: ['upright' as const] })) }));
+    } else if (kind === 'fork') {
+      if (d - MILE > 120) extra.push(sign(A(d - MILE), e.shields, e.dir, e.dests, { tab, dist: '1 MILE', also: e.also }));
+      extra.push(sign(A(d - MILE * 0.45), e.shields, e.dir, e.dests, { tab, dist: '1/2 MILE', also: e.also }));
+      extra.push(sign(A(d - 140), e.shields, e.dir, e.dests, { tab, arrows: ['upleft'], also: e.also }));
+    } else if (e.street) {
+      extra.push(sign(A(d - 9), undefined, undefined, [e.street], { arrows: [kind === 'left' ? 'left' : 'right'] }));
+    }
+  }
+  return { ...st, guide: [...st.guide, ...extra].sort((a, b) => a.at - b.at) };
+}
+
+/** the hand-written stage before its signs are expanded (free roam clones these) */
+export const rawAtlStage = (id: string): AtlStage | undefined => RAW.find((r) => r.id === id);
+const DYN = new Map<string, AtlStage>();
+/** free roam builds its legs at run time and registers them here so the engine finds them by id */
+export function registerAtlStage(st: AtlStage) { DYN.set(st.id, expandExits(st)); return st.id; }
+
 export const ATL_STAGES: AtlStage[] = PATH.map((p) => {
   const st = RAW.find((r) => r.id === p.id);
   if (!st) throw new Error(`atl path: missing stage ${p.id}`);
-  return { ...st, phase: p.phase, skills: p.skills, wxCap: p.wxCap };
+  return expandExits({ ...st, phase: p.phase, skills: p.skills, wxCap: p.wxCap });
 });
 
 export const ATL_PREFIX = 'atl-';
 export const isAtlId = (id: string) => id.startsWith(ATL_PREFIX);
-export const getAtlStage = (id: string): AtlStage | undefined => ATL_STAGES.find((s) => s.id === id);
+export const getAtlStage = (id: string): AtlStage | undefined => ATL_STAGES.find((s) => s.id === id) ?? DYN.get(id);
 
 /** Each Atlanta stage as an ordinary lesson card, so the menu, the scores and the report card handle it like any other. */
 export function atlLevels(): LevelConfig[] {
@@ -426,3 +513,8 @@ export function atlLevels(): LevelConfig[] {
   } as LevelConfig));
 }
 export type { StageEvent };
+
+/** a lesson card for a stage that was made at run time (free roam legs) */
+export function levelOfStage(s: AtlStage): LevelConfig {
+  return { id: s.id, name: s.name, subtitle: s.subtitle, length: s.lengthM * 10, speedLimit: s.limit, maxSpeed: s.maxSpeed, features: [], obstacleGap: 300, parScore: s.par, shoulderColor: 0x35414a } as LevelConfig;
+}

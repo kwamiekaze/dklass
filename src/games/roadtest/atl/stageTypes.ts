@@ -29,7 +29,30 @@ export interface GuideSign {
   left?: boolean;
   dist?: string;
   /** a second panel next to the first (the big gantries carry two or three) */
-  also?: { shields?: Shield[]; dir?: string; dests: string[]; arrows?: Arrow[]; exitOnly?: boolean }[];
+  also?: { shields?: Shield[]; dir?: string; dests: string[]; arrows?: Arrow[]; exitOnly?: boolean; tab?: string; dist?: string }[];
+}
+
+export type BranchKind = 'exit' | 'fork' | 'left' | 'right';
+/** A place where the road can be left: an interstate exit, a fork, or a left / right turn at an intersection. */
+export interface ExitSpec {
+  /** 0..1 along the stage, where the gore point (exit) or the intersection is */
+  at: number;
+  kind?: BranchKind;
+  /** exit number as printed on the green tab, e.g. "251B" */
+  no?: string;
+  shields?: Shield[];
+  dir?: string;
+  dests: string[];
+  /** second panel on the same sign (a fork) or the other direction of an interchange */
+  also?: GuideSign['also'];
+  /** street name on the blade sign at a turn */
+  street?: string;
+  /** free roam: the leg that follows when this branch is taken (a fork's left branch uses `toLeft`) */
+  to?: string; toLeft?: string;
+  /** what the banner says when the branch is taken */
+  name?: string;
+  /** the advance signs are written by hand (a gantry that shows several exits at once) */
+  quiet?: boolean;
 }
 
 export type StageEvent =
@@ -74,6 +97,14 @@ export interface AtlStage {
   /** the typical speed of traffic as a share of the limit (0.4 in a rush hour crawl, 1.05 on an open road) */
   flow: number;
   guide: GuideSign[];
+  /** exits, forks and turns: the signs for them are written from this list (see stages.ts) */
+  exits?: ExitSpec[];
+  /** start the run on an on-ramp beside the right lane, at ramp speed */
+  startRamp?: boolean;
+  /** two-way street with several lanes each way (left turns cross the oncoming lanes) */
+  twoway?: boolean;
+  /** free roam leg: ends at its end by handing on to `next` */
+  next?: string;
   events: StageEvent[];
   /** curve and hill character of the road */
   curves: 'straight' | 'gentle' | 'winding' | 'rolling';

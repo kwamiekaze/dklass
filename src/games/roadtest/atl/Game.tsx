@@ -26,7 +26,7 @@ import { clamp, damp, lerp, smooth } from '../g3d/util';
 import type { RunSim } from '../g3d/sim';
 import '../g3d/g3d.css';
 import './atl.css';
-import { AtlSim } from './sim';
+import { AtlSim, type LegEnd, type SimOpts } from './sim';
 import { getAtlStage } from './stages';
 import { AtlCtx, AtlWorld, makeCtx } from './World';
 import { Circles, GuideSigns, Lights, MessageBoards, PlayerRig, Peds, Props, Rails, RoadSigns, Stops, Traffic } from './Actors';
@@ -57,7 +57,7 @@ const readControls = () => ({
   right: !!(keys.ArrowRight || keys.KeyD) || touchControls.right,
 });
 
-export interface AtlHandle { sim: AtlSim; hud: HudState; paused: { current: boolean }; introT: number; skip: { current: boolean } }
+export interface AtlHandle { sim: AtlSim; hud: HudState; paused: { current: boolean }; introT: number; skip: { current: boolean }; /** free roam: this scene continues a drive, so no countdown and no loading screen */ cont?: boolean; legNo?: number }
 
 /** Work out this run's weather and time of day from the player's choices (random by default, weighted the way Georgia's weather really goes). */
 export function resolveRun(stageId: string): { weather: WeatherKind; tod: TimeOfDay | undefined } {
@@ -82,22 +82,25 @@ export function resolveRun(stageId: string): { weather: WeatherKind; tod: TimeOf
   return { weather, tod };
 }
 
+/** Build one scene handle. Free roam builds a new one for every leg and hands the score, the strikes and the speed on to it. */
+export function makeAtlHandle(levelId: string, difficulty: Difficulty, run: { weather: WeatherKind; tod: TimeOfDay | undefined }, opts: SimOpts & { cont?: boolean; legNo?: number } = {}): AtlHandle {
+  const sim = new AtlSim(levelId, difficulty, sound as unknown as Sfx, run.weather, run.tod, opts);
+  const hud = newHud();
+  hud.levelName = sim.level.name; hud.levelSub = sim.stage.subtitle; hud.difficulty = sim.difficulty.label; hud.mult = sim.difficulty.scoreMul; hud.limit = sim.stage.limit; hud.best = 0;
+  if (opts.cont) { hud.score = hud.display = sim.tracker.score; }
+  return { sim, hud, paused: { current: false }, introT: opts.cont ? 1 : 0, skip: { current: false }, cont: opts.cont, legNo: opts.legNo ?? 0 };
+}
+
 export function useAtlScene(levelId: string, difficulty: Difficulty): AtlHandle {
-  return useMemo(() => {
-    const { weather, tod } = resolveRun(levelId);
-    const sim = new AtlSim(levelId, difficulty, sound as unknown as Sfx, weather, tod);
-    const hud = newHud();
-    hud.levelName = sim.level.name; hud.levelSub = sim.stage.subtitle; hud.difficulty = sim.difficulty.label; hud.mult = sim.difficulty.scoreMul; hud.limit = sim.stage.limit; hud.best = 0;
-    return { sim, hud, paused: { current: false }, introT: 0, skip: { current: false } } as AtlHandle;
-  }, [levelId, difficulty]);
+  return useMemo(() => makeAtlHandle(levelId, difficulty, resolveRun(levelId)), [levelId, difficulty]);
 }
 
 const shake = { amp: 0, t: 0, dur: 0.01, punch: 0 };
 
-function Driver({ handle, onComplete, onReady }: { handle: AtlHandle; onComplete: (r: LevelResult) => void; onReady: () => void }) {
+function Driver({ handle, onComplete, onReady, onLeg }: { handle: AtlHandle; onComplete: (r: LevelResult) => void; onReady: () => void; onLeg?: (e: LegEnd) => void }) {
   const { sim, hud } = handle;
   const { camera, size } = useThree();
-  const intro = useRef(0), frames = useRef(0), ready = useRef(false), waited = useRef(0), errs = useRef(0), endWait = useRef(0);
+  const intro = useRef(handle.cont ? INTRO_SECONDS : 0), frames = useRef(0), ready = useRef(!!handle.cont), waited = useRef(0), legSent = useRef(false), errs = useRef(0), endWait = useRef(0);
   const prog = useProgress();
   const v = useMemo(() => new THREE.Vector3(), []);
   useEffect(() => bindKeys(), []);
@@ -142,6 +145,7 @@ function Driver({ handle, onComplete, onReady }: { handle: AtlHandle; onComplete
       if (sim.finished && !sim.isComplete) { if (!endWait.current) endWait.current = performance.now(); if (performance.now() - endWait.current > 2600) { sim.forceComplete(); for (const e of sim.drain()) dispatch(e); } }
     }
     errs.current = 0;
+    if (sim.leg && sim.free && !legSent.current && onLeg) { legSent.current = true; onLeg(sim.leg); }
     hud.score = sim.tracker.score;
     const diff = hud.score - hud.display;
     if (diff !== 0) { const step = Math.sign(diff) * Math.max(1, Math.ceil(Math.abs(diff) * Math.min(1, dt * 6))); hud.display = Math.abs(step) >= Math.abs(diff) ? hud.score : hud.display + step; }
@@ -161,7 +165,7 @@ const beat = { t: 0 };
 
 function CameraRig({ handle }: { handle: AtlHandle }) {
   const { sim } = handle;
-  const cam = useRef({ x: 0, t: 0, fov: 56, fin: 0 });
+  const cam = useRef({ x: sim.x, t: handle.cont ? 1 : 0, fov: 56, fin: 0 });
   const tmp = useMemo(() => ({ p: new THREE.Vector3(), l: new THREE.Vector3() }), []);
   useFrame(({ camera, size, clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05), c = cam.current, pc = camera as THREE.PerspectiveCamera;
@@ -192,7 +196,7 @@ function CameraRig({ handle }: { handle: AtlHandle }) {
   return null;
 }
 
-function Scene({ handle, carId, quality, bloom, onComplete, onReady }: { handle: AtlHandle; carId: GarageId; quality: Quality; bloom: boolean; onComplete: (r: LevelResult) => void; onReady: () => void }) {
+function Scene({ handle, carId, quality, bloom, onComplete, onReady, onLeg }: { handle: AtlHandle; carId: GarageId; quality: Quality; bloom: boolean; onComplete: (r: LevelResult) => void; onReady: () => void; onLeg?: (e: LegEnd) => void }) {
   const mix = useRef(TOD_MIX[handle.sim.stage.tod]);
   const ctx = useMemo(() => makeCtx(handle.sim, quality, mix), [handle, quality]);
   const rig = useRef<THREE.Group | null>(null);
@@ -205,7 +209,7 @@ function Scene({ handle, carId, quality, bloom, onComplete, onReady }: { handle:
         <PlayerRig carId={carId} lite={quality.lite} rig={rig} />
         <Sparks sim={sim} /><SpeedLines sim={sim} /><SkidMarks sim={sim} />
       </Suspense>
-      <Driver handle={handle} onComplete={onComplete} onReady={onReady} />
+      <Driver handle={handle} onComplete={onComplete} onReady={onReady} onLeg={onLeg} />
       <CameraRig handle={handle} />
     </AtlCtx.Provider>
   </NightCtx.Provider>;
@@ -257,8 +261,8 @@ function AtlHud({ handle }: { handle: AtlHandle }) {
   </div>;
 }
 
-export function AtlGame({ handle, onComplete, onLost }: { handle: AtlHandle; onComplete: (r: LevelResult) => void; onLost: () => void }) {
-  const [ready, setReady] = useState(false);
+export function AtlGame({ handle, onComplete, onLost, onLeg, fade }: { handle: AtlHandle; onComplete: (r: LevelResult) => void; onLost: () => void; onLeg?: (e: LegEnd) => void; fade?: boolean }) {
+  const [ready, setReady] = useState(!!handle.cont);
   const [carId] = useState(() => selectedCar().id);
   const done = useRef(onComplete); done.current = onComplete;
   const lost = useRef(onLost); useEffect(() => { lost.current = onLost; }, [onLost]);
@@ -288,7 +292,7 @@ export function AtlGame({ handle, onComplete, onLost }: { handle: AtlHandle; onC
     const unlock = () => { sound.init(); if (sound.isReady()) { sound.startEngine(); if (!sound.muted && !sound.musicMuted) sound.playTrack(track); } };
     window.addEventListener('keydown', unlock, { once: true }); window.addEventListener('pointerdown', unlock, { once: true });
     return () => { window.removeEventListener('keydown', unlock); window.removeEventListener('pointerdown', unlock); sound.stopEngine(); sound.stopMusic(); };
-  }, [handle]);
+  }, [handle.sim.level.id]);
   useEffect(() => {
     const skip = () => { handle.skip.current = true; };
     window.addEventListener('keydown', skip); window.addEventListener('pointerdown', skip);
@@ -308,10 +312,11 @@ export function AtlGame({ handle, onComplete, onLost }: { handle: AtlHandle; onC
       onCreated={({ gl }) => { if (import.meta.env.DEV) (window as unknown as { __gl?: unknown }).__gl = gl; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 0.92; gl.setClearColor('#e9dcc2'); gl.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); setCkey((k) => k + 1); }, { once: true }); }}
     >
       <PerformanceMonitor ms={350} iterations={8} flipflops={3} onDecline={() => setLvl((l) => clamp(l + 1, 0, 3))} onIncline={() => setLvl((l) => clamp(l - 1, 0, 3))} />
-      <Scene handle={handle} carId={carId} quality={quality} bloom={bloom} onComplete={onCompleteCb} onReady={() => setReady(true)} />
+      <Scene key={`${handle.sim.stage.id}:${handle.legNo ?? 0}`} handle={handle} carId={carId} quality={quality} bloom={bloom} onComplete={onCompleteCb} onReady={() => setReady(true)} onLeg={onLeg} />
     </Canvas>
     <Hud handle={handle as unknown as Parameters<typeof Hud>[0]['handle']} />
     <AtlHud handle={handle} />
+    {onLeg && <div className={`atl-fade${fade ? ' on' : ''}`} />}
     <div className={`rt3d-loading atl-loading${ready ? ' done' : ''}`} aria-hidden={ready}>
       <div className="rt3d-spin" />
       <h3>{st.name}</h3>

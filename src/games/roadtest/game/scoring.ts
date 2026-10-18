@@ -16,6 +16,8 @@ export const POINTS = {
   CIRCLE_YIELD: 100,
   KEEP_RIGHT: 10,
   WORK_ZONE_OK: 80,
+  EXIT_TAKEN: 60,
+  LEFT_YIELD: 100,
 
   HIT_CONE: -50,
   LANE_CROSS: -30,
@@ -34,6 +36,8 @@ export const POINTS = {
   SPEEDING_TICKET: -150,
   PULLED_OVER: -300,
   FAILED_TO_YIELD: -500,
+  LEFT_NO_YIELD: -250,
+  TURN_TOO_FAST: -60,
   HIT_PEDESTRIAN: 0, // catastrophic — ends run but preserves earned score
 } as const;
 
@@ -71,12 +75,16 @@ const LABELS: Record<string, string> = {
   SPEEDING_TICKET: 'Speeding ticket',
   PULLED_OVER: 'Pulled over for speeding',
   FAILED_TO_YIELD: 'Did not pull over for police',
+  EXIT_TAKEN: 'Took the exit safely',
+  LEFT_YIELD: 'Yielded to oncoming traffic on a left turn',
+  LEFT_NO_YIELD: 'Turned left in front of oncoming traffic',
+  TURN_TOO_FAST: 'Took a turn too fast',
 };
 
 export type PointKey = keyof typeof POINTS;
 
 /** Positive events that build the combo meter. */
-const POSITIVE_COMBO: PointKey[] = ['SIGNALLED', 'SAFE_GAP', 'MOVE_OVER', 'RAIL_STOP', 'CIRCLE_YIELD', 'WORK_ZONE_OK', 'STAR', 'CHECKPOINT', 'FULL_STOP', 'GREEN_LIGHT', 'SMOOTH_DRIVING', 'NEAR_MISS', 'PED_SAFE_PASS'];
+const POSITIVE_COMBO: PointKey[] = ['SIGNALLED', 'SAFE_GAP', 'MOVE_OVER', 'RAIL_STOP', 'CIRCLE_YIELD', 'WORK_ZONE_OK', 'EXIT_TAKEN', 'LEFT_YIELD', 'STAR', 'CHECKPOINT', 'FULL_STOP', 'GREEN_LIGHT', 'SMOOTH_DRIVING', 'NEAR_MISS', 'PED_SAFE_PASS'];
 
 export class ScoreTracker {
   private counts = new Map<PointKey, number>();

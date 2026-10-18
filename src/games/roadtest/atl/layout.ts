@@ -31,7 +31,7 @@ export interface Layout {
 
 export function layoutFor(s: AtlStage): Layout {
   const L = s.lanes, W = LANE;
-  if (s.road === 'interstate' || (s.road === 'arterial' && L >= 2)) {
+  if (s.road === 'interstate' || (s.road === 'arterial' && L >= 2 && !s.twoway)) {
     const inter = s.road === 'interstate';
     const half = (L * W) / 2;
     const xs = Array.from({ length: L }, (_, i) => -half + W / 2 + i * W);

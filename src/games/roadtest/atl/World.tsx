@@ -18,6 +18,7 @@ import type { RunSim } from '../g3d/sim';
 import { Bloom } from '../g3d/Bloom';
 import { bendMaterial, makeBend, PATHS, pathXd, stepBend, type BendUniforms, type PathSpec } from './path';
 import { LANE } from './layout';
+import { ACC, EXIT, accStrip, exitStrip, type Strip } from './ramps';
 import { adTexture, ROAD_TILE, roadTexture, skylineTexture } from './textures';
 import type { AtlSim } from './sim';
 import type { AtlStage } from './stageTypes';
@@ -188,6 +189,76 @@ function Edges() {
   return <>{geos.map((o, i) => <mesh key={i} geometry={o.g} material={o.m} receiveShadow />)}</>;
 }
 
+
+// ------------------------------------------------------------------ exit ramps, on-ramps and side streets ---
+/** A strip of pavement along the road whose centre and width come from a function of the distance, plus its white edge lines. */
+function stripGeometry(fn: (dd: number) => Strip | null, from: number, to: number, y: number, step = 6) {
+  const pos: number[] = [], idx: number[] = []; let n = 0;
+  const lineW = 0.16, linePos: number[] = [], lineIdx: number[] = []; let ln = 0;
+  for (let dd = from; dd <= to + 0.001; dd += step) {
+    const sP = fn(dd); if (!sP) continue;
+    const l = sP.c - sP.w / 2, r = sP.c + sP.w / 2;
+    pos.push(l, y, -dd, r, y, -dd); n++;
+    if (n > 1) { const a = (n - 2) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    const w = Math.max(0.0001, sP.w);
+    linePos.push(r - lineW, y + 0.012, -dd, r, y + 0.012, -dd, l, y + 0.012, -dd, l + lineW * Math.min(1, w), y + 0.012, -dd); ln++;
+    if (ln > 1) { const a = (ln - 2) * 4; lineIdx.push(a, a + 1, a + 4, a + 1, a + 5, a + 4, a + 2, a + 3, a + 6, a + 3, a + 7, a + 6); }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  const gl = new THREE.BufferGeometry(); gl.setAttribute('position', new THREE.Float32BufferAttribute(linePos, 3)); gl.setIndex(lineIdx); gl.computeVertexNormals();
+  return { g, gl };
+}
+
+function Ramps() {
+  const { sim, bend, stage } = useAtl();
+  const lay = sim.lay;
+  const asphalt = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ color: '#35363b', roughness: 0.92, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), bend), [bend]);
+  const paint = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ color: '#f3f1ea', roughness: 0.7, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), bend), [bend]);
+  const items = useMemo(() => {
+    if (lay.kind !== 'divided') return [] as { ref: number; geo: ReturnType<typeof stripGeometry>; pre: number; len: number }[];
+    const out: { ref: number; geo: ReturnType<typeof stripGeometry>; pre: number; len: number }[] = [];
+    for (const b of sim.branches) if (b.kind === 'exit') out.push({ ref: b.d, geo: stripGeometry((dd) => exitStrip(lay, dd), -EXIT.pre, EXIT.len, 0.03), pre: EXIT.pre, len: EXIT.len });
+    for (const m of sim.merges) out.push({ ref: m, geo: stripGeometry((dd) => accStrip(lay, dd), -ACC.par, ACC.taper, 0.03), pre: ACC.par, len: ACC.taper });
+    if (sim.rampStart) out.push({ ref: ACC.par, geo: stripGeometry((dd) => accStrip(lay, dd), -ACC.par, ACC.taper, 0.03), pre: ACC.par, len: ACC.taper });
+    return out;
+  }, [sim, lay]);
+  const refs = useRef<(THREE.Group | null)[]>([]);
+  useFrame(() => {
+    const T = sim.traveled;
+    items.forEach((it, i) => { const g = refs.current[i]; if (!g) return; g.position.z = T - it.ref; const rel = it.ref - T; g.visible = rel - it.pre < AHEAD + 40 && rel > -it.len - 60; });
+  });
+  void stage;
+  return <>{items.map((it, i) => <group key={i} ref={(g) => { refs.current[i] = g; }}>
+    <mesh geometry={it.geo.g} material={asphalt} receiveShadow renderOrder={2} frustumCulled={false} />
+    <mesh geometry={it.geo.gl} material={paint} renderOrder={3} frustumCulled={false} />
+  </group>)}</>;
+}
+
+/** The side streets at the turns of a city route: a strip of pavement across the road with its centre line. */
+function Crossroads() {
+  const { sim, bend } = useAtl();
+  const lay = sim.lay;
+  const asphalt = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ color: '#37383d', roughness: 0.92, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }), bend), [bend]);
+  const yellow = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ color: '#f0b81c', roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -5 }), bend), [bend]);
+  const white = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ color: '#f3f1ea', roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -5 }), bend), [bend]);
+  const items = useMemo(() => (lay.kind === 'twoway' ? sim.branches.filter((b) => b.kind === 'left' || b.kind === 'right') : []), [sim, lay]);
+  const refs = useRef<(THREE.Group | null)[]>([]);
+  useFrame(() => { const T = sim.traveled; items.forEach((b, i) => { const g = refs.current[i]; if (!g) return; g.position.z = T - b.d; const rel = b.d - T; g.visible = rel < AHEAD + 40 && rel > -80; }); });
+  const W = 11, x0 = lay.edgeL - 80, x1 = lay.edgeR + 80;
+  return <>{items.map((b, i) => {
+    const left = b.kind === 'left', xa = left ? x0 : lay.edgeR, xb = left ? lay.edgeL : x1;
+    return <group key={i} ref={(g) => { refs.current[i] = g; }}>
+      {/* the street itself, a little above the sidewalk so it cuts through it */}
+      <mesh position={[(xa + xb) / 2, 0.16, 0]} rotation={[-Math.PI / 2, 0, 0]} material={asphalt} renderOrder={4}><planeGeometry args={[xb - xa + 0.4, W]} /></mesh>
+      {/* the part across the road itself */}
+      <mesh position={[(lay.edgeL + lay.edgeR) / 2, 0.035, 0]} rotation={[-Math.PI / 2, 0, 0]} material={asphalt} renderOrder={4}><planeGeometry args={[lay.edgeR - lay.edgeL, W]} /></mesh>
+      {/* its centre line and the crosswalk and stop bar of the main road */}
+      <mesh position={[(xa + xb) / 2, 0.175, 0]} rotation={[-Math.PI / 2, 0, 0]} material={yellow} renderOrder={5}><planeGeometry args={[xb - xa, 0.14]} /></mesh>
+      {[-1, 1].map((sd) => <mesh key={sd} position={[(lay.edgeL + lay.edgeR) / 2, 0.05, sd * (W / 2 + 0.5)]} rotation={[-Math.PI / 2, 0, 0]} material={white} renderOrder={5}><planeGeometry args={[lay.edgeR - lay.edgeL, 0.5]} /></mesh>)}
+    </group>;
+  })}</>;
+}
+
 // ------------------------------------------------------------------ recycled scenery ---
 export interface Slot { x: number; y: number; z: number; ry: number; sx: number; sy: number; sz: number; color?: THREE.Color }
 
@@ -291,6 +362,15 @@ function Scenery() {
   });
   const urban = URBAN[stage.region];
   const right = lay.edgeR, left = lay.edgeL;
+  /** the right-hand barrier and sound wall stop where a ramp joins or leaves, so the ramp is open to the road */
+  const rampGaps = useMemo(() => {
+    const z: [number, number][] = [];
+    for (const b of sim.branches) if (b.kind === 'exit') z.push([b.d - EXIT.pre - 10, b.d + EXIT.len * 0.5]);
+    for (const m of sim.merges) z.push([m - ACC.par - 10, m + ACC.taper + 10]);
+    if (sim.rampStart) z.push([-60, ACC.par + ACC.taper + 10]);
+    return z;
+  }, [sim]);
+  const inRamp = (d: number) => rampGaps.some(([a, b]) => d >= a && d <= b);
   const rightOff = lay.sidewalks ? 3 : inter ? 1.8 : 1.4, leftOff = lay.sidewalks ? 3 : inter ? 1.8 : 1.4;
   const treeProb = stage.trees === 'none' ? 0 : inter ? 0.6 : 0.7;
   const pines = stage.trees === 'pine' || (stage.trees === 'mixed' && false);
@@ -333,10 +413,10 @@ function Scenery() {
 
     {/* the edges of the road: guardrail on a country interstate, sound walls through the city, plain posts on a street */}
     {inter && !wallsOn && <>
-      <Repeat geometry={G.rail} material={M.guard} spacing={6} per={2} make={(c, k) => ({ x: k ? right - 0.15 : left + 0.15, y: 0, z: 0, ry: 0, sx: 1, sy: 1, sz: 1 })} />
-      <Repeat geometry={G.post} material={M.concreteDark} spacing={3} per={2} make={(c, k) => ({ x: k ? right - 0.15 : left + 0.15, y: 0, z: 0, ry: 0, sx: 1, sy: 1, sz: 1 })} />
+      <Repeat geometry={G.rail} material={M.guard} spacing={6} per={2} make={(c, k) => (k && inRamp(c * 6) ? null : { x: k ? right - 0.15 : left + 0.15, y: 0, z: 0, ry: 0, sx: 1, sy: 1, sz: 1 })} />
+      <Repeat geometry={G.post} material={M.concreteDark} spacing={3} per={2} make={(c, k) => (k && inRamp(c * 3) ? null : { x: k ? right - 0.15 : left + 0.15, y: 0, z: 0, ry: 0, sx: 1, sy: 1, sz: 1 })} />
     </>}
-    {inter && wallsOn && <Repeat geometry={G.wall} material={M.concrete} spacing={8} per={1} make={(c) => (hash(c, 2) < 0.12 ? null : { x: right + 0.8, y: 0, z: 0, ry: 0, sx: 1, sy: 0.75 + hash(c, 4) * 0.5, sz: 1 })} />}
+    {inter && wallsOn && <Repeat geometry={G.wall} material={M.concrete} spacing={8} per={1} make={(c) => (hash(c, 2) < 0.12 || inRamp(c * 8) ? null : { x: right + 0.8, y: 0, z: 0, ry: 0, sx: 1, sy: 0.75 + hash(c, 4) * 0.5, sz: 1 })} />}
     {inter && <Repeat geometry={G.pole} material={M.pole} spacing={lampSpace * 1.5} per={1} make={(c) => ({ x: right + (wallsOn ? 2.2 : 1.6), y: 0, z: 6 + hash(c, 1) * 0, ry: 0, sx: 0.8, sy: 0.7, sz: 0.8 })} />}
     {inter && <Repeat geometry={G.head} material={M.lamp} spacing={lampSpace * 1.5} per={1} make={(c) => ({ x: right + (wallsOn ? 2.2 : 1.6), y: 0, z: 6, ry: Math.PI, sx: 0.8, sy: 0.7, sz: 0.8 })} />}
 
@@ -445,6 +525,8 @@ export function AtlWorld({ quality, bloom, mixRef }: { quality: Quality; bloom: 
     <Ground />
     <RoadSurface />
     <Edges />
+    <Ramps />
+    <Crossroads />
     <Scenery />
     <Billboards />
     <Weather lite={lite} />
