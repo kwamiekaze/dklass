@@ -231,12 +231,12 @@ function AtlHud({ handle }: { handle: AtlHandle }) {
       const rd = q('.atl-radar');
       if (rd) {
         const live = sim.stage.road === 'interstate', ph = sim.patrolPhase;
-        rd.dataset.s = !live ? 'off' : ph !== 'none' ? 'cop' : sim.fastT > 0.15 ? 'warn' : sim.tickets > 0 || sim.mph > 74 ? 'idle' : 'off';
+        rd.dataset.s = !live ? 'off' : ph !== 'none' && !sim.finished ? 'cop' : sim.fastT > 0.15 ? 'warn' : sim.tickets > 0 || sim.mph > 74 ? 'idle' : 'off';
         const u = rd.querySelector('u') as HTMLElement | null; if (u) u.style.width = `${Math.min(100, (ph !== 'none' ? 1 : sim.fastT / 5) * 100)}%`;
         rd.querySelectorAll('s').forEach((el, i) => el.classList.toggle('on', i < sim.tickets));
         const t = rd.querySelector('b'); if (t) t.textContent = ph === 'none' ? (sim.fastT > 0.15 ? `OVER 80 · ${Math.max(0, 5 - sim.fastT).toFixed(1)}s` : sim.tickets > 0 ? 'TICKETS' : 'SPEED WATCH') : ph === 'pull' || ph === 'stop' ? 'PULL OVER' : 'POLICE';
       }
-      const cf = q('.atl-copflash'); if (cf) cf.dataset.on = sim.patrolPhase !== 'none' ? (Math.floor(now / 170) % 2 ? 'a' : 'b') : '';
+      const cf = q('.atl-copflash'); if (cf) cf.dataset.on = sim.patrolPhase !== 'none' && !sim.finished ? (Math.floor(now / 170) % 2 ? 'a' : 'b') : '';   // the lights stop with the run
       if (sim.prompt !== lastPrompt) { lastPrompt = sim.prompt; promptAt = now; const p = q('.atl-prompt'); if (p) { p.textContent = sim.prompt; p.classList.remove('show'); void p.offsetWidth; p.classList.add('show'); } }
       if (now - promptAt > 7500) q('.atl-prompt')?.classList.remove('show');
     };
