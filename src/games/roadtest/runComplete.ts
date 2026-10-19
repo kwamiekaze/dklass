@@ -51,8 +51,8 @@ export function processRunResult(r: LevelResult): RunAftermath {
   writeN(LESSONS_DONE_KEY, lessonsDone);
 
   // Star rating 0-5 for XP.
-  const par = level?.parScore ?? 1000;
-  const starRating = Math.max(0, Math.min(5, Math.round((r.score / par) * 5)));
+  const par = r.parScore ?? level?.parScore ?? 1000;
+  const starRating = r.voided ? 0 : Math.max(0, Math.min(5, Math.round((r.score / par) * 5)));
   const xp = awardXpForRun(r.score, { passed: r.passed, stars: starRating, daily: isDaily });
 
   // Achievements.

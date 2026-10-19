@@ -10,7 +10,7 @@
  * The 3D scene only READS this object each frame; the sim never touches three, the DOM or Phaser.
  */
 import { getLevel } from '../game/levels';
-import { ScoreTracker, buildResult, type PointKey } from '../game/scoring';
+import { ScoreTracker, buildResult, deltaCue, labelOf, POINTS, type PointKey } from '../game/scoring';
 import { getDifficulty, type Difficulty, type DifficultyConfig, type LevelConfig, type LevelResult, type ObstacleType } from '../game/types';
 
 export const LANE_W = 3.4;
@@ -90,6 +90,7 @@ export type SimEvent =
   | { k: 'catastrophe'; dog: boolean }
   | { k: 'speedWarn' }
   | { k: 'milestone'; text: string }
+  | { k: 'delta'; kind: 'up' | 'down' | 'strike' | 'crit'; chip: string; sub?: string; tierUp: boolean; tierDown: boolean; tier: number; strikes: number; points: number }
   | { k: 'pickup'; type: 'magnet' | 'shield' | 'star' }
   | { k: 'complete'; result: LevelResult };
 
@@ -122,7 +123,8 @@ export class RunSim {
   // pickups
   magnetUntil = 0;
   hasShield = false;
-  strikes = 0;
+  /** Crash strikes live on the tracker, so the score, the streak and the safety record always agree. */
+  get strikes() { return this.tracker.strikes; }
 
   // stats the HUD and the end banner like
   nearMisses = 0;
@@ -135,6 +137,7 @@ export class RunSim {
   private speedWarned = false;
   private cleanTimer = 0;
   private laneCrossing = false;
+  private lanePrevX = 0;
   private laneCrossCooldown = 0;
   private lastRampAt = 0;
   private endlessSpawnCursor = L(500);
@@ -310,14 +313,25 @@ export class RunSim {
 
   award(key: PointKey, label?: string): number {
     const pts = this.tracker.add(key);
-    const sign = pts >= 0 ? '+' : '';
-    const comboTag = pts > 0 && this.tracker.combo > 1 ? ` x${this.tracker.combo}` : '';
-    this.float(`${label ?? ''} ${sign}${pts}${comboTag}`.trim(), pts >= 0);
-    if (pts < 0) {
+    const d = this.tracker.last!;
+    const cue = deltaCue(d);
+    const good = d.severity === 'reward';
+    const comboTag = good && this.tracker.combo > 1 ? ` x${this.tracker.combo}` : '';
+    this.float(`${label ?? ''} ${cue.chip}${comboTag}`.trim(), good);
+    this.emit({ k: 'delta', kind: cue.kind, chip: cue.chip, sub: cue.sub, tierUp: cue.tierUp, tierDown: cue.tierDown, tier: cue.tier, strikes: cue.strikes, points: pts });
+    if (!good) {
       this.cleanTimer = 0;
-      this.emit({ k: 'shake', amp: 0.5, dur: 0.15 });
-    }
+      this.emit({ k: 'shake', amp: cue.kind === 'strike' || cue.kind === 'crit' ? 0.9 : 0.5, dur: 0.15 });
+      if (cue.kind === 'strike') this.snd('strikeHit');
+      else if (cue.tierDown) this.snd('tierDown');
+    } else if (cue.tierUp) this.snd('tierUp');
     this.snd('setSfxPitchStep', Math.max(0, this.tracker.combo - 1));
+    // Three strikes ends the exam, on every course.
+    if (!this.finished && !d.examOver) return pts;
+    if (!this.finished && d.severity === 'strike') {
+      this.emit({ k: 'banner', title: 'EXAM OVER', sub: 'Three strikes. Your safety record ran out', ms: 2200, tone: 'red' });
+      this.after(0.9, () => this.finish());
+    }
     return pts;
   }
 
@@ -341,7 +355,7 @@ export class RunSim {
     this.laneDiscipline(dt);
     this.checkSpeeding(dt);
     this.checkSmooth(dt);
-    if (!this.level.endless && this.traveled >= this.effectiveLength) this.finish();
+    if (!this.level.endless && this.traveled >= this.effectiveLength) this.finish(true);
   }
 
   private drive(dt: number, c: Controls) {
@@ -517,14 +531,14 @@ export class RunSim {
 
   private catastrophe(ob: Ob) {
     const dog = ob.type === 'dog';
-    this.tracker.zeroOut('HIT_PEDESTRIAN');
+    this.award(dog ? 'HIT_ANIMAL' : 'HIT_PEDESTRIAN', dog ? 'ANIMAL' : 'PEDESTRIAN');
     this.snd('catastrophe');
     if (dog) this.snd('ownerShout');
     try { navigator.vibrate?.([80, 40, 120]); } catch { /* ignore */ }
     this.emit({ k: 'shake', amp: 1.6, dur: 0.5 });
     this.emit({ k: 'flash', color: 0xff2820, dur: 0.4 });
     this.emit({ k: 'catastrophe', dog });
-    this.emit({ k: 'banner', title: dog ? 'GAME OVER - HIT A DOG!' : 'GAME OVER - PEDESTRIAN!', ms: 2400, tone: 'red' });
+    this.emit({ k: 'banner', title: dog ? 'GAME OVER: HIT A DOG' : 'GAME OVER: PEDESTRIAN', sub: dog ? 'You keep 25% of your points' : 'You keep 10% of your points', ms: 2400, tone: 'red' });
     this.timeScale = 0.35;
     this.locked = true;
     ob.fly = { t: 0, vx: ob.mph && ob.mph > 0 ? 2 : -2, vd: 4, spin: 6 };
@@ -574,22 +588,22 @@ export class RunSim {
       this.emit({ k: 'shake', amp: 1.1, dur: 0.35 });
       this.emit({ k: 'flash', color: 0xff5a4e, dur: 0.18 });
       try { navigator.vibrate?.(60); } catch { /* ignore */ }
-      if (this.level.endless) {
-        this.strikes++;
-        if (this.strikes >= 3) this.after(0.6, () => this.finish());
-      }
     }
   }
 
   private laneDiscipline(dt: number) {
     this.laneCrossCooldown = Math.max(0, this.laneCrossCooldown - dt);
     const onDivider = DIVIDERS.some((d) => Math.abs(this.x - d) < X(18));
+    const moveDir = Math.sign(this.x - this.lanePrevX);
+    this.lanePrevX = this.x;
     if (onDivider && this.mph > 6) {
       if (!this.laneCrossing && this.laneCrossCooldown === 0) {
         this.laneCrossing = true;
         this.laneCrossCooldown = 1.2;
         let target = 0, best = Infinity;
         for (let i = 0; i < 3; i++) { const d = Math.abs(this.x - LANE_X[i]!); if (d < best) { best = d; target = i; } }
+        // judge the lane being moved INTO (by direction of travel), not the one being left, so bailing out of a blocked lane is never punished
+        if (moveDir !== 0) { const div = DIVIDERS.reduce((b, d) => (Math.abs(this.x - d) < Math.abs(this.x - b) ? d : b), DIVIDERS[0]!); target = moveDir > 0 ? (div < 0 ? 1 : 2) : (div < 0 ? 0 : 1); }
         let unsafe = false, reason = 'UNSAFE LANE CHANGE';
         for (const ob of this.obstacles) {
           if (ob.resolved || ob.hit) continue;
@@ -623,10 +637,16 @@ export class RunSim {
 
   endEarly() { this.finish(); }
 
-  private finish() {
+  private finish(completed = false) {
     if (this.finished) return;
     this.finished = true;
-    if (!this.level.endless) this.tracker.add('FINISH_BONUS');
+    const paid = completed && !this.level.endless && !this.tracker.examOver;
+    if (paid) {
+      this.tracker.add('FINISH_BONUS');
+      this.tracker.settle();
+      const bonuses = (['NO_CRASH_BONUS', 'SPOTLESS_BONUS', 'STREAK_MASTER'] as const).filter((k) => this.tracker.countOf(k) > 0);
+      bonuses.forEach((k, i) => this.after(0.35 * (i + 1), () => this.emit({ k: 'milestone', text: `${labelOf(k)} +${POINTS[k]}` })));
+    }
     this.snd('fanfare'); this.snd('setSfxPitchStep', 0); this.snd('setEndlessIntensity', 0);
     if (this.level.endless) {
       try {
@@ -635,10 +655,10 @@ export class RunSim {
       } catch { /* ignore */ }
     }
     this.emit({ k: 'finish', endless: !!this.level.endless });
-    this.emit({ k: 'banner', title: this.level.endless ? 'RUN OVER' : 'FINISH!', ms: 1500, tone: 'gold' });
+    this.emit({ k: 'banner', title: this.level.endless ? 'RUN OVER' : paid ? 'FINISH!' : 'EXAM OVER', ms: 1500, tone: paid || this.level.endless ? 'gold' : 'red' });
     this.after(1.5, () => {
       this.pendingResult = true;
-      this.emit({ k: 'complete', result: buildResult(this.level, this.tracker, this.difficulty, { distance: Math.round(this.travelPx) }) });
+      this.emit({ k: 'complete', result: buildResult(this.level, this.tracker, this.difficulty, { distance: Math.round(this.travelPx), completed: paid }) });
     });
   }
 

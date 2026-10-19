@@ -14,6 +14,7 @@ import { touchControls } from '../game/controls';
 import type { Difficulty, LevelResult } from '../game/types';
 import { pickTrackForLevel, sound } from '../sound';
 import type { Sfx, SimEvent } from '../g3d/sim';
+import { TIER_NAMES } from '../game/scoring';
 import { loadConditions } from '../g3d/conditions';
 import { rollGeorgiaWeather, KIND_LABEL, KINDS, type WeatherKind } from '../g3d/atmo';
 import { TOD_MIX, type TimeOfDay } from '../g3d/themes';
@@ -29,6 +30,7 @@ import './atl.css';
 import { AtlSim, type LegEnd, type SimOpts } from './sim';
 import { getAtlStage } from './stages';
 import { AtlCtx, AtlWorld, makeCtx } from './World';
+import { bridgeDuck, GIRDER_BOTTOM } from './Overpasses';
 import { Circles, GuideSigns, Lights, MessageBoards, PlayerRig, Peds, Props, Rails, RoadSigns, Stops, Traffic } from './Actors';
 
 export const INTRO_SECONDS = 2.3;
@@ -120,6 +122,7 @@ function Driver({ handle, onComplete, onReady, onLeg }: { handle: AtlHandle; onC
       case 'finish': fx.emit({ x: sim.x, y: 5, d: sim.traveled + 6, n: 130, color: [0xf2c14e, 0xffffff, 0xff4d4d, 0x29e069, 0x4da6ff], speed: 6, up: 5, life: 2.4, size: 0.5, gravity: 4, shape: 'confetti', drag: 0.8 }); hud.finished = true; break;
       case 'catastrophe': hud.catastrophe = true; fx.emit({ x: sim.x, y: 1, d: sim.traveled + 2, n: 60, color: [0xff2a1a, 0xff8a6e], speed: 6, up: 4, life: 1.1, size: 0.5 }); break;
       case 'speedWarn': hud.speedWarn = now; break;
+      case 'delta': hud.deltas.push({ kind: e.kind, chip: e.chip, sub: e.sub, born: now }); if (hud.deltas.length > 6) hud.deltas.shift(); if (e.tierUp) hud.toasts.push({ text: e.sub ?? 'STREAK UP', born: now }); break;
       case 'milestone': hud.toasts.push({ text: e.text, born: now }); break;
       case 'complete': hud.complete = e.result; onComplete(e.result); break;
       default: break;
@@ -150,7 +153,7 @@ function Driver({ handle, onComplete, onReady, onLeg }: { handle: AtlHandle; onC
     const diff = hud.score - hud.display;
     if (diff !== 0) { const step = Math.sign(diff) * Math.max(1, Math.ceil(Math.abs(diff) * Math.min(1, dt * 6))); hud.display = Math.abs(step) >= Math.abs(diff) ? hud.score : hud.display + step; }
     hud.mph = sim.mph; hud.over = sim.speeding; hud.combo = sim.tracker.combo; hud.maxCombo = sim.tracker.maxCombo; hud.stars = sim.tracker.starsCollected;
-    hud.progress = sim.progress; hud.strikes = sim.strikes; hud.limit = sim.speedLimitNow; hud.distance = sim.travelPx;
+    hud.progress = sim.progress; hud.strikes = sim.strikes; hud.limit = sim.speedLimitNow; hud.distance = sim.travelPx; hud.tierProg = sim.tracker.tierProgress; hud.tierName = TIER_NAMES[sim.tracker.combo - 1] ?? '';
     } catch (err) {
       if (import.meta.env.DEV) console.error('atl frame', err);
       // a frame that keeps failing would freeze the game with no way out: end the run and show the options
@@ -165,7 +168,7 @@ const beat = { t: 0 };
 
 function CameraRig({ handle }: { handle: AtlHandle }) {
   const { sim } = handle;
-  const cam = useRef({ x: sim.x, t: handle.cont ? 1 : 0, fov: 56, fin: 0 });
+  const cam = useRef({ x: sim.x, t: handle.cont ? 1 : 0, fov: 56, fin: 0, duck: 0 });
   const tmp = useMemo(() => ({ p: new THREE.Vector3(), l: new THREE.Vector3() }), []);
   useFrame(({ camera, size, clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05), c = cam.current, pc = camera as THREE.PerspectiveCamera;
@@ -175,6 +178,7 @@ function CameraRig({ handle }: { handle: AtlHandle }) {
     c.x = damp(c.x, sim.x, 7, dt);
     c.t = damp(c.t, handle.introT >= 1 ? 1 : clamp(handle.introT * 1.12, 0, 1), 9, dt);
     const e = smooth(0, 1, c.t);
+    c.duck = damp(c.duck, bridgeDuck(sim.traveled, back), 5, dt);
     const over = Math.max(0, c.x - 5.8); let px = c.x * 0.6 + over * 0.9, py = up, pz = back, lx = c.x * 0.4 + over * 0.8, ly = lookY, lz = lookZ;
     if (e < 0.999) { const a = lerp(2.5, 0, e), R = lerp(6.4, back, e), h = lerp(1.25, up, e); px = sim.x + Math.sin(a) * R * 0.9; pz = Math.cos(a) * R; py = h; lx = lerp(sim.x, c.x * 0.4, e); ly = lerp(0.85, lookY, e); lz = lerp(0, lookZ, e); }
     if (sim.finished) {
@@ -182,6 +186,8 @@ function CameraRig({ handle }: { handle: AtlHandle }) {
       if (handle.hud.catastrophe) { px = sim.x + 2.2; pz = 4.2; py = 1.9; lx = sim.x; ly = 0.7; lz = -2; }
       else { px = sim.x + Math.sin(a) * R; pz = Math.cos(a) * R * 0.85; py = lerp(up, 2.6, smooth(0, 1.2, c.fin)); lx = sim.x; ly = 1.0; lz = -2 - 8 * (1 - smooth(0, 1.2, c.fin)); }
     }
+    // under a bridge the chase camera drops below the girders and the view comes down with it, so it never passes through the deck
+    if (!sim.finished && e > 0.999 && c.duck > 0.001) { const lowY = Math.min(py, GIRDER_BOTTOM - 1.3); py = lerp(py, lowY, c.duck); ly = lerp(ly, Math.min(ly, 0.9), c.duck); }
     tmp.p.set(px, py, pz); tmp.l.set(lx, ly, lz);
     if (shake.t > 0) { shake.t -= dt; const f = Math.max(0, shake.t / shake.dur) * shake.amp; tmp.p.x += (Math.random() - 0.5) * 0.28 * f; tmp.p.y += (Math.random() - 0.5) * 0.22 * f; tmp.l.x += (Math.random() - 0.5) * 0.3 * f; if (shake.t <= 0) shake.amp = 0; }
     shake.punch = damp(shake.punch, 0, 7, dt);

@@ -81,6 +81,14 @@ export interface LevelResult {
   feedback: string[];
   passed: boolean;
   distance?: number;      // for endless mode
+  /** Points earned and lost over the run, before the difficulty multiplier. */
+  /** The par for this level at this difficulty, on the same scale as `score`. */
+  parScore?: number;
+  gained?: number;
+  lost?: number;
+  strikes?: number;
+  maxCombo?: number;
+  voided?: boolean;
   isNewBest?: boolean;
   previousBest?: number;
 }

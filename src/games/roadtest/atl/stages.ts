@@ -16,7 +16,7 @@ const base = (s: Partial<AtlStage> & Pick<AtlStage, 'id' | 'name' | 'subtitle' |
 
 const RAW: AtlStage[] = [
   base({
-    id: 'atl-connector-north', limit: 55, name: 'Downtown Connector North', subtitle: 'I-75/85 N · Five lanes through the heart of Atlanta', roadName: 'I-75/85 NORTH', region: 'downtown', skyline: 'downtown', lanes: 5, hov: true, lengthM: 4200, tod: 'dusk', traffic: 1.0, curves: 'rolling', par: 1700, walls: 'glass', place: 'Downtown Atlanta',
+    id: 'atl-connector-north', limit: 55, name: 'Downtown Connector North', subtitle: 'I-75/85 N · Five lanes through the heart of Atlanta', roadName: 'I-75/85 NORTH', region: 'downtown', skyline: 'downtown', lanes: 5, hov: true, lengthM: 4200, tod: 'dusk', traffic: 1.0, curves: 'rolling', par: 4200, walls: 'glass', place: 'Downtown Atlanta',
     guide: [
       sign(0.07, [I('75'), I('85')], 'NORTH', ['Chattanooga', 'Greenville'], { arrows: ['up'] }),
     ],
@@ -31,7 +31,7 @@ const RAW: AtlStage[] = [
     lessons: ['Downtown traffic bunches up. Leave a 3 second gap behind the car ahead.', 'Ramps feed in from the right. Make room if you can do it safely.', 'Never cut across the white gore stripes to catch an exit.'],
   }),
   base({
-    id: 'atl-connector-south', limit: 55, name: 'Downtown Connector South', subtitle: 'I-75/85 S · Skyline in the mirror, airport ahead', roadName: 'I-75/85 SOUTH', region: 'downtown', skyline: 'downtown', lanes: 5, lengthM: 4200, tod: 'golden', traffic: 1.0, curves: 'rolling', par: 1700, place: 'Downtown Atlanta',
+    id: 'atl-connector-south', limit: 55, name: 'Downtown Connector South', subtitle: 'I-75/85 S · Skyline in the mirror, airport ahead', roadName: 'I-75/85 SOUTH', region: 'downtown', skyline: 'downtown', lanes: 5, lengthM: 4200, tod: 'golden', traffic: 1.0, curves: 'rolling', par: 4600, place: 'Downtown Atlanta',
     guide: [
       sign(0.06, [I('75'), I('85')], 'SOUTH', ['Macon', 'Montgomery'], { arrows: ['up'] }),
       sign(0.42, undefined, undefined, ['Memorial Drive'], { tab: 'LEFT · HOV EXIT', dist: '1 MILE' }),
@@ -48,7 +48,7 @@ const RAW: AtlStage[] = [
     events: [{ t: 'tip', at: 0.12, title: 'Pick your lane early', sub: 'Drivers hunting for the airport and I-20 make late lane changes. Choose your lane early and hold it.' }, { t: 'merge', at: 0.28 }, { t: 'police', at: 0.5 }, { t: 'merge', at: 0.7 }, { t: 'vms', at: 0.12, text: 'USE  I-285  TO  BYPASS|DOWNTOWN' }],
   }),
   base({
-    id: 'atl-i20-west', limit: 65, name: 'I-20 West to Douglasville', subtitle: 'I-20 W · Out past the Westside toward Carrollton country', roadName: 'I-20 WEST', region: 'westside', skyline: 'hills', lanes: 4, lengthM: 4600, tod: 'day', traffic: 0.75, trucks: 0.22, curves: 'rolling', trees: 'pine', walls: 'warehouse', par: 1500, place: 'Westside to Douglas County',
+    id: 'atl-i20-west', limit: 65, name: 'I-20 West to Douglasville', subtitle: 'I-20 W · Out past the Westside toward Carrollton country', roadName: 'I-20 WEST', region: 'westside', skyline: 'hills', lanes: 4, lengthM: 4600, tod: 'day', traffic: 0.75, trucks: 0.22, curves: 'rolling', trees: 'pine', walls: 'warehouse', par: 4200, place: 'Westside to Douglas County',
     guide: [
       sign(0.08, [I('20')], 'WEST', ['Birmingham'], { arrows: ['up'] }),
       sign(0.34, [I('20')], 'WEST', ['Birmingham'], { arrows: ['up'] }),
@@ -63,7 +63,7 @@ const RAW: AtlStage[] = [
     lessons: ['Trucks have big blind spots. If you cannot see the driver\'s mirror, they cannot see you.', 'Pass on the left, then return to the right lane.', 'Keep right except to pass is Georgia law.'],
   }),
   base({
-    id: 'atl-i285-top-end', limit: 65, name: 'Top End Perimeter', subtitle: 'I-285 · Sandy Springs to Dunwoody under the office towers', roadName: 'I-285 EAST', region: 'perimeter', skyline: 'perimeter', lanes: 5, lengthM: 4400, tod: 'day', traffic: 1.05, trucks: 0.18, curves: 'gentle', par: 1650, place: 'Sandy Springs and Dunwoody',
+    id: 'atl-i285-top-end', limit: 65, name: 'Top End Perimeter', subtitle: 'I-285 · Sandy Springs to Dunwoody under the office towers', roadName: 'I-285 EAST', region: 'perimeter', skyline: 'perimeter', lanes: 5, lengthM: 4400, tod: 'day', traffic: 1.05, trucks: 0.18, curves: 'gentle', par: 4100, place: 'Sandy Springs and Dunwoody',
     guide: [
       sign(0.06, [I('285')], 'EAST', ['Dunwoody', 'Chamblee'], { arrows: ['up'] }),
       sign(0.3, [I('285')], 'EAST', ['Dunwoody', 'Chamblee'], { arrows: ['up'] }),
@@ -76,7 +76,7 @@ const RAW: AtlStage[] = [
     events: [{ t: 'tip', at: 0.18, title: 'The Top End', sub: 'The busiest stretch of I-285. Traffic joins from GA-400 and I-75, so expect weaving. Check your mirrors often.' }, { t: 'merge', at: 0.3 }, { t: 'merge', at: 0.58 }, { t: 'crash', at: 0.82 }],
   }),
   base({
-    id: 'atl-i285-west', limit: 65, name: 'West Wall Perimeter', subtitle: 'I-285 N · Cobb Parkway to the Chattahoochee', roadName: 'I-285 NORTH', region: 'cobb', skyline: 'cobb', lanes: 4, lengthM: 4400, tod: 'day', traffic: 0.9, curves: 'rolling', trees: 'hardwood', par: 1500, place: 'Cobb County, west side',
+    id: 'atl-i285-west', limit: 65, name: 'West Wall Perimeter', subtitle: 'I-285 N · Cobb Parkway to the Chattahoochee', roadName: 'I-285 NORTH', region: 'cobb', skyline: 'cobb', lanes: 4, lengthM: 4400, tod: 'day', traffic: 0.9, curves: 'rolling', trees: 'hardwood', par: 3900, place: 'Cobb County, west side',
     guide: [
       sign(0.07, [I('285')], 'NORTH', ['I-75', 'Chattanooga'], { arrows: ['up'] }),
       sign(0.3, [I('285')], 'NORTH', ['I-75', 'Chattanooga'], { arrows: ['up'] }),
@@ -90,7 +90,7 @@ const RAW: AtlStage[] = [
     events: [{ t: 'work', at: 0.35, len: 520 }, { t: 'merge', at: 0.7 }, { t: 'tip', at: 0.5, title: 'Crossing the river', sub: 'Bridges ice first and wind pushes light cars. Hold the wheel steady.' }],
   }),
   base({
-    id: 'atl-i285-airport', limit: 65, name: 'Airport Approach', subtitle: 'I-285 W · The busiest airport in the world next door', roadName: 'I-285 WEST', region: 'airport', skyline: 'airport', lanes: 5, lengthM: 4200, tod: 'dusk', traffic: 1.1, trucks: 0.2, curves: 'straight', trees: 'none', walls: 'warehouse', par: 1650, place: 'Hartsfield-Jackson',
+    id: 'atl-i285-airport', limit: 65, name: 'Airport Approach', subtitle: 'I-285 W · The busiest airport in the world next door', roadName: 'I-285 WEST', region: 'airport', skyline: 'airport', lanes: 5, lengthM: 4200, tod: 'dusk', traffic: 1.1, trucks: 0.2, curves: 'straight', trees: 'none', walls: 'warehouse', par: 4550, place: 'Hartsfield-Jackson',
     guide: [
       sign(0.06, [I('285')], 'WEST', ['Atlanta Airport'], { arrows: ['up'] }),
       sign(0.3, [I('285')], 'WEST', ['Atlanta Airport'], { arrows: ['up'] }),
@@ -103,7 +103,7 @@ const RAW: AtlStage[] = [
     events: [{ t: 'tip', at: 0.18, title: 'Airport traffic', sub: 'Rental cars and shuttles brake late. Keep a longer gap and watch the signs for the airport exits.' }, { t: 'vms', at: 0.1, text: 'AIRPORT  TRAFFIC|EXPECT  DELAYS' }, { t: 'merge', at: 0.4 }, { t: 'merge', at: 0.7 }, { t: 'police', at: 0.78 }],
   }),
   base({
-    id: 'atl-i285-east', limit: 65, name: 'East Side Perimeter', subtitle: 'I-285 S · DeKalb County and the Stone Mountain Freeway', roadName: 'I-285 SOUTH', region: 'intown', skyline: 'suburb', lanes: 4, lengthM: 4300, tod: 'golden', traffic: 0.85, curves: 'gentle', trees: 'hardwood', walls: 'retail', par: 1500, place: 'DeKalb County',
+    id: 'atl-i285-east', limit: 65, name: 'East Side Perimeter', subtitle: 'I-285 S · DeKalb County and the Stone Mountain Freeway', roadName: 'I-285 SOUTH', region: 'intown', skyline: 'suburb', lanes: 4, lengthM: 4300, tod: 'golden', traffic: 0.85, curves: 'gentle', trees: 'hardwood', walls: 'retail', par: 3700, place: 'DeKalb County',
     guide: [
       sign(0.07, [I('285')], 'SOUTH', ['I-20', 'Macon'], { arrows: ['up'] }),
       sign(0.3, [I('285')], 'SOUTH', ['I-20', 'Macon'], { arrows: ['up'] }),
@@ -116,7 +116,7 @@ const RAW: AtlStage[] = [
     events: [{ t: 'tip', at: 0.18, title: 'Stone Mountain Freeway', sub: 'US-78 splits off the Perimeter here. Read the green signs early, not at the gore.' }, { t: 'merge', at: 0.3 }, { t: 'crash', at: 0.55 }, { t: 'merge', at: 0.8 }],
   }),
   base({
-    id: 'atl-i75-cobb', limit: 65, name: 'I-75 to Marietta', subtitle: 'I-75 N · Cobb County and the Chattahoochee bridge', roadName: 'I-75 NORTH', region: 'cobb', skyline: 'cobb', lanes: 4, lengthM: 4600, tod: 'day', traffic: 0.95, curves: 'rolling', trees: 'pine', walls: 'retail', par: 1550, place: 'Cobb Parkway corridor',
+    id: 'atl-i75-cobb', limit: 65, name: 'I-75 to Marietta', subtitle: 'I-75 N · Cobb County and the Chattahoochee bridge', roadName: 'I-75 NORTH', region: 'cobb', skyline: 'cobb', lanes: 4, lengthM: 4600, tod: 'day', traffic: 0.95, curves: 'rolling', trees: 'pine', walls: 'retail', par: 4300, place: 'Cobb Parkway corridor',
     guide: [
       sign(0.07, [I('75')], 'NORTH', ['Marietta', 'Chattanooga'], { arrows: ['up'] }),
       sign(0.3, [I('75')], 'NORTH', ['Marietta', 'Chattanooga'], { arrows: ['up'] }),
@@ -130,7 +130,7 @@ const RAW: AtlStage[] = [
     events: [{ t: 'tip', at: 0.18, title: 'Chattahoochee bridge', sub: 'The river bridge leaves no room to swerve. Hold your lane and keep your space.' }, { t: 'merge', at: 0.28 }, { t: 'work', at: 0.5, len: 600 }, { t: 'merge', at: 0.78 }],
   }),
   base({
-    id: 'atl-i75-henry', limit: 65, name: 'I-75 South to McDonough', subtitle: 'I-75 S · Clayton and Henry counties', roadName: 'I-75 SOUTH', region: 'henry', skyline: 'hills', lanes: 4, lengthM: 4800, tod: 'day', traffic: 0.7, trucks: 0.25, curves: 'gentle', trees: 'pine', walls: 'warehouse', par: 1450, place: 'Henry County',
+    id: 'atl-i75-henry', limit: 65, name: 'I-75 South to McDonough', subtitle: 'I-75 S · Clayton and Henry counties', roadName: 'I-75 SOUTH', region: 'henry', skyline: 'hills', lanes: 4, lengthM: 4800, tod: 'day', traffic: 0.7, trucks: 0.25, curves: 'gentle', trees: 'pine', walls: 'warehouse', par: 3950, place: 'Henry County',
     guide: [
       sign(0.08, [I('75')], 'SOUTH', ['Macon'], { arrows: ['up'] }),
       sign(0.4, [I('75')], 'SOUTH', ['Macon'], { arrows: ['up'] }),
@@ -143,7 +143,7 @@ const RAW: AtlStage[] = [
     events: [{ t: 'police', at: 0.4 }, { t: 'merge', at: 0.45 }, { t: 'tip', at: 0.65, title: 'Open road, big trucks', sub: 'Trucks may drift at the edge of their lane. Give them space.' }],
   }),
   base({
-    id: 'atl-i85-gwinnett', limit: 65, name: 'I-85 North to Gwinnett', subtitle: 'I-85 N · Doraville, Norcross and Duluth', roadName: 'I-85 NORTH', region: 'gwinnett', skyline: 'suburb', lanes: 5, lengthM: 4600, tod: 'golden', traffic: 1.0, curves: 'gentle', trees: 'mixed', walls: 'retail', par: 1650, place: 'Gwinnett County',
+    id: 'atl-i85-gwinnett', limit: 65, name: 'I-85 North to Gwinnett', subtitle: 'I-85 N · Doraville, Norcross and Duluth', roadName: 'I-85 NORTH', region: 'gwinnett', skyline: 'suburb', lanes: 5, lengthM: 4600, tod: 'golden', traffic: 1.0, curves: 'gentle', trees: 'mixed', walls: 'retail', par: 4050, place: 'Gwinnett County',
     guide: [
       sign(0.06, [I('85')], 'NORTH', ['Greenville'], { arrows: ['up'] }),
       sign(0.3, [I('85')], 'NORTH', ['Greenville'], { arrows: ['up'] }),
@@ -157,7 +157,7 @@ const RAW: AtlStage[] = [
     lessons: ['The median toll lanes are for Peach Pass users. Never cross the double white lines to enter or leave them.', 'Gwinnett traffic compresses fast. Watch brake lights two cars ahead.', 'Keep right except to pass. Move over for faster traffic.'],
   }),
   base({
-    id: 'atl-i20-east', limit: 55, name: 'I-20 East to Stone Mountain', subtitle: 'I-20 E · Past the Capitol, toward the granite dome', roadName: 'I-20 EAST', region: 'stonemtn', skyline: 'stonemtn', lanes: 4, lengthM: 4500, tod: 'dusk', traffic: 0.85, curves: 'rolling', trees: 'hardwood', walls: 'houses', par: 1500, place: 'East Atlanta and DeKalb',
+    id: 'atl-i20-east', limit: 55, name: 'I-20 East to Stone Mountain', subtitle: 'I-20 E · Past the Capitol, toward the granite dome', roadName: 'I-20 EAST', region: 'stonemtn', skyline: 'stonemtn', lanes: 4, lengthM: 4500, tod: 'dusk', traffic: 0.85, curves: 'rolling', trees: 'hardwood', walls: 'houses', par: 4100, place: 'East Atlanta and DeKalb',
     guide: [
       sign(0.07, [I('20')], 'EAST', ['Augusta'], { arrows: ['up'] }),
       sign(0.3, [I('20')], 'EAST', ['Augusta'], { arrows: ['up'] }),
@@ -171,7 +171,7 @@ const RAW: AtlStage[] = [
     events: [{ t: 'merge', at: 0.33 }, { t: 'crash', at: 0.6 }, { t: 'tip', at: 0.82, title: 'Stone Mountain ahead', sub: 'Big and bare, you can see it for miles. Keep your eyes on the road, though.' }],
   }),
   base({
-    id: 'atl-ga400', name: 'GA-400 to Alpharetta', subtitle: 'GA-400 N · Buckhead to Roswell, toll free', roadName: 'GA-400 NORTH', region: 'buckhead', skyline: 'buckhead', lanes: 4, lengthM: 4400, tod: 'day', limit: 65, maxSpeed: 82, traffic: 0.95, curves: 'rolling', trees: 'hardwood', walls: 'glass', par: 1500, place: 'Buckhead and North Fulton',
+    id: 'atl-ga400', name: 'GA-400 to Alpharetta', subtitle: 'GA-400 N · Buckhead to Roswell, toll free', roadName: 'GA-400 NORTH', region: 'buckhead', skyline: 'buckhead', lanes: 4, lengthM: 4400, tod: 'day', limit: 65, maxSpeed: 82, traffic: 0.95, curves: 'rolling', trees: 'hardwood', walls: 'glass', par: 4100, place: 'Buckhead and North Fulton',
     guide: [
       sign(0.07, [GA('400')], 'NORTH', ['Alpharetta', 'Cumming'], { arrows: ['up'] }),
       sign(0.3, [GA('400')], 'NORTH', ['Alpharetta', 'Cumming'], { arrows: ['up'] }),
@@ -185,7 +185,7 @@ const RAW: AtlStage[] = [
     events: [{ t: 'tip', at: 0.18, title: 'GA-400', sub: 'The toll booth is long gone, but merges come fast around Buckhead. Signal early and match speed.' }, { t: 'merge', at: 0.36 }, { t: 'police', at: 0.58 }, { t: 'merge', at: 0.78 }],
   }),
   base({
-    id: 'atl-rush-hour', limit: 55, name: 'Connector Rush Hour', subtitle: 'I-75/85 · Stop and go at 5 pm. Stay calm', roadName: 'I-75/85 NORTH', region: 'midtown', skyline: 'midtown', lanes: 5, lengthM: 3400, tod: 'dusk', traffic: 1.5, flow: 0.45, trucks: 0.1, curves: 'rolling', par: 1600, place: 'Midtown Atlanta', isRush: true,
+    id: 'atl-rush-hour', limit: 55, name: 'Connector Rush Hour', subtitle: 'I-75/85 · Stop and go at 5 pm. Stay calm', roadName: 'I-75/85 NORTH', region: 'midtown', skyline: 'midtown', lanes: 5, lengthM: 3400, tod: 'dusk', traffic: 1.5, flow: 0.45, trucks: 0.1, curves: 'rolling', par: 5650, place: 'Midtown Atlanta', isRush: true,
     guide: [
       sign(0.1, [I('75'), I('85')], 'NORTH', ['Chattanooga', 'Greenville'], { arrows: ['up'] }),
     ],
@@ -198,7 +198,7 @@ const RAW: AtlStage[] = [
     lessons: ['In slow traffic, keep a full car length at a stop so you can steer around.', 'Keep your eyes moving: mirrors, brake lights, signs.', 'Do not weave. You will not get there faster.'],
   }),
   base({
-    id: 'atl-night-285', limit: 65, name: 'Night Run on the Perimeter', subtitle: 'I-285 · Lights glowing, trucks hauling, eyes open', roadName: 'I-285 NORTH', region: 'perimeter', skyline: 'perimeter', lanes: 4, lengthM: 4400, tod: 'night', traffic: 0.8, trucks: 0.3, curves: 'gentle', par: 1500, place: 'Sandy Springs, after dark',
+    id: 'atl-night-285', limit: 65, name: 'Night Run on the Perimeter', subtitle: 'I-285 · Lights glowing, trucks hauling, eyes open', roadName: 'I-285 NORTH', region: 'perimeter', skyline: 'perimeter', lanes: 4, lengthM: 4400, tod: 'night', traffic: 0.8, trucks: 0.3, curves: 'gentle', par: 3700, place: 'Sandy Springs, after dark',
     guide: [
       sign(0.07, [I('285')], 'NORTH', ['I-75', 'Chattanooga'], { arrows: ['up'] }),
     ],
@@ -211,7 +211,7 @@ const RAW: AtlStage[] = [
     lessons: ['Dim your high beams for cars ahead and behind.', 'Look to the right edge of the lane when oncoming lights glare.', 'Tired? Take the next exit and rest.'],
   }),
   base({
-    id: 'atl-sunset-20', limit: 55, name: 'Sunset on I-20', subtitle: 'I-20 W · Glare, long shadows and a golden skyline', roadName: 'I-20 WEST', region: 'westside', skyline: 'downtown', lanes: 4, lengthM: 4300, tod: 'dusk', traffic: 0.8, curves: 'rolling', par: 1450, place: 'West of the Connector',
+    id: 'atl-sunset-20', limit: 55, name: 'Sunset on I-20', subtitle: 'I-20 W · Glare, long shadows and a golden skyline', roadName: 'I-20 WEST', region: 'westside', skyline: 'downtown', lanes: 4, lengthM: 4300, tod: 'dusk', traffic: 0.8, curves: 'rolling', par: 3900, place: 'West of the Connector',
     guide: [
       sign(0.07, [I('20')], 'WEST', ['Birmingham'], { arrows: ['up'] }),
     ],
@@ -223,7 +223,7 @@ const RAW: AtlStage[] = [
     events: [{ t: 'tip', at: 0.1, title: 'Sun glare', sub: 'Sun visor down, sunglasses on, and slow a touch.' }, { t: 'merge', at: 0.5 }],
   }),
   base({
-    id: 'atl-storm-connector', limit: 55, name: 'Storm Over the Connector', subtitle: 'I-75/85 S · Thunder, wipers, hydroplaning risk', roadName: 'I-75/85 SOUTH', region: 'downtown', skyline: 'downtown', lanes: 5, lengthM: 3800, tod: 'dusk', weather: 'storm', traffic: 0.8, flow: 0.8, curves: 'rolling', par: 1500, place: 'Downtown Atlanta, stormy',
+    id: 'atl-storm-connector', limit: 55, name: 'Storm Over the Connector', subtitle: 'I-75/85 S · Thunder, wipers, hydroplaning risk', roadName: 'I-75/85 SOUTH', region: 'downtown', skyline: 'downtown', lanes: 5, lengthM: 3800, tod: 'dusk', weather: 'storm', traffic: 0.8, flow: 0.8, curves: 'rolling', par: 4300, place: 'Downtown Atlanta, stormy',
     guide: [
       sign(0.08, [I('75'), I('85')], 'SOUTH', ['Macon', 'Montgomery'], { arrows: ['up'] }),
       sign(0.45, [I('20')], undefined, ['Augusta', 'Birmingham'], { tab: 'EXIT 247', dist: '1 MILE', also: [{ dests: ['Fulton St', 'Central Ave', 'Ga State Univ'], tab: 'EXIT 246', dist: '3/4 MILE' }, { dests: ['Abernathy Blvd', 'Capitol Ave', 'Turner Field'], tab: 'EXIT 245', dist: '1/4 MILE' }] }),
@@ -238,7 +238,7 @@ const RAW: AtlStage[] = [
     lessons: ['In heavy rain slow 5 to 10 mph below the limit. Georgia drivers are allowed to.', 'Headlights on in rain. It is Georgia law with wipers.', 'Skip cruise control on wet roads.'],
   }),
   base({
-    id: 'atl-work-zone', limit: 65, name: 'Work Zone on I-75', subtitle: 'I-75 S · Lane closures, cones and doubled fines', roadName: 'I-75 SOUTH', region: 'henry', skyline: 'suburb', lanes: 4, lengthM: 4000, tod: 'day', traffic: 0.8, curves: 'gentle', walls: 'warehouse', par: 1450, place: 'Henry County',
+    id: 'atl-work-zone', limit: 65, name: 'Work Zone on I-75', subtitle: 'I-75 S · Lane closures, cones and doubled fines', roadName: 'I-75 SOUTH', region: 'henry', skyline: 'suburb', lanes: 4, lengthM: 4000, tod: 'day', traffic: 0.8, curves: 'gentle', walls: 'warehouse', par: 4350, place: 'Henry County',
     guide: [
       sign(0.06, [I('75')], 'SOUTH', ['Macon'], { arrows: ['up'] }),
       sign(0.3, undefined, undefined, ['Road Work', '1 Mile'], { arrows: ['up'] }),
@@ -251,7 +251,7 @@ const RAW: AtlStage[] = [
     lessons: ['Fines are doubled in work zones in Georgia. The workers are real people.', 'Merge early. Do not wait for the cones.', 'Watch for sudden stops. Look over the car ahead.'],
   }),
   base({
-    id: 'atl-move-over', limit: 65, name: 'Move Over Law', subtitle: 'I-285 · Police and tow trucks on the shoulder', roadName: 'I-285 EAST', region: 'perimeter', skyline: 'perimeter', lanes: 4, lengthM: 4000, tod: 'day', traffic: 0.7, curves: 'gentle', par: 1450, place: 'North Atlanta',
+    id: 'atl-move-over', limit: 65, name: 'Move Over Law', subtitle: 'I-285 · Police and tow trucks on the shoulder', roadName: 'I-285 EAST', region: 'perimeter', skyline: 'perimeter', lanes: 4, lengthM: 4000, tod: 'day', traffic: 0.7, curves: 'gentle', par: 4250, place: 'North Atlanta',
     guide: [
       sign(0.06, [I('285')], 'EAST', ['Dunwoody', 'Chamblee'], { arrows: ['up'] }),
     ],
@@ -263,7 +263,7 @@ const RAW: AtlStage[] = [
     lessons: ['Georgia law: move over one lane for emergency vehicles on the shoulder, or slow down if you cannot.', 'Signal first, check the mirror, then move.', 'Slow to 20 under the limit if you cannot change lanes.'],
   }),
   base({
-    id: 'atl-fog-i20', limit: 65, name: 'Foggy Morning on I-20', subtitle: 'I-20 W · Valley fog near the Chattahoochee', roadName: 'I-20 WEST', region: 'douglasville', skyline: 'hills', lanes: 3, lengthM: 3800, tod: 'day', weather: 'fog', traffic: 0.55, flow: 0.8, curves: 'gentle', trees: 'pine', par: 1400, place: 'Douglas County',
+    id: 'atl-fog-i20', limit: 65, name: 'Foggy Morning on I-20', subtitle: 'I-20 W · Valley fog near the Chattahoochee', roadName: 'I-20 WEST', region: 'douglasville', skyline: 'hills', lanes: 3, lengthM: 3800, tod: 'day', weather: 'fog', traffic: 0.55, flow: 0.8, curves: 'gentle', trees: 'pine', par: 3600, place: 'Douglas County',
     guide: [
       sign(0.1, [I('20')], 'WEST', ['Birmingham'], { arrows: ['up'] }),
     ],
@@ -277,85 +277,85 @@ const RAW: AtlStage[] = [
 
   // ---- Carrollton and the west side ---
   base({
-    id: 'atl-carrollton-square', name: 'Downtown Carrollton', subtitle: '30117 · Adamson Square, Maple Street and Newnan Street', roadName: 'MAPLE ST', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 2400, limit: 25, maxSpeed: 40, tod: 'day', traffic: 0.5, trucks: 0.04, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'brick', par: 1000, place: 'Carrollton, Georgia',
+    id: 'atl-carrollton-square', name: 'Downtown Carrollton', subtitle: '30117 · Adamson Square, Maple Street and Newnan Street', roadName: 'MAPLE ST', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 2400, limit: 25, maxSpeed: 40, tod: 'day', traffic: 0.5, trucks: 0.04, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'brick', par: 6050, place: 'Carrollton, Georgia',
     guide: [sign(0.1, undefined, undefined, ['Adamson Square', 'Downtown'], { arrows: ['up'] }), sign(0.5, [US('27')], undefined, ['Newnan St', 'Villa Rica'], { arrows: ['right'] }), sign(0.82, [GA('61')], undefined, ['Villa Rica', 'University of West Georgia'], { arrows: ['up'] })],
     events: [{ t: 'ped', at: 0.18 }, { t: 'stop', at: 0.32 }, { t: 'rail', at: 0.48, train: true, gates: true, name: 'Dixie St' }, { t: 'ped', at: 0.62 }, { t: 'light', at: 0.78 }, { t: 'tip', at: 0.05, title: 'Carrollton, 30117', sub: 'Green Belt, brick storefronts, and the Adamson Square courthouse.' }],
     lessons: ['A full stop at a stop sign means the wheels stop moving.', 'Pedestrians in a crosswalk have the right of way.', 'At a railroad crossing with flashing lights, stop at least 15 feet back.'],
   }),
   base({
-    id: 'atl-carrollton-circle', name: 'Maple Street Roundabout', subtitle: '30117 · Yield, look left, then go', roadName: 'MAPLE ST', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 2200, limit: 30, maxSpeed: 45, tod: 'golden', traffic: 0.5, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'houses', par: 1000, place: 'Carrollton, Georgia',
+    id: 'atl-carrollton-circle', name: 'Maple Street Roundabout', subtitle: '30117 · Yield, look left, then go', roadName: 'MAPLE ST', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 2200, limit: 30, maxSpeed: 45, tod: 'golden', traffic: 0.5, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'houses', par: 4600, place: 'Carrollton, Georgia',
     guide: [sign(0.14, undefined, undefined, ['Roundabout ahead'], { arrows: ['up'] }), sign(0.55, [GA('166')], undefined, ['Bankhead Hwy', 'Lovvorn Rd'], { arrows: ['right'] })],
     events: [{ t: 'tip', at: 0.07, title: 'Yield at the entry', sub: 'Traffic already in the circle goes first. Look left, enter when clear, signal your exit.' }, { t: 'circle', at: 0.3 }, { t: 'ped', at: 0.45 }, { t: 'circle', at: 0.7 }],
     lessons: ['Slow down, look left, yield to traffic already in the circle.', 'Never stop inside a roundabout.', 'Signal right when you leave.'],
   }),
   base({
-    id: 'atl-us27-carrollton', name: 'US-27 to Carrollton', subtitle: 'US-27 · Rolling farmland and pines toward town', roadName: 'US-27 SOUTH', road: 'rural', region: 'rural', skyline: 'hills', lanes: 1, lengthM: 3200, limit: 55, maxSpeed: 70, tod: 'day', traffic: 0.45, trucks: 0.14, flow: 0.95, curves: 'winding', trees: 'pine', walls: 'houses', par: 1200, place: 'Carroll County',
+    id: 'atl-us27-carrollton', name: 'US-27 to Carrollton', subtitle: 'US-27 · Rolling farmland and pines toward town', roadName: 'US-27 SOUTH', road: 'rural', region: 'rural', skyline: 'hills', lanes: 1, lengthM: 3200, limit: 55, maxSpeed: 70, tod: 'day', traffic: 0.45, trucks: 0.14, flow: 0.95, curves: 'winding', trees: 'pine', walls: 'houses', par: 3300, place: 'Carroll County',
     guide: [sign(0.08, [US('27')], 'SOUTH', ['Carrollton', 'Newnan'], { arrows: ['up'] }), sign(0.52, [GA('113')], undefined, ['Carrollton'], { arrows: ['upright'] }), sign(0.85, undefined, undefined, ['Carrollton 3', 'Villa Rica'], { arrows: ['up'] })],
     events: [{ t: 'rail', at: 0.4, train: false, gates: false }, { t: 'school', at: 0.62, len: 300 }, { t: 'tip', at: 0.08, title: 'Two-lane road', sub: 'No center line crossing. A solid yellow means no passing.' }],
     lessons: ['Solid yellow on your side means do not pass.', 'Slow for curves; the posted speed is a maximum.', 'Deer are active at dusk. Scan the ditches.'],
   }),
   base({
-    id: 'atl-bankhead-hwy', name: 'Bankhead Highway', subtitle: 'US-78 · Four lanes of Georgia strip road', roadName: 'BANKHEAD HWY', road: 'arterial', region: 'carrollton', skyline: 'carrollton', lanes: 2, lengthM: 3000, limit: 45, maxSpeed: 62, tod: 'day', traffic: 0.7, flow: 0.95, curves: 'gentle', trees: 'mixed', walls: 'retail', par: 1200, place: 'Carrollton to Villa Rica',
+    id: 'atl-bankhead-hwy', name: 'Bankhead Highway', subtitle: 'US-78 · Four lanes of Georgia strip road', roadName: 'BANKHEAD HWY', road: 'arterial', region: 'carrollton', skyline: 'carrollton', lanes: 2, lengthM: 3000, limit: 45, maxSpeed: 62, tod: 'day', traffic: 0.7, flow: 0.95, curves: 'gentle', trees: 'mixed', walls: 'retail', par: 4800, place: 'Carrollton to Villa Rica',
     guide: [sign(0.1, [US('78')], undefined, ['Bankhead Hwy', 'Villa Rica'], { arrows: ['up'] }), sign(0.5, [GA('61')], undefined, ['Villa Rica', 'Carrollton'], { arrows: ['upright'] }), sign(0.8, [GA('8')], undefined, ['Douglasville', 'Temple'], { arrows: ['up'] })],
     events: [{ t: 'tip', at: 0.18, title: 'Bankhead Highway', sub: 'One of the first paved cross-country routes. Today it is full of driveways, so watch for turning cars.' }, { t: 'light', at: 0.2 }, { t: 'light', at: 0.45 }, { t: 'rail', at: 0.62, train: true, gates: true, name: 'Bankhead' }, { t: 'light', at: 0.85 }],
     lessons: ['Yellow means stop if you safely can.', 'Watch for cars turning into driveways.', 'Left lane on a four-lane road is for passing.'],
   }),
   base({
-    id: 'atl-villa-rica', name: 'Villa Rica Backroads', subtitle: 'GA-61 · Curvy two-lane through Carroll County pines', roadName: 'GA-61', road: 'rural', region: 'villarica', skyline: 'hills', lanes: 1, lengthM: 3000, limit: 45, maxSpeed: 62, tod: 'golden', traffic: 0.4, trucks: 0.1, flow: 0.95, curves: 'winding', trees: 'pine', walls: 'houses', par: 1150, place: 'Villa Rica, Georgia',
+    id: 'atl-villa-rica', name: 'Villa Rica Backroads', subtitle: 'GA-61 · Curvy two-lane through Carroll County pines', roadName: 'GA-61', road: 'rural', region: 'villarica', skyline: 'hills', lanes: 1, lengthM: 3000, limit: 45, maxSpeed: 62, tod: 'golden', traffic: 0.4, trucks: 0.1, flow: 0.95, curves: 'winding', trees: 'pine', walls: 'houses', par: 3600, place: 'Villa Rica, Georgia',
     guide: [sign(0.1, [GA('61')], 'NORTH', ['Villa Rica'], { arrows: ['up'] }), sign(0.6, [US('78')], undefined, ['Bankhead Hwy'], { arrows: ['upright'] })],
     events: [{ t: 'rail', at: 0.42, train: true, gates: true, name: 'Villa Rica' }, { t: 'tip', at: 0.1, title: 'Curves ahead', sub: 'Yellow signs suggest a safe speed. Believe them.' }],
   }),
   base({
-    id: 'atl-douglasville', name: 'Chapel Hill Road', subtitle: 'Douglasville · Railroad crossings and four lanes', roadName: 'CHAPEL HILL RD', road: 'arterial', region: 'douglasville', skyline: 'suburb', lanes: 2, lengthM: 2800, limit: 40, maxSpeed: 58, tod: 'day', traffic: 0.75, flow: 0.95, curves: 'gentle', trees: 'mixed', walls: 'retail', par: 1200, place: 'Douglasville, Georgia',
+    id: 'atl-douglasville', name: 'Chapel Hill Road', subtitle: 'Douglasville · Railroad crossings and four lanes', roadName: 'CHAPEL HILL RD', road: 'arterial', region: 'douglasville', skyline: 'suburb', lanes: 2, lengthM: 2800, limit: 40, maxSpeed: 58, tod: 'day', traffic: 0.75, flow: 0.95, curves: 'gentle', trees: 'mixed', walls: 'retail', par: 4850, place: 'Douglasville, Georgia',
     guide: [sign(0.1, [GA('5')], undefined, ['Douglasville', 'Dallas'], { arrows: ['up'] }), sign(0.55, [I('20')], 'EAST', ['Atlanta'], { arrows: ['upright'] })],
     events: [{ t: 'tip', at: 0.18, title: 'Railroad crossings', sub: 'Stop at least 15 feet from the nearest rail. Never change lanes or stop on the tracks.' }, { t: 'light', at: 0.2 }, { t: 'rail', at: 0.38, train: true, gates: true, name: 'Chapel Hill' }, { t: 'ped', at: 0.58 }, { t: 'light', at: 0.74 }, { t: 'circle', at: 0.88 }],
   }),
   base({
-    id: 'atl-peachtree-street', name: 'Peachtree Street', subtitle: 'Midtown · Stoplights, buses and Georgia Tech students', roadName: 'PEACHTREE ST', road: 'arterial', region: 'midtown', skyline: 'midtown', lanes: 2, lengthM: 2600, limit: 35, maxSpeed: 52, tod: 'dusk', traffic: 0.85, flow: 0.9, curves: 'straight', trees: 'hardwood', walls: 'glass', par: 1150, place: 'Midtown Atlanta',
+    id: 'atl-peachtree-street', name: 'Peachtree Street', subtitle: 'Midtown · Stoplights, buses and Georgia Tech students', roadName: 'PEACHTREE ST', road: 'arterial', region: 'midtown', skyline: 'midtown', lanes: 2, lengthM: 2600, limit: 35, maxSpeed: 52, tod: 'dusk', traffic: 0.85, flow: 0.9, curves: 'straight', trees: 'hardwood', walls: 'glass', par: 5150, place: 'Midtown Atlanta',
     guide: [sign(0.1, undefined, undefined, ['Peachtree St', 'Midtown'], { arrows: ['up'] }), sign(0.5, undefined, undefined, ['10th Street', 'Piedmont Park'], { arrows: ['right'] })],
     events: [{ t: 'tip', at: 0.18, title: 'Midtown crosswalks', sub: 'Buses, students and scooters. Stop for people in the crosswalk and stay stopped until they clear.' }, { t: 'light', at: 0.14 }, { t: 'ped', at: 0.25 }, { t: 'light', at: 0.42 }, { t: 'ped', at: 0.58 }, { t: 'light', at: 0.74 }, { t: 'stop', at: 0.9 }],
     lessons: ['Look both ways even on green. Red-light runners exist.', 'Scooter riders and walkers share Midtown. Slow down.', 'Do not block the box: stay out of an intersection you cannot clear.'],
   }),
   base({
-    id: 'atl-buckhead', name: 'Roswell Road, Buckhead', subtitle: 'Buckhead · Busy lanes, valets and rain-slicked brick', roadName: 'ROSWELL RD', road: 'arterial', region: 'buckhead', skyline: 'buckhead', lanes: 2, lengthM: 2600, limit: 35, maxSpeed: 52, tod: 'night', traffic: 0.9, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'glass', par: 1200, place: 'Buckhead',
+    id: 'atl-buckhead', name: 'Roswell Road, Buckhead', subtitle: 'Buckhead · Busy lanes, valets and rain-slicked brick', roadName: 'ROSWELL RD', road: 'arterial', region: 'buckhead', skyline: 'buckhead', lanes: 2, lengthM: 2600, limit: 35, maxSpeed: 52, tod: 'night', traffic: 0.9, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'glass', par: 4950, place: 'Buckhead',
     guide: [sign(0.1, undefined, undefined, ['Roswell Rd', 'Buckhead'], { arrows: ['up'] }), sign(0.55, undefined, undefined, ['Peachtree Rd', 'Lenox'], { arrows: ['right'] })],
     events: [{ t: 'tip', at: 0.18, title: 'Wet brick', sub: 'Rain on brick pavers is slick. Brake early and gently, and give valets room.' }, { t: 'light', at: 0.18 }, { t: 'ped', at: 0.3 }, { t: 'light', at: 0.5 }, { t: 'ped', at: 0.66 }, { t: 'light', at: 0.84 }],
   }),
   base({
-    id: 'atl-ponce', name: 'Ponce de Leon Avenue', subtitle: 'Decatur · Rail crossing and the city streets', roadName: 'PONCE DE LEON AVE', road: 'arterial', region: 'intown', skyline: 'suburb', lanes: 2, lengthM: 2700, limit: 35, maxSpeed: 52, tod: 'golden', traffic: 0.8, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'brick', par: 1200, place: 'Decatur, Georgia',
+    id: 'atl-ponce', name: 'Ponce de Leon Avenue', subtitle: 'Decatur · Rail crossing and the city streets', roadName: 'PONCE DE LEON AVE', road: 'arterial', region: 'intown', skyline: 'suburb', lanes: 2, lengthM: 2700, limit: 35, maxSpeed: 52, tod: 'golden', traffic: 0.8, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'brick', par: 5300, place: 'Decatur, Georgia',
     guide: [sign(0.1, [US('278')], undefined, ['Decatur', 'Ponce de Leon'], { arrows: ['up'] }), sign(0.55, [GA('155')], undefined, ['Clairmont Rd'], { arrows: ['right'] })],
     events: [{ t: 'tip', at: 0.18, title: 'Decatur buses', sub: 'MARTA buses stop often. Expect brake lights and watch for people stepping off.' }, { t: 'light', at: 0.16 }, { t: 'rail', at: 0.36, train: true, gates: true, name: 'Ponce' }, { t: 'ped', at: 0.54 }, { t: 'circle', at: 0.72 }, { t: 'light', at: 0.88 }],
   }),
   base({
-    id: 'atl-marietta-square', name: 'Marietta Square', subtitle: 'Marietta · Train tracks, circles and Cobb charm', roadName: 'ROSWELL ST', road: 'local', region: 'cobb', skyline: 'cobb', lanes: 1, lengthM: 2300, limit: 25, maxSpeed: 40, tod: 'day', traffic: 0.55, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'brick', par: 1000, place: 'Marietta, Georgia',
+    id: 'atl-marietta-square', name: 'Marietta Square', subtitle: 'Marietta · Train tracks, circles and Cobb charm', roadName: 'ROSWELL ST', road: 'local', region: 'cobb', skyline: 'cobb', lanes: 1, lengthM: 2300, limit: 25, maxSpeed: 40, tod: 'day', traffic: 0.55, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'brick', par: 6050, place: 'Marietta, Georgia',
     guide: [sign(0.1, undefined, undefined, ['Marietta Square'], { arrows: ['up'] }), sign(0.6, [US('41')], undefined, ['Cobb Pkwy'], { arrows: ['right'] })],
     events: [{ t: 'tip', at: 0.18, title: 'Marietta Square', sub: 'Train tracks, circles and angle parking. Slow down, look twice, yield in the circle.' }, { t: 'circle', at: 0.2 }, { t: 'ped', at: 0.34 }, { t: 'rail', at: 0.5, train: true, gates: true, name: 'Square' }, { t: 'stop', at: 0.7 }, { t: 'school', at: 0.82, len: 220 }],
   }),
   base({
-    id: 'atl-stone-mountain', name: 'Stone Mountain Highway', subtitle: 'US-78 · School zones and the granite dome', roadName: 'STONE MOUNTAIN HWY', road: 'arterial', region: 'stonemtn', skyline: 'stonemtn', lanes: 2, lengthM: 2800, limit: 45, maxSpeed: 62, tod: 'day', traffic: 0.7, flow: 0.95, curves: 'rolling', trees: 'pine', walls: 'retail', par: 1200, place: 'Stone Mountain, Georgia',
+    id: 'atl-stone-mountain', name: 'Stone Mountain Highway', subtitle: 'US-78 · School zones and the granite dome', roadName: 'STONE MOUNTAIN HWY', road: 'arterial', region: 'stonemtn', skyline: 'stonemtn', lanes: 2, lengthM: 2800, limit: 45, maxSpeed: 62, tod: 'day', traffic: 0.7, flow: 0.95, curves: 'rolling', trees: 'pine', walls: 'retail', par: 4400, place: 'Stone Mountain, Georgia',
     guide: [sign(0.1, [US('78')], undefined, ['Stone Mountain', 'Snellville'], { arrows: ['up'] }), sign(0.6, [GA('10')], undefined, ['Memorial Dr'], { arrows: ['upright'] })],
     events: [{ t: 'tip', at: 0.07, title: 'School zones', sub: 'The lower limit applies when the lights flash or children are present. Slow down early.' }, { t: 'school', at: 0.25, len: 300 }, { t: 'light', at: 0.5 }, { t: 'rail', at: 0.66, train: false, gates: false }, { t: 'ped', at: 0.82 }],
   }),
   base({
-    id: 'atl-airport-camp-creek', name: 'Camp Creek Parkway', subtitle: 'College Park · Hotels, shuttles and a rail line', roadName: 'CAMP CREEK PKWY', road: 'arterial', region: 'airport', skyline: 'airport', lanes: 2, lengthM: 2700, limit: 45, maxSpeed: 62, tod: 'dusk', traffic: 0.9, flow: 0.95, curves: 'straight', trees: 'none', walls: 'retail', par: 1200, place: 'College Park',
+    id: 'atl-airport-camp-creek', name: 'Camp Creek Parkway', subtitle: 'College Park · Hotels, shuttles and a rail line', roadName: 'CAMP CREEK PKWY', road: 'arterial', region: 'airport', skyline: 'airport', lanes: 2, lengthM: 2700, limit: 45, maxSpeed: 62, tod: 'dusk', traffic: 0.9, flow: 0.95, curves: 'straight', trees: 'none', walls: 'retail', par: 4100, place: 'College Park',
     guide: [sign(0.1, [GA('6')], undefined, ['Camp Creek Pkwy', 'Airport'], { arrows: ['up'] }), sign(0.6, [I('285')], undefined, ['Airport', 'Macon'], { arrows: ['upright'] })],
     events: [{ t: 'tip', at: 0.18, title: 'Hotels and shuttles', sub: 'Shuttles stop without warning. Keep your gap and cover the brake near driveways.' }, { t: 'light', at: 0.18 }, { t: 'rail', at: 0.4, train: true, gates: true, name: 'Camp Creek' }, { t: 'ped', at: 0.6 }, { t: 'light', at: 0.8 }],
   }),
   // ---- added for the learning path ---
   base({
-    id: 'atl-first-drive', name: 'First Drive: Hays Mill Road', subtitle: '30117 · Quiet streets, your first stop sign', roadName: 'HAYS MILL RD', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 1500, limit: 25, maxSpeed: 35, tod: 'day', traffic: 0.15, trucks: 0, flow: 0.85, curves: 'straight', trees: 'hardwood', walls: 'houses', par: 700, place: 'Carrollton, Georgia',
+    id: 'atl-first-drive', name: 'First Drive: Hays Mill Road', subtitle: '30117 · Quiet streets, your first stop sign', roadName: 'HAYS MILL RD', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 1500, limit: 25, maxSpeed: 35, tod: 'day', traffic: 0.15, trucks: 0, flow: 0.85, curves: 'straight', trees: 'hardwood', walls: 'houses', par: 3700, place: 'Carrollton, Georgia',
     guide: [sign(0.3, undefined, undefined, ['Hays Mill Rd'], { arrows: ['up'] }), sign(0.72, undefined, undefined, ['Downtown Carrollton'], { arrows: ['right'] })],
     events: [{ t: 'tip', at: 0.04, title: 'Your first drive', sub: 'Hands at 9 and 3. Ease the gas, stay right of the yellow line.' }, { t: 'stop', at: 0.42 }, { t: 'ped', at: 0.72 }],
     lessons: ['Look where you want to go. The car follows your eyes.', 'Ease onto the gas and ease onto the brake.', 'Stay inside the lane and a little right of center.'],
   }),
   base({
-    id: 'atl-lovvorn', name: 'Neighborhood Streets: Lovvorn Road', subtitle: '30117 · School zone, stop signs and a light', roadName: 'LOVVORN RD', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 1900, limit: 30, maxSpeed: 42, tod: 'day', traffic: 0.3, trucks: 0.02, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'houses', par: 850, place: 'Carrollton, Georgia',
+    id: 'atl-lovvorn', name: 'Neighborhood Streets: Lovvorn Road', subtitle: '30117 · School zone, stop signs and a light', roadName: 'LOVVORN RD', road: 'local', region: 'carrollton', skyline: 'carrollton', lanes: 1, lengthM: 1900, limit: 30, maxSpeed: 42, tod: 'day', traffic: 0.3, trucks: 0.02, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'houses', par: 3750, place: 'Carrollton, Georgia',
     guide: [sign(0.25, undefined, undefined, ['Lovvorn Rd'], { arrows: ['up'] }), sign(0.65, [GA('166')], undefined, ['Bankhead Hwy'], { arrows: ['right'] })],
     events: [{ t: 'tip', at: 0.18, title: 'Neighborhood streets', sub: 'Kids and bikes appear fast. Stay at or under the limit and cover the brake at driveways.' }, { t: 'stop', at: 0.2 }, { t: 'school', at: 0.4, len: 220 }, { t: 'ped', at: 0.62 }, { t: 'light', at: 0.82 }],
     lessons: ['School zone: 25 while the lights flash. Children can appear from anywhere.', 'Stop before the white line, not on it.', 'A yellow light means stop if you safely can.'],
   }),
   base({
-    id: 'atl-onramp-i20', limit: 65, startRamp: true, name: 'On-Ramp and Merge', subtitle: 'I-20 W · Speed up on the ramp, then blend in', roadName: 'I-20 WEST', region: 'westside', skyline: 'hills', lanes: 3, lengthM: 3000, tod: 'day', traffic: 0.4, trucks: 0.1, flow: 0.98, curves: 'gentle', trees: 'pine', par: 1100, place: 'West Atlanta',
+    id: 'atl-onramp-i20', limit: 65, startRamp: true, name: 'On-Ramp and Merge', subtitle: 'I-20 W · Speed up on the ramp, then blend in', roadName: 'I-20 WEST', region: 'westside', skyline: 'hills', lanes: 3, lengthM: 3000, tod: 'day', traffic: 0.4, trucks: 0.1, flow: 0.98, curves: 'gentle', trees: 'pine', par: 3450, place: 'West Atlanta',
     guide: [
       sign(0.1, [I('20')], 'WEST', ['Birmingham'], { arrows: ['up'] }),
       sign(0.5, [I('20')], 'WEST', ['Birmingham'], { arrows: ['up'] }),
@@ -367,19 +367,19 @@ const RAW: AtlStage[] = [
     lessons: ['Use the whole ramp to match highway speed.', 'Never stop on a ramp unless traffic forces you.', 'Signal early and find a gap, do not force one.'],
   }),
   base({
-    id: 'atl-rain-ponce', name: 'Ponce in the Rain', subtitle: 'Decatur · Wet brick, slick rails and long stops', roadName: 'PONCE DE LEON AVE', road: 'arterial', region: 'intown', skyline: 'suburb', lanes: 2, lengthM: 2600, limit: 35, maxSpeed: 52, tod: 'dusk', weather: 'rain', traffic: 0.7, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'brick', par: 1200, place: 'Decatur, Georgia, rainy',
+    id: 'atl-rain-ponce', name: 'Ponce in the Rain', subtitle: 'Decatur · Wet brick, slick rails and long stops', roadName: 'PONCE DE LEON AVE', road: 'arterial', region: 'intown', skyline: 'suburb', lanes: 2, lengthM: 2600, limit: 35, maxSpeed: 52, tod: 'dusk', weather: 'rain', traffic: 0.7, flow: 0.9, curves: 'gentle', trees: 'hardwood', walls: 'brick', par: 4950, place: 'Decatur, Georgia, rainy',
     guide: [sign(0.2, undefined, undefined, ['Decatur', 'Clairmont Rd'], { arrows: ['up'] }), sign(0.6, [US('78')], undefined, ['Stone Mountain'], { arrows: ['up'] })],
     events: [{ t: 'tip', at: 0.04, title: 'Wet roads', sub: 'Double your following distance. Brake early and gently, especially on rails.' }, { t: 'light', at: 0.2 }, { t: 'rail', at: 0.4, train: true, gates: true, name: 'Ponce' }, { t: 'ped', at: 0.6 }, { t: 'light', at: 0.82 }],
     lessons: ['Wet roads double stopping distance.', 'Painted lines and steel rails are slick in rain.', 'Headlights on whenever wipers are on.'],
   }),
   base({
-    id: 'atl-fog-villa-rica', name: 'Foggy Backroads: Villa Rica', subtitle: 'GA-61 · Low beams and slow curves', roadName: 'GA-61', road: 'rural', region: 'villarica', skyline: 'hills', lanes: 1, lengthM: 2800, limit: 45, maxSpeed: 62, tod: 'day', weather: 'fog', traffic: 0.3, trucks: 0.08, flow: 0.85, curves: 'winding', trees: 'pine', walls: 'houses', par: 1150, place: 'Villa Rica, Georgia, foggy',
+    id: 'atl-fog-villa-rica', name: 'Foggy Backroads: Villa Rica', subtitle: 'GA-61 · Low beams and slow curves', roadName: 'GA-61', road: 'rural', region: 'villarica', skyline: 'hills', lanes: 1, lengthM: 2800, limit: 45, maxSpeed: 62, tod: 'day', weather: 'fog', traffic: 0.3, trucks: 0.08, flow: 0.85, curves: 'winding', trees: 'pine', walls: 'houses', par: 3100, place: 'Villa Rica, Georgia, foggy',
     guide: [sign(0.2, [GA('61')], undefined, ['Villa Rica', 'Carrollton'], { arrows: ['up'] })],
     events: [{ t: 'tip', at: 0.05, title: 'Fog', sub: 'Low beams, slow down and use the right edge line as your guide.' }, { t: 'rail', at: 0.5, train: false, gates: false }],
     lessons: ['Never use high beams in fog.', 'Slow until you can stop inside what you can see.', 'Do not stop on the road. Pull completely off.'],
   }),
   base({
-    id: 'atl-snow-285', limit: 65, name: 'Rare Snow Day on I-285', subtitle: 'I-285 · Georgia roads when the flakes fall', roadName: 'I-285 EAST', region: 'perimeter', skyline: 'perimeter', lanes: 4, lengthM: 3600, tod: 'day', weather: 'snow', traffic: 0.45, flow: 0.6, trucks: 0.08, curves: 'gentle', par: 1400, place: 'North Atlanta, snowy',
+    id: 'atl-snow-285', limit: 65, name: 'Rare Snow Day on I-285', subtitle: 'I-285 · Georgia roads when the flakes fall', roadName: 'I-285 EAST', region: 'perimeter', skyline: 'perimeter', lanes: 4, lengthM: 3600, tod: 'day', weather: 'snow', traffic: 0.45, flow: 0.6, trucks: 0.08, curves: 'gentle', par: 4200, place: 'North Atlanta, snowy',
     guide: [
       sign(0.08, [I('285')], 'EAST', ['Dunwoody', 'Chamblee'], { arrows: ['up'] }),
     ],
@@ -390,7 +390,7 @@ const RAW: AtlStage[] = [
     lessons: ['Triple your following distance on ice.', 'If it is not safe, stay home. Georgia roads are not ready for snow.', 'Brake gently. Steer gently. Do everything slowly.'],
   }),
   base({
-    id: 'atl-master-storm', limit: 55, name: 'Master Class: Night Storm Rush', subtitle: 'I-75/85 · Everything at once. The final exam', roadName: 'I-75/85 NORTH', region: 'midtown', skyline: 'midtown', lanes: 5, lengthM: 5200, tod: 'night', weather: 'storm', traffic: 1.35, flow: 0.55, trucks: 0.2, curves: 'rolling', par: 2000, place: 'Atlanta, midnight storm',
+    id: 'atl-master-storm', limit: 55, name: 'Master Class: Night Storm Rush', subtitle: 'I-75/85 · Everything at once. The final exam', roadName: 'I-75/85 NORTH', region: 'midtown', skyline: 'midtown', lanes: 5, lengthM: 5200, tod: 'night', weather: 'storm', traffic: 1.35, flow: 0.55, trucks: 0.2, curves: 'rolling', par: 7500, place: 'Atlanta, midnight storm',
     guide: [
       sign(0.08, [I('75'), I('85')], 'NORTH', ['Chattanooga', 'Greenville'], { arrows: ['up'] }),
     ],

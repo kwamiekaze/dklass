@@ -4,13 +4,13 @@
  * signalling, following distance, keeping right, moving over for emergency vehicles, railroad crossings, roundabouts, work zones, stop signs and lights.
  * The scene only reads this object each frame.
  */
-import { buildResult, ScoreTracker, type PointKey } from '../game/scoring';
+import { buildResult, deltaCue, labelOf, POINTS, ScoreTracker, type PointKey } from '../game/scoring';
 import { getDifficulty, type Difficulty, type DifficultyConfig, type LevelConfig, type LevelResult } from '../game/types';
 import { getLevel } from '../game/levels';
 import { MPH_TO_MPS, seeded, type Sfx, type SimEvent } from '../g3d/sim';
 import { layoutFor, LANE, type Layout } from './layout';
 import { getAtlStage, levelOfStage } from './stages';
-import { accStrip, exitStrip, stripSpan, ACC, ACC_TOTAL, EXIT } from './ramps';
+import { accStrip, exitStrip, stripSpan, roadEdge, ACC, ACC_TOTAL, EXIT } from './ramps';
 import type { AtlStage } from './stageTypes';
 
 export type VehKind = 'sedan' | 'suv' | 'pickup' | 'van' | 'hatch' | 'box' | 'semi' | 'bus' | 'police' | 'wreck' | 'tow' | 'taxi' | 'ambulance';
@@ -71,7 +71,9 @@ export class AtlSim {
 
   // player
   x = 0; steerV = 0; yaw = 0; mph = 0; prevMph = 0; traveled = 0; time = 0; finished = false; invulnUntil = 0; braking = false; accel = 0; locked = false; speeding = false; timeScale = 1;
-  strikes = 0; strikes0 = 0; nearMisses = 0;
+  /** Strikes live on the tracker so the score cut, the streak and the safety record can never disagree. */
+  get strikes() { return this.tracker.strikes; } set strikes(v: number) { this.tracker.strikes = v; }
+  strikes0 = 0; nearMisses = 0;
   laneIdx = 0; signalDir: -1 | 0 | 1 = 0; signalAt = -99;
   gapSec = 0; leaderGap = 0; leaderV = 0;
   prompt = '';
@@ -90,7 +92,8 @@ export class AtlSim {
   private speedingTimer = 0; private speedWarned = false;
   private tailT = 0; private tailCool = 0; private gapT = 0; private gapCool = 0;
   private leftT = 0; private leftCool = 0; private rightCool = 6; private hovT = 0; private hovCool = 0;
-  private lastLane = 0; private crossCool = 0; private lastLaneChangeAt = -99;
+  private cleanT = 0; private wxT = 0; private mergers = new Map<number, Veh>();
+  private lastLane = 0; private crossCool = 0; private lastLaneChangeAt = -99; private lastLaneDir = 0; private mergeDone = false;
   private spawnCool: number[] = [];
   private onCool = 0;
   private fired = new Set<number>();
@@ -139,8 +142,17 @@ export class AtlSim {
   private banner(title: string, sub?: string, ms = 2600, tone: 'gold' | 'red' | 'white' = 'gold') { this.emit({ k: 'banner', title, sub, ms, tone }); }
   private award(key: PointKey, text?: string, x?: number) {
     const pts = this.tracker.add(key);
-    if (text) this.float(`${pts >= 0 ? '+' : ''}${pts} ${text}`, pts >= 0, x);
-    if (pts > 0) this.snd.checkpoint?.(); return pts;
+    const d = this.tracker.last!, cue = deltaCue(d), good = d.severity === 'reward';
+    if (text) this.float(`${text} ${cue.chip}${good && this.tracker.combo > 1 ? ` x${this.tracker.combo}` : ''}`, good, x);
+    this.emit({ k: 'delta', kind: cue.kind, chip: cue.chip, sub: cue.sub, tierUp: cue.tierUp, tierDown: cue.tierDown, tier: cue.tier, strikes: cue.strikes, points: pts });
+    if (good) { this.snd.checkpoint?.(); if (cue.tierUp) this.snd.tierUp?.(); }
+    else {
+      this.cleanT = 0;
+      this.emit({ k: 'shake', amp: cue.kind === 'strike' || cue.kind === 'crit' ? 0.9 : 0.4, dur: 0.15 });
+      if (cue.kind === 'strike') this.snd.strikeHit?.(); else if (cue.tierDown) this.snd.tierDown?.();
+    }
+    this.snd.setSfxPitchStep?.(Math.max(0, this.tracker.combo - 1));
+    return pts;
   }
   private after(sec: number, fn: () => void) { this.timers.push({ at: this.time + sec, fn }); }
   /** Runs due timers. It also runs after the run is over, because the end-of-run popup is itself a timer. */
@@ -157,13 +169,15 @@ export class AtlSim {
     const L = this.effectiveLength, st = this.stage, lay = this.lay, r = this.rnd;
     const D = (at: number) => 40 + at * (L - 90);
     for (const g of st.guide) this.signs.push({ at: g.at, d: D(g.at), shown: false });
+    // quarter-way checkpoints: a clean drive is paid as it goes, not only at the end
+    if (!this.free) [0.25, 0.5, 0.75].forEach((at, i) => this.evList.push({ at: D(at), run: () => { this.award('CHECKPOINT', `CHECKPOINT ${i + 1} OF 4`); this.banner(`CHECKPOINT ${i + 1} OF 4`, `${Math.round(at * 100)}% of the drive`, 1600, 'gold'); } }));
     st.events.forEach((e, i) => {
       const d = D(e.at);
       switch (e.t) {
         case 'vms': this.evList.push({ at: d - 220, run: () => this.banner('GEORGIA 511', e.text.replace(/\|/g, ' · ').replace(/\s{2,}/g, ' '), 3600, 'white') }); break;
         case 'tip': this.evList.push({ at: d, run: () => { this.banner(e.title, e.sub, 4200, 'gold'); this.prompt = e.sub; } }); break;
         case 'exit': this.evList.push({ at: d - 120, run: () => this.banner(`EXIT ${e.no ?? ''} ${e.name}`.trim(), e.lesson, 3200, 'white') }); break;
-        case 'merge': if (lay.kind === 'divided') { this.merges.push(d + 60); this.evList.push({ at: d + 60 - ACC_TOTAL - 150, run: () => this.spawnMerger(d + 60 - ACC_TOTAL + 20, d + 60) }); } break;
+        case 'merge': if (lay.kind === 'divided') { this.merges.push(d + 60); this.evList.push({ at: d + 60 - ACC_TOTAL - 150, run: () => this.spawnMerger(d + 60 - ACC_TOTAL + 20, d + 60) }); this.evList.push({ at: d + 60, run: () => this.mergeCheck(d + 60) }); } break;
         case 'work': {
           const lanes = [lay.lanes - 1]; if (lay.lanes >= 5 && e.len >= 600) lanes.push(lay.lanes - 2);
           this.closures.push({ d0: d, d1: d + e.len, lanes, kind: 'work' });
@@ -172,7 +186,7 @@ export class AtlSim {
             const x = this.lay.xs[ln]!;
             // taper: a diagonal of cones across the lane before the closure, then two columns of barrels down the closed lane
             const xb = this.lay.xs[ln]! - LANE / 2;
-            for (let k = 0; k < 9; k++) this.props.push({ id: this.nextId++, k: 'cone', d: d - 90 + k * 10, x: xb - LANE * 0.5 + (k / 8) * LANE, hit: false });
+            for (let k = 0; k < 9; k++) this.props.push({ id: this.nextId++, k: 'cone', d: d - 90 + k * 10, x: xb + (k / 8) * LANE, hit: false });
             for (let dd = d; dd < d + e.len; dd += 9) for (const off of [-0.95, 0.95]) this.props.push({ id: this.nextId++, k: 'barrel', d: dd + (off > 0 ? 4.5 : 0), x: this.lay.xs[ln]! + off, hit: false });
           }
           this.props.push({ id: this.nextId++, k: 'arrow', d: d - 70, x: lay.xs[lay.lanes - 1]!, hit: false });
@@ -233,8 +247,9 @@ export class AtlSim {
   private spawnMerger(d: number, mergeAt: number) {
     const lay = this.lay; if (lay.kind !== 'divided') return;
     const s0 = accStrip(lay, d - mergeAt), rl = lay.lanes - 1 + ((s0?.c ?? lay.xs[lay.lanes - 1]! + LANE) - lay.xs[lay.lanes - 1]!) / LANE;
-    const v = this.makeVeh(this.rnd.frac() < 0.2 ? 'pickup' : 'sedan', d, rl, Math.max(14, this.mph * KMPH * 0.85)); v.want = this.stage.limit * KMPH * 0.9; v.tl = lay.lanes - 1; v.lcFrom = rl; v.mergeAt = mergeAt;
+    const v = this.makeVeh(this.rnd.frac() < 0.2 ? 'pickup' : 'sedan', d, rl, Math.max(14, this.mph * KMPH * 0.85)); v.want = this.stage.limit * KMPH * 0.9; v.tl = lay.lanes - 1; v.lcFrom = rl; v.mergeAt = mergeAt; this.mergers.set(mergeAt, v);
     this.vehicles.push(v);
+    if (!this.prompt) this.prompt = 'Cars are merging from the right: ease off or move left and make room.';
   }
 
   // -------------------------------------------------------------------- traffic
@@ -408,8 +423,11 @@ export class AtlSim {
     this.collisions(dt);
     this.stepProps(dt);
     this.laneRules(dt);
+    this.rampMerge();
     this.followRules(dt);
     this.speedRules(dt);
+    if (this.weatherKind !== 'clear' && this.weatherKind !== 'cloudy' && !this.locked) { const lim = this.speedLimitNow; if (this.mph >= lim - 18 && this.mph <= lim - 3) { this.wxT += dt; if (this.wxT >= 10) { this.wxT = 0; this.award('WEATHER_CARE', 'DRIVING TO THE CONDITIONS'); } } }
+    if (this.mph > 8 && !this.speeding && !this.locked) { this.cleanT += dt; if (this.cleanT >= 8) { this.cleanT = 0; this.award('SMOOTH_DRIVING', 'SMOOTH'); } }
     this.stepBranches(dt);
     this.stepRails(dt); this.stepCircles(dt); this.stepLights(dt); this.stepStops(); this.stepPeds(dt); this.stepPolice(); this.stepPatrol(dt);
     // signal cancels itself
@@ -504,10 +522,9 @@ export class AtlSim {
     this.emit({ k: 'crash', x, d, big }); this.emit({ k: 'shake', amp: big ? 1 : 0.5, dur: big ? 0.6 : 0.3 }); this.emit({ k: 'flash', color: 0xff3030, dur: 0.25 });
     if (cone) { this.award('HIT_CONE', 'CONE'); const s = Math.sign(this.x - cone.x) || 1; cone.fly = { t: 0, vx: 6 * s, vd: this.mph * KMPH * 1.2, spin: 9 }; cone.hit = true; this.mph *= 0.92; return; }
     this.award('HIT_TRAFFIC', 'CRASH');
-    this.strikes++;
     if (veh) { veh.hit = true; const s = Math.sign(veh.x - this.x) || 1; veh.fly = { t: 0, vx: 3 * s, vd: Math.max(2, this.mph * KMPH * 0.5), spin: 1.2 * s }; veh.still = false; veh.v = 0; }
     this.mph = Math.max(0, this.mph * 0.45 - 6);
-    this.banner(this.strikes >= 3 ? 'TOO MANY CRASHES' : 'CRASH', this.strikes >= 3 ? 'The exam ends here' : `Strike ${this.strikes} of 3 · leave more space`, 2200, 'red');
+    this.banner(this.strikes >= 3 ? 'TOO MANY CRASHES' : 'CRASH', this.strikes >= 3 ? 'Strike 3 of 3. The exam ends here' : `Strike ${this.strikes} of 3 · half your points gone · leave more space`, 2400, 'red');
     if (this.strikes >= 3) this.after(0.7, () => this.finish());
   }
   private collisions(dt: number) {
@@ -532,6 +549,39 @@ export class AtlSim {
     if (this.props.length > 0 && Math.random() < 0.02) this.props = this.props.filter((p) => p.d > T - 120 && !(p.fly && p.fly.t > 2));
   }
 
+  // ---- merging
+  /** The player drives past the point where an on-ramp joins. Traffic is merging from the right: moving over, or leaving a real gap, is the textbook courtesy and it is paid. */
+  private mergeCheck(at: number) {
+    if (this.finished || this.leg) return;
+    const v = this.mergers.get(at); if (!v) return;
+    const lay = this.lay, rel = v.d - this.traveled;                  // + means the merging car is ahead of the player
+    if (v.fly || v.hit) return;
+    const sp = Math.max(this.mph * KMPH, 4);
+    const crowding = this.laneIdx >= lay.lanes - 1 && Math.abs(rel) / sp < 1.0;
+    if (!crowding) this.award('MERGE_YIELD', 'MADE ROOM');
+  }
+  /** The player's own merge from the on-ramp: join the road at speed, signalled, into a real gap. */
+  private rampMerge() {
+    const lay = this.lay;
+    if (!this.rampStart || this.mergeDone || lay.kind !== 'divided' || this.finished) return;
+    if (this.x > roadEdge(lay) - 0.8) return;                         // still on the ramp lane
+    this.mergeDone = true;
+    const pd = this.traveled, sp = this.mph * KMPH;
+    const signalled = this.signalDir === -1 && this.time - this.signalAt < 12;
+    let cut = false;
+    for (const v of this.vehicles) {
+      if (v.dir !== 1 || v.fly || v.hit || Math.abs(v.x - this.x) > 2.4) continue;
+      const gap = pd - v.d - (DIM[v.kind].l + 4.7) / 2;               // metres of clear road between the other car's nose and our tail
+      if (gap > -2 && gap < 6 + Math.max(0, v.v - sp) * 1.3) { cut = true; break; }
+    }
+    this.signalDir = 0;
+    if (cut) { this.award('MERGE_CUTOFF', 'CUT OFF A CAR'); this.banner('CUT OFF', 'Wait for a gap behind the car, then merge', 2400, 'red'); return; }
+    if (!signalled) { this.award('NO_SIGNAL', 'NO SIGNAL'); this.prompt = 'Signal left (Q), check your mirror, then merge.'; }
+    else this.award('SIGNALLED', 'SIGNALLED');
+    if (this.mph < this.stage.limit - 15) { this.award('MERGE_TOO_SLOW', 'MERGE AT TRAFFIC SPEED'); this.banner('TOO SLOW', 'Speed up on the ramp. Traffic is doing the limit', 2400, 'white'); }
+    else if (signalled) { this.award('MERGE_CLEAN', 'CLEAN MERGE'); this.banner('CLEAN MERGE', 'Signalled, matched speed, found the gap', 2200, 'gold'); }
+  }
+
   // ---- lane discipline
   private laneRules(dt: number) {
     const lay = this.lay, st = this.stage;
@@ -543,14 +593,14 @@ export class AtlSim {
       const dir = idx < this.laneIdx ? -1 : 1;
       this.laneIdx = idx;
       if (lay.kind === 'divided' && lay.lanes > 1 && this.time - this.lastLaneChangeAt > 0.8 && this.mph > 8) {
-        this.lastLaneChangeAt = this.time;
+        this.lastLaneChangeAt = this.time; this.lastLaneDir = dir;
         if (this.signalDir === dir && this.time - this.signalAt < 6) { this.award('SIGNALLED', 'SIGNALLED'); this.signalDir = 0; }
         else this.award('NO_SIGNAL', 'NO SIGNAL');
       }
     }
     // double yellow / wrong side on a two-way road
     this.crossCool -= dt;
-    if (lay.kind === 'twoway' && this.x - 0.92 < -0.02 && this.mph > 5 && this.crossCool <= 0) { this.crossCool = 3.2; this.award('LANE_CROSS', 'CENTER LINE'); }
+    if (lay.kind === 'twoway' && this.x - 0.92 < -0.02 && this.mph > 5 && this.crossCool <= 0 && !this.turningLeft()) { this.crossCool = 3.2; this.award('LANE_CROSS', 'CENTER LINE'); }
     if (lay.kind === 'divided' && (this.x > lay.maxX - 0.05 || this.x < lay.minX + 0.05) && this.mph > 15 && this.crossCool <= 0 && !this.onRampLane(this.x)) { this.crossCool = 3; this.award('LANE_CROSS', 'EDGE LINE'); }
     // HOV: a solo driver stays out
     if (st.hov && this.laneIdx === 0 && this.mph > 5) { this.hovT += dt; if (this.hovT > 2.2 && this.time > this.hovCool) { this.hovCool = this.time + 8; this.award('HOV_SOLO', 'HOV: 2+ RIDERS'); } } else this.hovT = Math.max(0, this.hovT - dt);
@@ -564,6 +614,8 @@ export class AtlSim {
       if (this.laneIdx >= lay.lanes - 2 && this.rightCool <= 0 && this.mph > 25) { this.rightCool = 28; this.award('KEEP_RIGHT', 'KEEP RIGHT'); }
     }
   }
+  /** crossing the centre line is exactly what a left turn needs: no penalty while one is coming up or under way */
+  private turningLeft() { for (const b of this.branches) if (b.kind === 'left' && !b.done) { const dd = this.traveled - b.d; if (dd > -95 && dd < 24) return true; } return false; }
   private followRules(dt: number) {
     // nearest car ahead in our lane
     let best = 1e9, bv = 0;
@@ -607,8 +659,8 @@ export class AtlSim {
       if (!r.done && this.traveled > r.d - 4.2 && this.traveled < r.d + 3 && !(r as Rail & { x?: boolean }).x) {
         (r as Rail & { x?: boolean }).x = true;
         if (active) {
-          if (r.phase === 'train') { this.emit({ k: 'crash', x: this.x, d: r.d, big: true }); this.emit({ k: 'catastrophe', dog: false }); this.tracker.zeroOut(); this.locked = true; this.banner('TRAIN STRIKE', 'Never cross when the gates are down', 3000, 'red'); this.after(1.2, () => this.finish()); }
-          else { this.award('RAN_RAIL', 'GATES DOWN'); this.strikes++; this.banner('RAN THE GATES', 'Stop at least 15 feet back', 2600, 'red'); }
+          if (r.phase === 'train') { this.emit({ k: 'crash', x: this.x, d: r.d, big: true }); this.emit({ k: 'catastrophe', dog: false }); this.award('HIT_TRAIN', 'TRAIN'); this.locked = true; this.banner('TRAIN STRIKE', 'Never cross when the gates are down · you keep 5% of your points', 3000, 'red'); this.after(1.2, () => this.finish()); }
+          else { this.award('RAN_RAIL', 'GATES DOWN'); this.banner('RAN THE GATES', 'Stop at least 15 feet back', 2600, 'red'); }
         } else if (!r.stopped && !r.train && r.gates === false && this.mph <= 22) { r.stopped = true; this.award('RAIL_STOP', 'LOOKED BOTH WAYS'); }
         else if (!r.stopped && r.done) { r.stopped = true; this.award('RAIL_STOP', 'CLEAR TRACKS'); }
       }
@@ -645,10 +697,10 @@ export class AtlSim {
       const dist = l.d - this.traveled;
       if (l.script === 'red' && l.state === 'green' && dist < Math.max(95, this.mph * KMPH * 4.5)) { l.state = 'yellow'; l.t = 0; }
       if (l.state === 'yellow') { l.t += dt; if (l.t > 2.4) { l.state = 'red'; l.t = 0; } }
-      if (l.state === 'red' && dist > 0 && dist < 20 && this.mph < 1.2) { l.stoppedT += dt; l.stopped = true; if (l.stoppedT > 2.4) { l.state = 'green'; } }
+      if (l.state === 'red' && dist > 0 && dist < 20 && this.mph < 1.2) { l.stoppedT += dt; l.stopped = true; if (l.stoppedT > 2.4) { l.state = 'green'; l.script = 'green'; } }
       if (this.traveled > l.d - 0.5) {
         l.done = true;
-        if (l.state === 'red') { this.award('RAN_RED_LIGHT', 'RED LIGHT'); this.strikes++; this.banner('RAN A RED LIGHT', 'Cross traffic has the right of way', 2400, 'red'); }
+        if (l.state === 'red') { this.award('RAN_RED_LIGHT', 'RED LIGHT'); this.banner('RAN A RED LIGHT', 'Cross traffic has the right of way', 2400, 'red'); }
         else { this.award('GREEN_LIGHT', 'GREEN'); if (l.stopped) this.award('FULL_STOP', 'STOPPED'); }
         l.cross = false;
       }
@@ -672,9 +724,10 @@ export class AtlSim {
         p.t += dt; p.x += Math.sign(p.toX - p.fromX) * 1.45 * dt;
         if ((p.toX - p.fromX) * (p.toX - p.x) <= 0) { p.state = 'done'; if (!p.hit && p.slowed) { this.award('PED_SAFE_PASS', 'YIELDED'); } }
         const onMyRoad = p.x > this.lay.padL + 0.2 && p.x < this.lay.padR - 0.2;
-        if (onMyRoad && dist < 20 && dist > 0 && this.mph < 14) p.slowed = true;
+        if (dist < 60 && dist > 0 && this.mph < 14) p.slowed = true;   // slowed down for someone crossing ahead, not only at the last second
+        void onMyRoad;
         if (!p.hit && Math.abs(p.d - this.traveled) < 2.7 && Math.abs(p.x - this.x) < 1.15) {
-          p.hit = true; this.emit({ k: 'crash', x: this.x, d: p.d, big: true }); this.emit({ k: 'catastrophe', dog: false }); this.tracker.zeroOut(); this.locked = true; this.banner('STRUCK A PEDESTRIAN', 'Always yield in a crosswalk', 3000, 'red'); this.after(1.1, () => this.finish());
+          p.hit = true; this.emit({ k: 'crash', x: this.x, d: p.d, big: true }); this.emit({ k: 'catastrophe', dog: false }); this.award('HIT_PEDESTRIAN', 'PEDESTRIAN'); this.locked = true; this.banner('STRUCK A PEDESTRIAN', 'Always yield in a crosswalk · you keep 10% of your points', 3000, 'red'); this.after(1.1, () => this.finish());
         }
       }
     }
@@ -819,7 +872,7 @@ export class AtlSim {
         if (this.mph < 2) { this.stopT += dt; if (this.stopT > 1.1) { this.patrolPhase = 'stop'; this.patrolT = 0; this.onPulledOver(this.x > lastX + LANE * 0.5 - 1.2); } } else this.stopT = 0;
         if (t > 9 && t < 9.1) this.banner('KEEP SLOWING', 'Stop behind the cruiser on the shoulder', 2400, 'red');
         if (t > 24 && this.mph > 8) {
-          this.award('FAILED_TO_YIELD', 'DID NOT STOP'); this.tracker.zeroOut(); this.cited = true; this.locked = true;
+          this.award('FAILED_TO_YIELD', 'DID NOT STOP'); this.cited = true; this.locked = true;
           this.banner('FAILED TO YIELD', 'Always pull over for blue lights', 3600, 'red'); this.emit({ k: 'catastrophe', dog: false }); this.patrolPhase = 'stop'; this.after(2.2, () => this.finish());
         }
         break;
@@ -842,8 +895,13 @@ export class AtlSim {
     this.snd.fanfare?.();
     this.emit({ k: 'finish', endless: false });
     const early = this.traveled < this.effectiveLength - 5 && !this.exitedLate;
-    if (!early && !this.tracker.voided) { this.tracker.add('FINISH_BONUS'); }
-    const result = buildResult(this.level, this.tracker, this.difficulty);
+    const paid = !early && !this.free && !this.cited && !this.tracker.examOver;
+    if (paid) {
+      this.tracker.add('FINISH_BONUS');
+      this.tracker.settle();
+      (['NO_CRASH_BONUS', 'SPOTLESS_BONUS', 'STREAK_MASTER'] as const).filter((k) => this.tracker.countOf(k) > 0).forEach((k, i) => this.after(0.3 * (i + 1), () => this.emit({ k: 'milestone', text: `${labelOf(k)} +${POINTS[k]}` })));
+    }
+    const result = buildResult(this.level, this.tracker, this.difficulty, { completed: paid });
     if (this.cited) result.passed = false;
     result.feedback = this.feedback(result);
     this.result = result;

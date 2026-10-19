@@ -1,4 +1,5 @@
 /** Daily Challenge — deterministic level+difficulty derived from date. */
+import { parFor } from './scoring';
 import { LEVELS } from './levels';
 import { DIFFICULTIES, type Difficulty } from './types';
 
@@ -59,7 +60,7 @@ export function getDailyChallenge(day = todayKey()): DailyChallenge {
     difficulty: diff.id,
     difficultyLabel: diff.label,
     flavor,
-    parScore: Math.round(level.parScore * diff.scoreMul),
+    parScore: Math.round(parFor(level, diff) * diff.scoreMul),
   };
 }
 
