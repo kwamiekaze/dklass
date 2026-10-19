@@ -64,6 +64,18 @@ export function ReportCard({ result, aftermath, onRetry, onNext, onMenu }: Props
           <strong>{result.score}</strong>
         </div>
 
+        {result.gained !== undefined && (
+          <div className="report-ledger" aria-label="Points earned and lost">
+            <div className="up"><small>EARNED</small><b>+{Math.round(result.gained).toLocaleString()}</b></div>
+            <div className="down"><small>LOST</small><b>-{Math.round(result.lost ?? 0).toLocaleString()}</b></div>
+            <div className="rec">
+              <small>SAFETY RECORD</small>
+              <span className="shields">{[0, 1, 2].map((i) => <i key={i} className={i >= 3 - (result.strikes ?? 0) ? 'gone' : ''} />)}</span>
+            </div>
+            <div className="streak"><small>BEST STREAK</small><b>×{result.maxCombo ?? 1}</b></div>
+          </div>
+        )}
+
         <table className="report-table">
           <tbody>
             {result.events.map((e) => (

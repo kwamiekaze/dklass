@@ -39,7 +39,7 @@ export async function submitScore(result: LevelResult): Promise<SubmitScoreOutco
   if (!user) return { isNewBest: false, previousBest: null, isGuest: true };
 
   const { name: displayName, hasUsername } = await resolveDisplayName(user.id);
-  const stars = Math.max(0, Math.min(5, Math.round((result.score / Math.max(1, (result as any).parScore || 1000)) * 5)));
+  const stars = Math.max(0, Math.min(5, Math.round((result.score / Math.max(1, result.parScore || 1000)) * 5)));
 
   // Every play row
   try {

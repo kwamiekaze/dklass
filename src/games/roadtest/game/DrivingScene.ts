@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { getLevel } from './levels';
-import { ScoreTracker, buildResult, POINTS, type PointKey } from './scoring';
+import { ScoreTracker, buildResult, deltaCue, labelOf, POINTS, TIER_NAMES, type PointKey } from './scoring';
 import { touchControls } from './controls';
 import { loadPlayerCarTexture, makeTextures, PED_TINTS, DOG_KEYS } from './textures';
 import { GAME_EVENTS, getDifficulty, type LevelConfig, type ObstacleType, type Difficulty, type DifficultyConfig } from './types';
@@ -84,7 +84,6 @@ export class DrivingScene extends Phaser.Scene {
   private laneCrossCooldown = 0;
 
   // Endless
-  private strikes = 0;
   private lastRampAt = 0;
   private endlessSpawnCursor = 500;
   private endlessTrafficMul = 1;
@@ -137,7 +136,6 @@ export class DrivingScene extends Phaser.Scene {
     this.cleanTimer = 0;
     this.laneCrossing = false;
     this.laneCrossCooldown = 0;
-    this.strikes = 0;
     this.lastRampAt = 0;
     this.endlessSpawnCursor = 500;
     this.endlessTrafficMul = 1;
@@ -520,13 +518,12 @@ export class DrivingScene extends Phaser.Scene {
     this.comboText = this.add.text(GAME_W / 2, 34, '×1', { ...hudStyle, fontSize: '20px', color: '#ffe89a' })
       .setOrigin(0.5, 0).setDepth(21);
 
-    // Progress bar (or strikes for endless)
-    if (this.level.endless) {
-      for (let i = 0; i < 3; i++) {
-        const s = this.add.image(GAME_W - 20 - i * 26, 46, 'shield').setDepth(22).setScale(0.7);
-        this.shieldSprites.push(s);
-      }
-    } else {
+    // Safety record: three shields on every course
+    for (let i = 0; i < 3; i++) {
+      const s = this.add.image(GAME_W - 52 - i * 24, 50, 'shield').setDepth(22).setScale(0.7);
+      this.shieldSprites.push(s);
+    }
+    if (!this.level.endless) {
       this.add.rectangle(GAME_W / 2, 58, 220, 6, 0x3a3a40).setDepth(21);
       this.progressFill = this.add.rectangle(GAME_W / 2 - 110, 58, 1, 6, 0xf2c14e)
         .setOrigin(0, 0.5).setDepth(22);
@@ -572,24 +569,38 @@ export class DrivingScene extends Phaser.Scene {
 
   private award(key: PointKey, label?: string): number {
     const pts = this.tracker.add(key);
-    const sign = pts >= 0 ? '+' : '';
-    const comboTag = pts > 0 && this.tracker.combo > 1 ? ` ×${this.tracker.combo}` : '';
-    this.float(`${label ?? ''} ${sign}${pts}${comboTag}`.trim(), pts >= 0 ? '#f2c14e' : '#ff5a4e');
-    if (pts < 0) {
+    const d = this.tracker.last!, cue = deltaCue(d), good = d.severity === 'reward';
+    const comboTag = good && this.tracker.combo > 1 ? ` ×${this.tracker.combo}` : '';
+    this.float(`${label ?? ''} ${cue.chip}${comboTag}`.trim(), good ? '#f2c14e' : '#ff5a4e');
+    if (cue.sub && (cue.tierUp || cue.tierDown || cue.kind === 'strike' || cue.kind === 'crit')) this.float(cue.sub, good ? '#ffe89a' : '#ff9a8e', GAME_W / 2, 150);
+    if (good) {
+      if (cue.tierUp) sound.tierUp();
+      this.scoreText.setColor('#fff3c4'); this.time.delayedCall(260, () => this.scoreText.setColor('#f2c14e'));
+      this.tweens.add({ targets: this.scoreText, scale: 1.18, yoyo: true, duration: 120 });
+    } else {
       this.cleanTimer = 0;
-      this.cameras.main.shake(120, 0.004);
+      this.cameras.main.shake(cue.kind === 'strike' || cue.kind === 'crit' ? 260 : 120, cue.kind === 'strike' || cue.kind === 'crit' ? 0.01 : 0.004);
       this.player.setTint(0xff6b5e);
       this.time.delayedCall(200, () => this.player.clearTint());
+      this.scoreText.setColor('#ff5a4e'); this.time.delayedCall(420, () => this.scoreText.setColor('#f2c14e'));
+      if (cue.kind === 'strike') { sound.strikeHit(); this.cameras.main.flash(180, 255, 60, 40); }
+      else if (cue.tierDown) sound.tierDown();
     }
+    // Safety record shields: one goes dark for each strike. The third ends the exam.
+    this.shieldSprites.forEach((sh, i) => { if (i >= 3 - this.tracker.strikes) this.tweens.add({ targets: sh, alpha: 0.2, scale: 0.4, duration: 300 }); });
     // score display is lerped by animateScore()
 
     this.updateComboHud();
+    if (d.severity === 'strike' && this.tracker.examOver && !this.finished) {
+      this.float('EXAM OVER', '#ff5a4e', GAME_W / 2, 300);
+      this.time.delayedCall(700, () => this.finish());
+    }
     return pts;
   }
 
   private updateComboHud() {
     const c = this.tracker.combo;
-    this.comboText.setText(`×${c}`);
+    this.comboText.setText(c > 1 ? `${TIER_NAMES[c - 1]} ×${c}` : '×1');
     const scale = 1 + (c - 1) * 0.12;
     this.comboText.setScale(scale);
     this.comboText.setColor(c >= 5 ? '#ffe89a' : c >= 3 ? '#f2c14e' : '#ffffff');
@@ -708,7 +719,7 @@ export class DrivingScene extends Phaser.Scene {
     this.updateHud();
     this.animateScore(dt);
 
-    if (!this.level.endless && this.traveled >= this.effectiveLength) this.finish();
+    if (!this.level.endless && this.traveled >= this.effectiveLength) this.finish(true);
   }
 
   /** Smoothly counts the displayed score toward the tracked score. */
@@ -985,7 +996,7 @@ export class DrivingScene extends Phaser.Scene {
   private pedestrianCatastrophe(ob: Obstacle) {
     const isDog = ob.type === 'dog';
     // Zero score, dramatic FX, end run.
-    this.tracker.zeroOut('HIT_PEDESTRIAN');
+    this.award(isDog ? 'HIT_ANIMAL' : 'HIT_PEDESTRIAN', isDog ? 'ANIMAL' : 'PEDESTRIAN');
     sound.catastrophe();
     if (isDog) sound.ownerShout();
     try { navigator.vibrate?.([80, 40, 120]); } catch { /* ignore */ }
@@ -995,7 +1006,7 @@ export class DrivingScene extends Phaser.Scene {
     this.time.timeScale = 0.35;
     this.tweens.add({ targets: ob.sprite, alpha: 0.2, angle: 90, y: ob.sprite.y + 20, duration: 400 });
     // Banner
-    const bannerLabel = isDog ? 'GAME OVER — HIT A DOG!' : 'GAME OVER — PEDESTRIAN!';
+    const bannerLabel = isDog ? 'GAME OVER: HIT A DOG!\nYou keep 25% of your points' : 'GAME OVER: PEDESTRIAN!\nYou keep 10% of your points';
     const banner = this.add.text(GAME_W / 2, 340, bannerLabel, {
       fontFamily: '"Bebas Neue", sans-serif', fontSize: '38px', color: '#ff5a4e',
       stroke: '#101014', strokeThickness: 8, align: 'center', wordWrap: { width: GAME_W - 30 },
@@ -1128,19 +1139,6 @@ export class DrivingScene extends Phaser.Scene {
         targets: this.player, alpha: 0.35, yoyo: true, repeat: 4, duration: 120,
         onComplete: () => this.player.setAlpha(1),
       });
-
-      // Endless strikes
-      if (this.level.endless) {
-        this.strikes++;
-        const idx = 3 - this.strikes;
-        if (idx >= 0 && this.shieldSprites[3 - this.strikes]) {
-          const sh = this.shieldSprites[3 - this.strikes];
-          this.tweens.add({ targets: sh, alpha: 0.15, scale: 0.4, duration: 300 });
-        }
-        if (this.strikes >= 3) {
-          this.time.delayedCall(600, () => this.finish());
-        }
-      }
     }
   }
 
@@ -1230,10 +1228,16 @@ export class DrivingScene extends Phaser.Scene {
 
   public endEarly() { this.finish(); }
 
-  private finish() {
+  private finish(completed = false) {
     if (this.finished) return;
     this.finished = true;
-    if (!this.level.endless) this.tracker.add('FINISH_BONUS');
+    const paid = completed && !this.level.endless && !this.tracker.examOver;
+    if (paid) {
+      this.tracker.add('FINISH_BONUS');
+      this.tracker.settle();
+      (['NO_CRASH_BONUS', 'SPOTLESS_BONUS', 'STREAK_MASTER'] as const).filter((k) => this.tracker.countOf(k) > 0)
+        .forEach((k, i) => this.time.delayedCall(350 * (i + 1), () => this.float(`${labelOf(k)} +${POINTS[k]}`, '#ffe89a', GAME_W / 2, 220 + i * 34)));
+    }
     this.scoreText.setText(`SCORE ${this.tracker.score}`);
     sound.fanfare();
     sound.setSfxPitchStep(0);
@@ -1245,7 +1249,7 @@ export class DrivingScene extends Phaser.Scene {
       } catch { /* ignore */ }
     }
 
-    const label = this.level.endless ? 'RUN OVER' : 'FINISH!';
+    const label = this.level.endless ? 'RUN OVER' : paid ? 'FINISH!' : 'EXAM OVER';
     const banner = this.add.text(GAME_W / 2, 340, label, {
       fontFamily: '"Bebas Neue", sans-serif', fontSize: '68px', color: '#f2c14e',
       stroke: '#101014', strokeThickness: 10,
@@ -1255,7 +1259,7 @@ export class DrivingScene extends Phaser.Scene {
     this.time.delayedCall(1500, () => {
       this.game.events.emit(
         GAME_EVENTS.LEVEL_COMPLETE,
-        buildResult(this.level, this.tracker, this.difficulty, { distance: Math.round(this.traveled) })
+        buildResult(this.level, this.tracker, this.difficulty, { distance: Math.round(this.traveled), completed: paid })
       );
     });
   }

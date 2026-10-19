@@ -7,6 +7,7 @@ import { fleetFiles } from '../../../components/nuhome2/world/Fleet';
 import { touchControls } from '../game/controls';
 import type { Difficulty } from '../game/types';
 import { sound } from '../sound';
+import { TIER_NAMES } from '../game/scoring';
 import { MPH_TO_MPS, RunSim, type Controls, type Sfx, type SimEvent } from './sim';
 import { themeFor } from './themes';
 import { FRONTS, FRONT_BANNER, loadConditions, resolveConditions, type Resolved } from './conditions';
@@ -77,6 +78,7 @@ function Driver({ handle, onComplete, onReady }: { handle: SceneHandle; onComple
         hud.finished = true; break;
       case 'catastrophe': hud.catastrophe = true; fx.emit({ x: sim.x, y: 1, d: sim.traveled + 2, n: 60, color: [0xff2a1a, 0xff8a6e], speed: 6, up: 4, life: 1.1, size: 0.5 }); break;
       case 'speedWarn': hud.speedWarn = now; break;
+      case 'delta': hud.deltas.push({ kind: e.kind, chip: e.chip, sub: e.sub, born: now }); if (hud.deltas.length > 6) hud.deltas.shift(); if (e.tierUp) hud.toasts.push({ text: e.sub ?? 'STREAK UP', born: now }); break;
       case 'milestone': hud.toasts.push({ text: e.text, born: now }); break;
       case 'pickup': shakeState.punch = Math.max(shakeState.punch, 0.18); break;
       case 'complete': hud.complete = e.result; onComplete(e.result); break;
@@ -121,7 +123,7 @@ function Driver({ handle, onComplete, onReady }: { handle: SceneHandle; onComple
     if (diff !== 0) { const step = Math.sign(diff) * Math.max(1, Math.ceil(Math.abs(diff) * Math.min(1, dt * 6))); hud.display = Math.abs(step) >= Math.abs(diff) ? hud.score : hud.display + step; }
     hud.mph = sim.mph; hud.over = sim.overLimit; hud.combo = sim.tracker.combo; hud.maxCombo = sim.tracker.maxCombo; hud.stars = sim.tracker.starsCollected;
     hud.progress = sim.progress; hud.strikes = sim.strikes; hud.magnet = Math.max(0, sim.magnetUntil - sim.time); hud.shield = sim.hasShield;
-    hud.distance = sim.travelPx; hud.nearMisses = sim.nearMisses;
+    hud.distance = sim.travelPx; hud.nearMisses = sim.nearMisses; hud.tierProg = sim.tracker.tierProgress; hud.tierName = TIER_NAMES[sim.tracker.combo - 1] ?? '';
     // keep the effects tied to the car
     if (!sim.finished && frames.current % 2 === 0) {
       if (sim.tracker.combo >= 4 && sim.mph > 8) fx.emit({ x: sim.x + (Math.random() - 0.5) * 0.5, y: 0.55, d: sim.traveled - 2.2, n: 1, color: [0xffb300, 0xf2c14e, 0xff6a13], speed: 0.7, up: 1.3, fwd: -2, life: 0.45, size: 0.55, gravity: -2, drag: 2 });

@@ -14,7 +14,7 @@ export function Hud({ handle }: { handle: SceneHandle }) {
 
   useEffect(() => {
     const hud = handle.hud;
-    let raf = 0, lastCount = -2, lastCombo = 0, lastStars = -1, lastShield = false, lastScore = -1, lastMph = -1, lastOver: boolean | null = null, lastStrikes = -1, lastMagnet = -1, lastKm = -1;
+    let raf = 0, lastCount = -2, lastCombo = 0, lastStars = -1, lastShield = false, lastScore = -1, lastMph = -1, lastOver: boolean | null = null, lastStrikes = -1, lastMagnet = -1, lastKm = -1, lastTier = '', lastProg = -1;
     const E = (k: string) => el.current[k] as HTMLElement | null;
     const spawn = (parent: HTMLElement | null, cls: string, html: string, ms: number, style?: Partial<CSSStyleDeclaration>) => {
       if (!parent) return;
@@ -42,11 +42,24 @@ export function Hud({ handle }: { handle: SceneHandle }) {
         E('tl')?.setAttribute('data-combo', String(hud.combo));
       }
       if (hud.stars !== lastStars) { lastStars = hud.stars; const s = E('stars'); if (s) { s.textContent = `★ ${hud.stars}`; s.classList.remove('pop'); void s.offsetWidth; s.classList.add('pop'); } }
-      // progress / strikes
+      // streak meter: name and fill toward the next tier
+      const tn = hud.combo > 1 ? `${hud.tierName} ×${hud.combo}` : 'BUILD A STREAK';
+      if (tn !== lastTier) { lastTier = tn; const t = E('tier'); if (t) t.textContent = tn; }
+      const pr = Math.round(hud.tierProg * 100);
+      if (pr !== lastProg) { lastProg = pr; const f = E('tierFill'); if (f) f.style.width = `${pr}%`; }
+      // safety record: three shields, shown on every course
+      if (hud.strikes !== lastStrikes) { lastStrikes = hud.strikes; E('strikes')?.querySelectorAll('i').forEach((p, i) => p.classList.toggle('gone', i >= 3 - hud.strikes)); }
+      // ups and downs: chip beside the score, score flashes gold when it rises and red when it falls
+      while (hud.deltas.length) {
+        const d = hud.deltas.shift()!;
+        spawn(E('deltas'), `rt3d-delta ${d.kind}`, `<b>${d.chip}</b>${d.sub ? `<small>${d.sub}</small>` : ''}`, 2300);
+        const s = E('score'); if (s) { s.classList.remove('up', 'down'); void s.offsetWidth; s.classList.add(d.kind === 'up' ? 'up' : 'down'); }
+        if (d.kind === 'strike' || d.kind === 'crit') { const t = E('tl'); if (t) { t.classList.add('hit'); window.setTimeout(() => t.classList.remove('hit'), 1100); } }
+      }
+      // progress
       if (hud.endless) {
         const km = Math.floor(hud.distance * 0.1);
         if (km !== lastKm) { lastKm = km; const d = E('dist'); if (d) d.textContent = `${km.toLocaleString()} m`; }
-        if (hud.strikes !== lastStrikes) { lastStrikes = hud.strikes; E('strikes')?.querySelectorAll('i').forEach((p, i) => p.classList.toggle('gone', i >= 3 - hud.strikes)); }
         const bar = E('best'); if (bar && hud.best > 0) bar.style.width = `${Math.min(100, (hud.distance / hud.best) * 100).toFixed(1)}%`;
       } else {
         const f = E('fill'); if (f) f.style.width = `${(hud.progress * 100).toFixed(2)}%`;
@@ -87,6 +100,9 @@ export function Hud({ handle }: { handle: SceneHandle }) {
         <span className="rt3d-combo" ref={set('combo')} data-lvl="1">×1</span>
         <span className="rt3d-pips" ref={set('pips')}><i className="on" /><i /><i /><i /><i /></span>
       </div>
+      <div className="rt3d-streak"><b ref={set('tier')}>BUILD A STREAK</b><i><u ref={set('tierFill')} /></i></div>
+      <div className="rt3d-strikes sm" ref={set('strikes')} title="Safety record: three strikes ends the exam"><i /><i /><i /><small>SAFETY</small></div>
+      <div className="rt3d-deltas" ref={set('deltas')} />
     </div>
 
     <div className="rt3d-tr">
@@ -104,7 +120,6 @@ export function Hud({ handle }: { handle: SceneHandle }) {
       <div className="rt3d-name">{h.levelName}</div>
       {h.endless ? <>
         <div className="rt3d-dist" ref={set('dist')}>0 m</div>
-        <div className="rt3d-strikes" ref={set('strikes')}><i /><i /><i /></div>
         {h.best > 0 && <div className="rt3d-bestbar"><i ref={set('best')} /><small>BEST {Math.round(h.best * 0.1).toLocaleString()} m</small></div>}
       </> : <div className="rt3d-prog">
         <i className="fill" ref={set('fill')} />

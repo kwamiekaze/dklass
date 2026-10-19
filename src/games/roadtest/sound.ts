@@ -696,6 +696,26 @@ export const sound = {
     playArp([784, 988, 1319, 1568, 1976], 0.09, 'triangle', 0.16);
   },
   fanfare() { playArp([523, 659, 784, 1047, 1319], 0.11, 'triangle', 0.18); },
+  /** Score went up a tier: bright rising run. */
+  tierUp() { playArp([523, 659, 784, 1047], 0.06, 'triangle', 0.14); },
+  /** Small points lost, streak dropped a tier: two falling notes. */
+  tierDown() { playArp([494, 392, 311], 0.08, 'sawtooth', 0.08); },
+  /** A strike: a low falling sweep with a thud, you can hear the points leave. */
+  strikeHit() {
+    playThud();
+    if (!isRunning() || !sfxBus) return;
+    try {
+      const t = ctx!.currentTime;
+      const o = ctx!.createOscillator(); const g = ctx!.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(420, t);
+      o.frequency.exponentialRampToValueAtTime(70, t + 0.5);
+      g.gain.setValueAtTime(0.14, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+      o.connect(g).connect(sfxBus);
+      o.start(t); o.stop(t + 0.6);
+    } catch { /* ignore */ }
+  },
   uiTick() { playTone(880, 0.04, 'square', 0.05); },
 
   /** Star Magnet pickup: rising sparkly whoosh. */

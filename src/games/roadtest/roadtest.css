@@ -1463,3 +1463,16 @@
 .game-wrap .rt-site-header .n2-hdr--bar .n2-hdr-wheel { width: 44px; }
 .game-wrap .rt-site-header .n2-hdr--bar .n2-hdr-word { font-size: clamp(15px, 4.2vw, 21px); white-space: nowrap; overflow: visible; }
 .rt-site-header .rt-quit { white-space: nowrap; flex: none; }
+
+/* Report card ledger: what you earned, what you lost, how clean the record stayed */
+.report-ledger { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0 12px; }
+.report-ledger > div { background: rgba(255,255,255,.05); border: 1px solid rgba(242,193,78,.25); border-radius: 12px; padding: 8px 6px; text-align: center; display: flex; flex-direction: column; gap: 3px; align-items: center; }
+.report-ledger small { font-size: 10px; letter-spacing: 1.4px; opacity: .7; }
+.report-ledger b { font-family: "Bebas Neue", sans-serif; font-weight: 400; font-size: 24px; line-height: 1; }
+.report-ledger .up b { color: #f2c14e; }
+.report-ledger .down b { color: #ff6a5e; }
+.report-ledger .streak b { color: #ffe89a; }
+.report-ledger .shields { display: inline-flex; gap: 4px; margin-top: 2px; }
+.report-ledger .shields i { width: 14px; height: 16px; background: linear-gradient(180deg, #f2c14e, #c9971f); clip-path: polygon(50% 0, 100% 18%, 100% 58%, 50% 100%, 0 58%, 0 18%); }
+.report-ledger .shields i.gone { background: linear-gradient(180deg, #ff6a5e, #8a1c14); opacity: .5; transform: scale(.75); }
+@media (max-width: 460px) { .report-ledger { grid-template-columns: repeat(2, 1fr); } }

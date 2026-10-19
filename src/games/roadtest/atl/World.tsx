@@ -21,6 +21,7 @@ import { LANE } from './layout';
 import { ACC, ACC_TOTAL, EXIT, accStrip, exitStrip, roadEdge } from './ramps';
 import { buildRamp, type RampGeo } from './rampGeo';
 import { adTexture, ROAD_TILE, roadTexture, skylineTexture } from './textures';
+import { Overpasses } from './Overpasses';
 import type { AtlSim } from './sim';
 import type { AtlStage } from './stageTypes';
 
@@ -347,6 +348,8 @@ function Scenery() {
     roof: (() => { const g = new THREE.ConeGeometry(0.7071, 1, 4); g.rotateY(Math.PI / 4); g.translate(0, 0.5, 0); return g; })(),
     deck: (() => { const g = new THREE.BoxGeometry(1, 1.5, 15); g.translate(0, 0, 0); return g; })(),
     pier: (() => { const g = new THREE.BoxGeometry(1.4, 1, 3); g.translate(0, 0.5, 0); return g; })(),
+    bush: (() => { const g = new THREE.IcosahedronGeometry(1, 1); g.translate(0, 0.55, 0); return g; })(),
+    marker: (() => { const g = new THREE.BoxGeometry(0.24, 1.4, 0.06); g.translate(0, 0.7, 0); return g; })(),
     awning: (() => { const g = new THREE.BoxGeometry(1, 0.12, 1); g.translate(0, 0, 0.5); return g; })(),
     ramp: (() => { const g = new THREE.BoxGeometry(5, 0.9, 1); g.translate(0, 0, 0); return g; })(),
   }), []);
@@ -398,6 +401,15 @@ function Scenery() {
         ? <><Repeat geometry={G.pine} material={M.pine} spacing={8} per={2} make={treeSlotFixed} shadow={!lite} /><Repeat geometry={G.pine2} material={M.pine} spacing={8} per={2} make={treeSlotFixed} /></>
         : <><Repeat geometry={G.crown} material={M.leaf} spacing={8} per={2} make={treeSlotFixed} shadow={!lite} /><Repeat geometry={G.crown2} material={M.leaf2} spacing={8} per={2} make={treeSlotFixed} /></>}
     </>}
+
+    {/* undergrowth: shrubs and brush along the tree line, so the verge is never bare */}
+    {stage.trees !== 'none' && !lite && <Repeat geometry={G.bush} material={M.leaf2} spacing={5} per={4} make={(c, k) => {
+      const s = k & 1 ? 1 : -1; if (hash(c, 200 + k) > 0.7 || (s > 0 && nearRamp(c * 5))) return null;
+      const off = s > 0 ? right + rightOff + 1.6 : left - leftOff - 1.6, w = 1.1 + hash(c, 210 + k) * 1.7;
+      return { x: off + s * hash(c, 220 + k) * (inter ? 14 : 8), y: 0, z: hash(c, 230 + k) * 5, ry: hash(c, 240 + k) * 6, sx: w * 1.4, sy: w * (0.55 + hash(c, 250 + k) * 0.5), sz: w, color: colOf(hash(c, 260 + k) > 0.5 ? '#ffffff' : '#cfe0b8', 0.25, c * 5 + k) };
+    }} />}
+    {/* green mile markers on the interstate shoulder */}
+    {inter && lay.kind === 'divided' && <Repeat geometry={G.marker} material={M.awning} spacing={160} per={1} make={(c) => (nearRamp(c * 160 + 20) ? null : { x: right + 1.5, y: 0, z: 20, ry: 0.15, sx: 1, sy: 1, sz: 1 })} />}
 
     {/* the median: a concrete jersey barrier on an interstate, with tall double lamps standing on it */}
     {lay.kind === 'divided' && inter && <>
@@ -458,11 +470,7 @@ function Scenery() {
     </>}
 
     {/* overpasses: a bridge over the interstate every few hundred metres */}
-    {lay.kind === 'divided' && inter && <>
-      <Repeat geometry={G.deck} material={M.deck} spacing={470} ahead={AHEAD} per={1} make={(c) => ((hash(c, 31) < 0.15 || nearRamp(c * 470 + 100 + hash(c, 32) * 200)) ? null : { x: (left + right) / 2, y: 6.9, z: 100 + hash(c, 32) * 200, ry: 0, sx: right - left + 18, sy: 1, sz: 1 })} />
-      <Repeat geometry={G.pier} material={M.concreteDark} spacing={470} per={3} make={(c, k) => ((hash(c, 31) < 0.15 || nearRamp(c * 470 + 100 + hash(c, 32) * 200)) ? null : { x: [left - 3, (lay.medianL + lay.medianR) / 2, right + 3][k]!, y: 0, z: 100 + hash(c, 32) * 200, ry: 0, sx: 1, sy: 6.3, sz: 1 })} />
-      <Repeat geometry={G.box} material={M.deck} spacing={470} per={2} make={(c, k) => ((hash(c, 31) < 0.15 || nearRamp(c * 470 + 100 + hash(c, 32) * 200)) ? null : { x: (left + right) / 2, y: 7.55, z: 100 + hash(c, 32) * 200 + (k ? 7.2 : -7.2), ry: 0, sx: right - left + 18, sy: 0.9, sz: 0.3 })} />
-    </>}
+    {lay.kind === 'divided' && inter && <Overpasses left={left} right={right} medianX={(lay.medianL + lay.medianR) / 2} nearRamp={nearRamp} />}
     {/* the long elevated ramps of the big interchanges */}
     {lay.kind === 'divided' && inter && (city || stage.region === 'airport' || stage.region === 'intown') && <>
       <Repeat geometry={G.ramp} material={M.concrete} spacing={700} per={2} make={(c, k) => (hash(c, 41 + k) < 0.3 ? null : { x: (k ? 1 : -1) * ((k ? right : -left) + 26 + hash(c, 5) * 18) * (k ? 1 : 1) + (k ? 0 : 0), y: 10.5 + hash(c, 6) * 4, z: 60 + hash(c, 7) * 360, ry: (k ? -1 : 1) * (0.07 + hash(c, 8) * 0.12), sx: 1, sy: 1, sz: 130 })} />
