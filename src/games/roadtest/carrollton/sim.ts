@@ -10,6 +10,7 @@ import { Traffic, signalState, type Mover, type SigState } from './traffic';
 import { makeRoutePlanner, type Route } from './route';
 import { Pedestrians } from './peds';
 import { Trains } from './trains';
+import { parkedWorld, type Parked } from './parked';
 
 export const OPEN_ID = 'atl-carrollton-open';
 export const M_PER_S_TO_MPH = 1 / MPH;
@@ -176,6 +177,7 @@ export class OpenSim {
     this.rules(dt);
     this.traffic.step(dt, this.time, this.asMover(), () => true);
     this.collideCars();
+    this.collideParked();
     if (this.traffic.cars.length < this.traffic.max * 0.9 && ((this.time * 4) | 0) % 2 === 0) this.traffic.spawnOne(this.x, this.z, 90, 300, true, Math.sin(this.h), Math.cos(this.h));
     this.peds.step(dt, this.time, this.asMover(), this.traffic.cars);
     this.trains.step(dt, this.time);
@@ -319,7 +321,33 @@ export class OpenSim {
       }
     }
   }
-  private onHit(kind: 'building' | 'car', speed: number) {
+  /** parked cars in driveways and lots: solid, like a wall that can be dented */
+  private parkGrid: Map<number, Parked[]> | null = null;
+  private collideParked() {
+    if (!this.parkGrid) {
+      this.parkGrid = new Map();
+      for (const c of parkedWorld(this.map).cars) { const k = (Math.floor(c.x / 20) + 512) * 1024 + Math.floor(c.z / 20) + 512; let l = this.parkGrid.get(k); if (!l) { l = []; this.parkGrid.set(k, l); } l.push(c); }
+    }
+    const cs = Math.cos(this.h), sn = Math.sin(this.h), gx = Math.floor(this.x / 20), gz = Math.floor(this.z / 20);
+    for (let ix = gx - 1; ix <= gx + 1; ix++) for (let iz = gz - 1; iz <= gz + 1; iz++) {
+      const list = this.parkGrid.get((ix + 512) * 1024 + iz + 512); if (!list) continue;
+      for (const car of list) {
+        const ccs = Math.cos(car.h), csn = Math.sin(car.h);
+        for (let i = 0; i < 3; i++) {
+          const o1 = (i - 1) * 1.5, ax = this.x + sn * o1, az = this.z + cs * o1;
+          for (let j = 0; j < 3; j++) {
+            const o2 = (j - 1) * 1.45, bx = car.x + csn * o2, bz = car.z + ccs * o2, rr = 1.85, ddx = ax - bx, ddz = az - bz, d = Math.hypot(ddx, ddz);
+            if (d < rr && d > 1e-4) {
+              const nx = ddx / d, nz = ddz / d; this.x += nx * (rr - d); this.z += nz * (rr - d);
+              const into = -(Math.sin(this.h) * this.v * nx + Math.cos(this.h) * this.v * nz);
+              if (into > 0.6) { this.v *= Math.max(0.1, 1 - into / 12); this.onHit('parked', into); }
+            }
+          }
+        }
+      }
+    }
+  }
+  private onHit(kind: 'building' | 'car' | 'parked', speed: number) {
     if (this.crashCool > this.time) return;
     this.crashCool = this.time + 1.3;
     const big = speed > 5;
@@ -327,6 +355,7 @@ export class OpenSim {
     this.emit({ k: 'shake', amp: Math.min(1.6, 0.4 + speed / 8), dur: 0.4 });
     this.emit({ k: 'crash', x: this.x, z: this.z, big });
     if (kind === 'building') { if (speed > 2.5) { this.award('HIT_BUILDING', 'HIT'); if (big) this.strike('You hit a building'); } }
+    else if (kind === 'parked') { if (speed > 1.5) { this.award('HIT_TRAFFIC', 'COLLISION'); if (speed > 3.5) this.strike('You hit a parked car'); } }
     else { this.award('HIT_TRAFFIC', 'COLLISION'); if (speed > 2.5) this.strike('You hit another car'); }
   }
   private collideCars() {

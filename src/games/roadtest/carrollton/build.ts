@@ -4,7 +4,7 @@
  * World metres, x east, z south, y up. Map data (c) OpenStreetMap contributors.
  */
 import * as THREE from 'three';
-import { offsetPoly, pointOnPoly, rand01, type Building, type Edge, type GameMap, type Node } from './map';
+import { buildingAt, offsetPoly, pointOnPoly, rand01, type Building, type Edge, type GameMap, type Node } from './map';
 
 export class Acc {
   pos: number[] = []; nor: number[] = []; col: number[] = []; uv: number[] = []; idx: number[] = [];
@@ -18,6 +18,8 @@ export class Acc {
     return nx * n[a * 3]! + ny * n[a * 3 + 1]! + nz * n[a * 3 + 2]! >= 0;
   }
   quad(a: number, b: number, c: number, d: number) { if (this.faces(a, b, c)) this.idx.push(a, b, c, a, c, d); else this.idx.push(a, c, b, a, d, c); }
+  /** both windings, the same normals: a card seen from either side, lit as if it were round (foliage) */
+  card(a: number, b: number, c: number, d: number) { this.idx.push(a, b, c, a, c, d, a, c, b, a, d, c); }
   tri(a: number, b: number, c: number) { if (this.faces(a, b, c)) this.idx.push(a, b, c); else this.idx.push(a, c, b); }
   get empty() { return this.idx.length === 0; }
   /** the same mesh cut into square tiles (they share the vertex buffers), so the renderer can skip the tiles that are behind you or far away */
@@ -58,7 +60,7 @@ const mix = (a: THREE.Color, b: THREE.Color, t: number) => a.clone().lerp(b, t);
 const SIDEWALK = 2.0, KERB = 0.14;
 
 // ------------------------------------------------------------------------------------------------ the roads
-export const ROAD_COL: Record<number, THREE.Color> = { 1: C(0x5a5c5f), 2: C(0x4a4d51), 3: C(0x404348), 4: C(0x3a3d42), 5: C(0x35383d) };
+export const ROAD_COL: Record<number, THREE.Color> = { 1: C(0x707274), 2: C(0x64676b), 3: C(0x5b5e63), 4: C(0x54575c), 5: C(0x4e5156) };
 
 /** a flat ribbon along a polyline, `hw` each side of it, laid at height y */
 function ribbon(a: Acc, p: number[], hw: number, y: number, col: THREE.Color, vScale = 8, off = 0, vStart = 0) {
@@ -92,7 +94,7 @@ export function buildRoads(map: GameMap): RoadParts {
   // ---- asphalt
   for (const e of map.edges) {
     const w = e.way; if (!w.drive) continue;
-    ribbon(get(w.rank), e.p, w.width / 2, 0.0, mix(ROAD_COL[w.rank] ?? ROAD_COL[2]!, C(0x4a4d52), rand01(e.id * 7 + 1) * 0.35), 9);
+    ribbon(get(w.rank), e.p, w.width / 2, 0.0, mix(ROAD_COL[w.rank] ?? ROAD_COL[2]!, C(0x686b6f), rand01(e.id * 7 + 1) * 0.35), 9);
   }
   // junction pads, so the corners where roads of different widths meet are filled
   for (const n of map.nodes) {
@@ -254,83 +256,168 @@ function buildCrosswalks(map: GameMap, a: Acc) {
 
 // ------------------------------------------------------------------------------------------------ buildings
 export const FLOOR_H = 3.4, BAY_W = 3.3;
-export interface BuildingParts { houses: Acc; shops: Acc; roofs: Acc; extras: Acc; signs: { b: Building; x: number; z: number; nx: number; nz: number; w: number; y: number }[]; courthouse: Building | null; heights: Map<number, number> }
+export type WallStyle = 'brick' | 'stucco' | 'siding' | 'brickhouse';
+export const WALL_STYLES: WallStyle[] = ['brick', 'stucco', 'siding', 'brickhouse'];
+export interface BuildingParts {
+  walls: Record<WallStyle, Acc>; roofsGable: Acc; roofsFlat: Acc; trim: Acc; awnings: Acc; contact: Acc;
+  signs: { b: Building; x: number; z: number; nx: number; nz: number; w: number; y: number }[]; courthouse: Building | null; heights: Map<number, number>;
+}
 
 const NAMED_TINT: Record<string, number> = {
   'Carroll County Courthouse': 0xdcd3bf, 'Southeastern Quilt & Textile Museum': 0xa4533c, 'Hudson Mill': 0x9c4a36, 'Carrollton Art Center': 0xc9b9a1, 'Neva Lomason Memorial Library': 0xc0724f,
   'Moores Chapel Methodist Church': 0xe8e2d4, 'Howard B. Benson Building': 0xb7694a, 'James Bonner Building': 0xb86a4a, 'Maple Street Mansion': 0xf0ead8, 'The Depot on Bradley': 0xa95c40,
 };
+/** brick colours, a little over 1 because the brick texture itself is mid grey */
+const BRICKS = [0xd06a4e, 0xbb5a43, 0xc77a58, 0xa9553f, 0xd59a6e, 0xb8684c, 0xc98f6a];
+const STUCCO = [0xf1e7d4, 0xe6dccb, 0xd9d4ca, 0xcfc4b0, 0xe9e1cf, 0xc6cfd4, 0xdad0bd];
+const AWNING = [0x2f5d3a, 0x7a2230, 0x23395b, 0x8a6a2a, 0x34373b, 0x5b2a4a, 0x1f5a5a];
+const isBrickColour = (c: number) => [0xb4553f, 0x8c5a45, 0x9b6b52, 0xa4533c, 0x9c4a36, 0xc0724f, 0xb7694a, 0xb86a4a, 0xa95c40].includes(c);
 
 export function buildBuildings(map: GameMap): BuildingParts {
-  const houses = new Acc(), shops = new Acc(), roofs = new Acc(), extras = new Acc();
+  const walls = { brick: new Acc(), stucco: new Acc(), siding: new Acc(), brickhouse: new Acc() } as Record<WallStyle, Acc>;
+  const roofsGable = new Acc(), roofsFlat = new Acc(), trim = new Acc(), awnings = new Acc(), contact = new Acc();
   const signs: BuildingParts['signs'] = []; let courthouse: Building | null = null; const heights = new Map<number, number>();
+  const centre = map.buildings.find((b) => b.landmark === 'courthouse');
+  const UP = [0, 1, 0];
   for (const b of map.buildings) {
-    const named = b.name && NAMED_TINT[b.name];
-    const wallCol = C(named ?? b.color), roofCol = C(b.roof);
+    const named = b.name ? NAMED_TINT[b.name] : undefined;
     const isHouse = b.gable;
-    const floors = Math.max(1, Math.round(b.h / FLOOR_H)), H = floors * FLOOR_H + (isHouse ? 0 : 0.5);
+    const downtown = centre ? Math.hypot(b.cx - centre.cx, b.cz - centre.cz) < 420 : false;
+    const r = rand01(b.id * 7.77 + 3);
+    let style: WallStyle;
+    if (isHouse) style = isBrickColour(b.color) || r < 0.22 ? 'brickhouse' : 'siding';
+    else if (named !== undefined) style = isBrickColour(named) ? 'brick' : 'stucco';
+    else style = isBrickColour(b.color) || (downtown ? r < 0.75 : r < 0.35) ? 'brick' : 'stucco';
+    const tint = style === 'brick' || style === 'brickhouse'
+      ? C(named !== undefined && isBrickColour(named) ? named : BRICKS[Math.floor(rand01(b.id * 3.1) * BRICKS.length)]!).multiplyScalar(1.22)
+      : style === 'stucco' ? C(named ?? STUCCO[Math.floor(rand01(b.id * 3.3) * STUCCO.length)]!) : C(b.color).multiplyScalar(1.05);
+    const roofCol = C(b.roof);
+    const floors = Math.max(1, Math.round(b.h / FLOOR_H)), H = floors * FLOOR_H + (isHouse ? 0 : 0.9);
     heights.set(b.id, H);
-    const acc = isHouse ? houses : shops;
+    const acc = walls[style];
     const n = b.p.length / 2;
-    // winding: make the polygon counter-clockwise seen from above (x right, z down => positive signed area in this frame is clockwise on screen, so we just compute and flip as needed)
     let area = 0; for (let i = 0; i < n; i++) { const j = (i + 1) % n; area += b.p[i * 2]! * b.p[j * 2 + 1]! - b.p[j * 2]! * b.p[i * 2 + 1]!; }
     const ord = area > 0 ? [...Array(n).keys()] : [...Array(n).keys()].reverse();
+    const trimCol = style === 'brick' ? C(0xe2dccd) : style === 'stucco' ? tint.clone().multiplyScalar(0.82) : C(0xf2f0ea);
     let acc0 = 0;
     for (let k = 0; k < n; k++) {
       const i = ord[k]!, j = ord[(k + 1) % n]!;
       const x0 = b.p[i * 2]!, z0 = b.p[i * 2 + 1]!, x1 = b.p[j * 2]!, z1 = b.p[j * 2 + 1]!, L = Math.hypot(x1 - x0, z1 - z0); if (L < 0.2) continue;
-      const nxn = (z1 - z0) / L, nzn = -(x1 - x0) / L;           // outward normal for a counter-clockwise (positive area) ring in this frame; DoubleSide covers the other case
+      const nxn = (z1 - z0) / L, nzn = -(x1 - x0) / L;
       const bays = Math.max(1, Math.round(L / BAY_W)), u0 = acc0 / 4, u1 = (acc0 + bays) / 4; acc0 += bays;
-      const shade = 0.92 + 0.08 * nxn;                             // a touch of fake directional shading per wall
-      const col = wallCol.clone().multiplyScalar(shade + rand01(b.id * 13 + k) * 0.04);
-      const a = acc.v(x0, 0, z0, col, u0, 0, nxn, 0, nzn), bq = acc.v(x1, 0, z1, col, u1, 0, nxn, 0, nzn), c = acc.v(x1, H, z1, col, u1, floors / 3, nxn, 0, nzn), d = acc.v(x0, H, z0, col, u0, floors / 3, nxn, 0, nzn);
+      const col = tint.clone().multiplyScalar(0.97 + rand01(b.id * 13 + k) * 0.06);
+      const top = floors / 3 + (isHouse ? 0 : 0.9 / FLOOR_H / 3);
+      const a = acc.v(x0, 0, z0, col, u0, 0, nxn, 0, nzn), bq = acc.v(x1, 0, z1, col, u1, 0, nxn, 0, nzn), c = acc.v(x1, H, z1, col, u1, top, nxn, 0, nzn), d = acc.v(x0, H, z0, col, u0, top, nxn, 0, nzn);
       acc.quad(a, bq, c, d);
+      // ---- a cornice cap along the top of the wall of a flat-roofed building: a ledge that throws a line of shadow
+      if (!isHouse) {
+        const o = 0.32, y0 = H - 0.05, y1 = H + 0.28, ox = nxn * o, oz = nzn * o;
+        const tc = trimCol.clone().multiplyScalar(1.02), tcd = trimCol.clone().multiplyScalar(0.7);
+        trim.quad(trim.v(x0 + ox, y1, z0 + oz, tc, 0, 0, 0, 1, 0), trim.v(x1 + ox, y1, z1 + oz, tc, 0, 0, 0, 1, 0), trim.v(x1 - nxn * 0.3, y1, z1 - nzn * 0.3, tc, 0, 0, 0, 1, 0), trim.v(x0 - nxn * 0.3, y1, z0 - nzn * 0.3, tc, 0, 0, 0, 1, 0));
+        trim.quad(trim.v(x0 + ox, y0, z0 + oz, tc, 0, 0, nxn, 0, nzn), trim.v(x1 + ox, y0, z1 + oz, tc, 0, 0, nxn, 0, nzn), trim.v(x1 + ox, y1, z1 + oz, tc, 0, 0, nxn, 0, nzn), trim.v(x0 + ox, y1, z0 + oz, tc, 0, 0, nxn, 0, nzn));
+        trim.quad(trim.v(x0, y0, z0, tcd, 0, 0, 0, -1, 0), trim.v(x1, y0, z1, tcd, 0, 0, 0, -1, 0), trim.v(x1 + ox, y0, z1 + oz, tcd, 0, 0, 0, -1, 0), trim.v(x0 + ox, y0, z0 + oz, tcd, 0, 0, 0, -1, 0));
+        // the storefront cornice: a thin ledge above the ground floor on brick and stucco shops
+        if (L > 4) {
+          const yb = FLOOR_H - 0.12, yt = FLOOR_H + 0.1, ob = 0.18;
+          trim.quad(trim.v(x0 + nxn * ob, yb, z0 + nzn * ob, tcd, 0, 0, nxn, 0, nzn), trim.v(x1 + nxn * ob, yb, z1 + nzn * ob, tcd, 0, 0, nxn, 0, nzn), trim.v(x1 + nxn * ob, yt, z1 + nzn * ob, tc, 0, 0, nxn, 0, nzn), trim.v(x0 + nxn * ob, yt, z0 + nzn * ob, tc, 0, 0, nxn, 0, nzn));
+          trim.quad(trim.v(x0, yt, z0, tc, 0, 0, 0, 1, 0), trim.v(x1, yt, z1, tc, 0, 0, 0, 1, 0), trim.v(x1 + nxn * ob, yt, z1 + nzn * ob, tc, 0, 0, 0, 1, 0), trim.v(x0 + nxn * ob, yt, z0 + nzn * ob, tc, 0, 0, 0, 1, 0));
+        }
+      }
+      // ---- contact shadow on the ground around the base (a multiply decal: grey at the wall, white 2 m out)
+      {
+        const D = isHouse ? 1.6 : 2.2, inC = new THREE.Color().setScalar(0.66), outC = new THREE.Color().setScalar(1);
+        const ext = 0.6, ex = (x1 - x0) / L * ext, ez = (z1 - z0) / L * ext;
+        contact.quad(contact.v(x0 - ex, 0.15, z0 - ez, inC, 0, 0, 0, 1, 0), contact.v(x1 + ex, 0.15, z1 + ez, inC, 0, 0, 0, 1, 0), contact.v(x1 + ex + nxn * D, 0.15, z1 + ez + nzn * D, outC, 0, 0, 0, 1, 0), contact.v(x0 - ex + nxn * D, 0.15, z0 - ez + nzn * D, outC, 0, 0, 0, 1, 0));
+      }
+    }
+    // ---- the wall that faces the street (for the porch, the awning and the sign)
+    let front: { x0: number; z0: number; x1: number; z1: number; nx: number; nz: number; L: number; d: number } | null = null;
+    for (let k = 0; k < n; k++) {
+      const i = ord[k]!, j = ord[(k + 1) % n]!, x0 = b.p[i * 2]!, z0 = b.p[i * 2 + 1]!, x1 = b.p[j * 2]!, z1 = b.p[j * 2 + 1]!, L = Math.hypot(x1 - x0, z1 - z0); if (L < 4) continue;
+      const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, nx = (z1 - z0) / L, nz = -(x1 - x0) / L;
+      const probe = map.roadAt(mx + nx * 6, mz + nz * 6); const d = probe ? probe.dist : 99;
+      if (!front || d < front.d) front = { x0, z0, x1, z1, nx, nz, L, d };
     }
     // ---- roof
     if (isHouse) {
-      // an oriented box around the footprint: a gable roof along its long side
       let best = 0, bl = 0; for (let i = 0; i < n; i++) { const j = (i + 1) % n, l = Math.hypot(b.p[j * 2]! - b.p[i * 2]!, b.p[j * 2 + 1]! - b.p[i * 2 + 1]!); if (l > bl) { bl = l; best = i; } }
       const j0 = (best + 1) % n, ax = (b.p[j0 * 2]! - b.p[best * 2]!) / bl, az = (b.p[j0 * 2 + 1]! - b.p[best * 2 + 1]!) / bl, bx = -az, bz = ax;
       let minA = 1e9, maxA = -1e9, minB = 1e9, maxB = -1e9;
       for (let i = 0; i < n; i++) { const dx = b.p[i * 2]! - b.cx, dz = b.p[i * 2 + 1]! - b.cz, pa = dx * ax + dz * az, pb = dx * bx + dz * bz; minA = Math.min(minA, pa); maxA = Math.max(maxA, pa); minB = Math.min(minB, pb); maxB = Math.max(maxB, pb); }
-      const ov = 0.45, rise = Math.min(3.4, (maxB - minB) * 0.34 + 0.6);
+      const ov = 0.5, rise = Math.min(3.6, (maxB - minB) * 0.36 + 0.6);
       const P = (pa: number, pb: number, y: number) => [b.cx + ax * pa + bx * pb, y, b.cz + az * pa + bz * pb] as const;
-      const e00 = P(minA - ov, minB - ov, H), e01 = P(maxA + ov, minB - ov, H), e11 = P(maxA + ov, maxB + ov, H), e10 = P(minA - ov, maxB + ov, H);
-      const r0 = P(minA - ov, (minB + maxB) / 2, H + rise), r1 = P(maxA + ov, (minB + maxB) / 2, H + rise);
-      const rc = roofCol.clone(); const sl = Math.hypot(rise, (maxB - minB) / 2); const ny = ((maxB - minB) / 2) / sl, nb = rise / sl;
-      const V = (p: readonly number[], c2: THREE.Color, nrmB: number) => roofs.v(p[0]!, p[1]!, p[2]!, c2, p[0]! / 3, p[2]! / 3, bx * nrmB * nb, ny, bz * nrmB * nb);
-      const sA = rc.clone().multiplyScalar(1.05), sB = rc.clone().multiplyScalar(0.8);
-      roofs.quad(V(e00, sB, -1), V(e01, sB, -1), V(r1, sB, -1), V(r0, sB, -1));
-      roofs.quad(V(e11, sA, 1), V(e10, sA, 1), V(r0, sA, 1), V(r1, sA, 1));
-      // gable ends in wall colour
-      const g0 = [P(minA, minB, H), P(minA, maxB, H), P(minA, (minB + maxB) / 2, H + rise * 0.9)], g1 = [P(maxA, minB, H), P(maxA, maxB, H), P(maxA, (minB + maxB) / 2, H + rise * 0.9)];
-      for (const g of [g0, g1]) { const t = [0, 1, 2].map((i) => houses.v(g[i]![0], g[i]![1], g[i]![2], wallCol, 0, 0, ax, 0, az)); houses.tri(t[0]!, t[1]!, t[2]!); }
+      const midB = (minB + maxB) / 2, half = (maxB - minB) / 2 + ov, sl = Math.hypot(rise, half), ny = half / sl, nb = rise / sl;
+      const rc = roofCol.clone().multiplyScalar(1.15);
+      const V = (pa: number, pb: number, y: number, side: number) => { const p = P(pa, pb, y); const slope = Math.abs(pb - midB) <= 1e-6 ? sl : (half - Math.abs(pb - midB)) / half * sl; return roofsGable.v(p[0], p[1], p[2], rc, pa / 4, slope / 4, bx * side * nb, ny, bz * side * nb); };
+      roofsGable.quad(V(minA - ov, minB - ov, H - 0.15, -1), V(maxA + ov, minB - ov, H - 0.15, -1), V(maxA + ov, midB, H + rise, -1), V(minA - ov, midB, H + rise, -1));
+      roofsGable.quad(V(maxA + ov, maxB + ov, H - 0.15, 1), V(minA - ov, maxB + ov, H - 0.15, 1), V(minA - ov, midB, H + rise, 1), V(maxA + ov, midB, H + rise, 1));
+      // the fascia boards under the eaves
+      const fasc = C(0xf2f0ea);
+      for (const [pb, sd] of [[minB - ov, -1], [maxB + ov, 1]] as const) {
+        const p0 = P(minA - ov, pb, H - 0.15), p1 = P(maxA + ov, pb, H - 0.15);
+        trim.quad(trim.v(p0[0], H - 0.4, p0[2], fasc, 0, 0, bx * sd, 0, bz * sd), trim.v(p1[0], H - 0.4, p1[2], fasc, 0, 0, bx * sd, 0, bz * sd), trim.v(p1[0], H - 0.12, p1[2], fasc, 0, 0, bx * sd, 0, bz * sd), trim.v(p0[0], H - 0.12, p0[2], fasc, 0, 0, bx * sd, 0, bz * sd));
+      }
+      // gable ends in the wall colour, with the siding texture carried up
+      for (const pa of [minA, maxA]) {
+        const g0 = P(pa, minB, H), g1 = P(pa, maxB, H), g2 = P(pa, midB, H + rise * 0.92), sd = pa === minA ? -1 : 1;
+        const t = [g0, g1, g2].map((g, i) => acc.v(g[0], g[1], g[2], tint, i === 0 ? 0 : i === 1 ? (maxB - minB) / BAY_W / 4 : (maxB - minB) / BAY_W / 8, i === 2 ? (H + rise) / FLOOR_H / 3 : H / FLOOR_H / 3, ax * sd, 0, az * sd));
+        acc.tri(t[0]!, t[1]!, t[2]!);
+      }
+      // a brick chimney at one end of the ridge
+      if (rand01(b.id * 4.4) < 0.6) { const cp = P((rand01(b.id) < 0.5 ? minA : maxA) * 0.7, midB + (maxB - minB) * 0.18, 0); box(trim, cp[0], H - 1, cp[2], 0.9, rise + 2.0, 0.9, C(0x9c5440), Math.atan2(ax, az)); box(trim, cp[0], H + rise + 0.95, cp[2], 1.05, 0.12, 1.05, C(0x6b6b6b), Math.atan2(ax, az)); }
+      // the front porch: a little roof on posts, and the deck
+      if (front && front.L > 6 && front.d < 30) {
+        const pw = Math.min(front.L * 0.62, 8), mx = (front.x0 + front.x1) / 2, mz = (front.z0 + front.z1) / 2, tx = (front.x1 - front.x0) / front.L, tz = (front.z1 - front.z0) / front.L, depth = 2.2;
+        const pc = rc.clone().multiplyScalar(0.95), white = C(0xf4f2ec), deck = C(0x9a8a76);
+        const A = (lat: number, out: number, y: number, nrm = UP) => trim.v(mx + tx * lat + front!.nx * out, y, mz + tz * lat + front!.nz * out, pc, 0, 0, nrm[0]!, nrm[1]!, nrm[2]!);
+        trim.quad(A(-pw / 2, 0, 3.0), A(pw / 2, 0, 3.0), A(pw / 2, depth, 2.6), A(-pw / 2, depth, 2.6));
+        box(trim, mx + front.nx * (depth / 2), 0, mz + front.nz * (depth / 2), pw, 0.38, depth, deck, Math.atan2(tx, tz) + Math.PI / 2);
+        for (const lat of [-pw / 2 + 0.2, pw / 2 - 0.2]) box(trim, mx + tx * lat + front.nx * (depth - 0.2), 0.38, mz + tz * lat + front.nz * (depth - 0.2), 0.16, 2.24, 0.16, white);
+      }
     } else {
+      // flat roof a little below the top of the walls: the walls become a parapet
       const tris = THREE.ShapeUtils.triangulateShape(pairs(b.p), []);
-      const base = roofs.n; const rc = roofCol.clone().multiplyScalar(0.9 + rand01(b.id) * 0.2);
-      for (let i = 0; i < n; i++) roofs.v(b.p[i * 2]!, H + 0.02, b.p[i * 2 + 1]!, rc, b.p[i * 2]! / 6, b.p[i * 2 + 1]! / 6);
-      for (const t of tris) roofs.tri(base + t[0]!, base + t[1]!, base + t[2]!);
-      // a parapet lip and some roof equipment
-      if (b.area > 140) {
-        const bx = 1.6 + rand01(b.id * 3) * 1.4;
-        box(extras, b.cx + (rand01(b.id * 5) - 0.5) * Math.sqrt(b.area) * 0.35, H, b.cz + (rand01(b.id * 9) - 0.5) * Math.sqrt(b.area) * 0.35, bx, 1.1, bx * 0.8, C(0x8d9094));
+      const base = roofsFlat.n; const rc = C(0xbdbab4).multiplyScalar(0.85 + rand01(b.id) * 0.2);
+      for (let i = 0; i < n; i++) roofsFlat.v(b.p[i * 2]!, H - 0.75, b.p[i * 2 + 1]!, rc, b.p[i * 2]! / 8, b.p[i * 2 + 1]! / 8);
+      for (const t of tris) roofsFlat.tri(base + t[0]!, base + t[1]!, base + t[2]!);
+      // roof equipment: an AC unit or two, a hatch
+      if (b.area > 120) {
+        const k = b.area > 600 ? 3 : 1;
+        for (let q = 0; q < k; q++) {
+          const bx = 1.4 + rand01(b.id * 3 + q) * 1.2, ox = (rand01(b.id * 5 + q) - 0.5) * Math.sqrt(b.area) * 0.4, oz = (rand01(b.id * 9 + q) - 0.5) * Math.sqrt(b.area) * 0.4;
+          if (!buildingAt(map, b.cx + ox, b.cz + oz)) continue;
+          box(trim, b.cx + ox, H - 0.75, b.cz + oz, bx, 1.0, bx * 0.8, C(0x9da1a6)); box(trim, b.cx + ox, H + 0.25, b.cz + oz, bx * 0.7, 0.1, bx * 0.55, C(0x55595e));
+        }
+      }
+      // an awning over the storefront on the street side
+      if (front && front.d < 14 && front.L > 5 && (b.name || rand01(b.id * 6.6) < 0.45) && floors <= 4) {
+        const ac = C(AWNING[Math.floor(rand01(b.id * 8.8) * AWNING.length)]!), acd = ac.clone().multiplyScalar(0.72);
+        const tx = (front.x1 - front.x0) / front.L, tz = (front.z1 - front.z0) / front.L, inset = Math.min(1.2, front.L * 0.1), out = 1.5;
+        const ax0 = front.x0 + tx * inset, az0 = front.z0 + tz * inset, ax1 = front.x1 - tx * inset, az1 = front.z1 - tz * inset, ny2 = 0.8, nb2 = 0.6;
+        const A = (x: number, z: number, o: number, y: number, c: THREE.Color, nrm: number[]) => awnings.v(x + front!.nx * o, y, z + front!.nz * o, c, 0, 0, nrm[0]!, nrm[1]!, nrm[2]!);
+        const sn = [front.nx * nb2, ny2, front.nz * nb2], fn = [front.nx, 0, front.nz];
+        awnings.quad(A(ax0, az0, 0, 2.95, ac, sn), A(ax1, az1, 0, 2.95, ac, sn), A(ax1, az1, out, 2.45, ac, sn), A(ax0, az0, out, 2.45, ac, sn));
+        awnings.quad(A(ax0, az0, out, 2.45, acd, fn), A(ax1, az1, out, 2.45, acd, fn), A(ax1, az1, out, 2.2, acd, fn), A(ax0, az0, out, 2.2, acd, fn));
       }
     }
     if (b.landmark === 'courthouse') courthouse = b;
-    // ---- sign on the wall facing the nearest street
-    if (b.name && !isHouse && b.area > 90) {
-      let bestD = 1e9, pick: { x: number; z: number; nx: number; nz: number; w: number } | null = null;
-      for (let k = 0; k < n; k++) {
-        const i = ord[k]!, j = ord[(k + 1) % n]!, x0 = b.p[i * 2]!, z0 = b.p[i * 2 + 1]!, x1 = b.p[j * 2]!, z1 = b.p[j * 2 + 1]!, L = Math.hypot(x1 - x0, z1 - z0); if (L < 5) continue;
-        const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, nx = (z1 - z0) / L, nz = -(x1 - x0) / L;
-        const probe = map.roadAt(mx + nx * 6, mz + nz * 6); const d = probe ? probe.dist : 99;
-        // the outward normal must point to the street: compare against the road direction
-        if (d < bestD) { bestD = d; pick = { x: mx, z: mz, nx, nz, w: L }; }
-      }
-      if (pick && bestD < 30) signs.push({ b, ...pick, y: Math.min(H - 0.8, 4.4) });
+    // ---- the sign on the wall facing the street
+    if (b.name && !isHouse && b.area > 90 && front && front.d < 30) {
+      signs.push({ b, x: (front.x0 + front.x1) / 2, z: (front.z0 + front.z1) / 2, nx: front.nx, nz: front.nz, w: front.L, y: Math.min(H - 1.0, 4.3) });
     }
   }
-  return { houses, shops, roofs, extras, signs, courthouse, heights };
+  return { walls, roofsGable, roofsFlat, trim, awnings, contact, signs, courthouse, heights };
+}
+
+/** driveways (flat concrete) and the stall lines of the parking lots, from parked.ts */
+export function buildDriveways(pw: { driveways: { x0: number; z0: number; x1: number; z1: number; w: number }[]; stalls: { x0: number; z0: number; x1: number; z1: number }[] }) {
+  const drive = new Acc(), stalls = new Acc(); const cc = C(0xd8d5ce), W = C(0xeeeeea);
+  for (const d of pw.driveways) {
+    const L = Math.hypot(d.x1 - d.x0, d.z1 - d.z0) || 1, rx = -(d.z1 - d.z0) / L * d.w / 2, rz = (d.x1 - d.x0) / L * d.w / 2;
+    drive.quad(drive.v(d.x0 - rx, 0, d.z0 - rz, cc, 0, 0), drive.v(d.x0 + rx, 0, d.z0 + rz, cc, 1, 0), drive.v(d.x1 + rx, 0, d.z1 + rz, cc, 1, L / 4), drive.v(d.x1 - rx, 0, d.z1 - rz, cc, 0, L / 4));
+  }
+  for (const s of pw.stalls) ribbon(stalls, [s.x0, s.z0, s.x1, s.z1], 0.06, 0, W, 4);
+  return { drive, stalls };
 }
 
 export function box(a: Acc, cx: number, y0: number, cz: number, w: number, h: number, d: number, col: THREE.Color, rotY = 0) {

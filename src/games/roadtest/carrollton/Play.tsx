@@ -27,6 +27,8 @@ import { disposeCarrolltonTextures } from './tex';
 import { disposeSignAtlases } from './signs';
 import type { Route } from './route';
 
+/** ?pm=0 keeps the quality fixed (for testing on slow software renderers) */
+const NO_PM = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('pm') === '0';
 export const INTRO_SECONDS = 2.6;
 
 // ------------------------------------------------------------ input ---
@@ -192,21 +194,28 @@ function CameraRig({ handle, map }: { handle: OpenHandle; map: GameMap }) {
     camera.position.copy(tmp.p); camera.lookAt(tmp.l); camera.rotateZ(clamp(-sim.yawRate * 0.015, -0.03, 0.03) * e);
     c.fov = damp(c.fov, fovB + sp * 9 + shake.punch * 6, 5, dt);
     if (Math.abs(pc.fov - c.fov) > 0.01) { pc.fov = c.fov; pc.updateProjectionMatrix(); }
-    pc.near = 0.3;
+    pc.near = 0.4;
   });
   return null;
 }
 
-function Scene({ handle, carId, quality, onComplete, onReady }: { handle: OpenHandle; carId: GarageId; quality: Quality; onComplete: (r: LevelResult) => void; onReady: () => void }) {
+/** shadow map size for this device: real sun shadows everywhere, sharper on stronger machines; ?shadows=0 turns them off */
+export function shadowSizeFor(tier: Quality['tier']) {
+  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('shadows') === '0') return 0;
+  return tier === 'high' ? 2048 : tier === 'mid' ? 1536 : 1024;
+}
+
+function Scene({ handle, carId, quality, lvl, onComplete, onReady }: { handle: OpenHandle; carId: GarageId; quality: Quality; lvl: number; onComplete: (r: LevelResult) => void; onReady: () => void }) {
   const sim = handle.sim, map = sim.map;
   const env = useMemo(() => makeEnv(), []);
   const mix = useRef(0);
+  const shadowSize = useMemo(() => shadowSizeFor(quality.tier), [quality.tier]);
   const { scene } = useThree();
   useEffect(() => { if (import.meta.env.DEV) (window as unknown as { __scene?: THREE.Scene }).__scene = scene; }, [scene]);
   return <NightCtx.Provider value={mix}>
     <Suspense fallback={null}>
-      <Atmosphere sim={sim} env={env} shadow={quality.tier === 'high' ? quality.shadow : 0} mix={mix} />
-      <OpenWorld sim={sim} env={env} quality={quality} />
+      <Atmosphere sim={sim} env={env} shadow={shadowSize} active={lvl < 2} mix={mix} lite={quality.tier === 'lite'} />
+      <OpenWorld sim={sim} env={env} quality={quality} shadowOn={shadowSize > 0} />
       <PlayerRig sim={sim} carId={carId} lite={quality.lite} />
     </Suspense>
     <Driver handle={handle} onComplete={onComplete} onReady={onReady} />
@@ -399,14 +408,14 @@ export function OpenGame({ handle, onComplete, onLost }: { handle: OpenHandle; o
     <Canvas
       key={ckey}
       className="rt3d-canvas"
-      shadows={quality.shadow > 0 && tierName === 'high'}
+      shadows={shadowSizeFor(tierName) > 0 ? 'percentage' : false}
       dpr={dpr}
       gl={{ antialias: typeof window === 'undefined' || window.innerWidth >= 900, alpha: false, powerPreference: 'high-performance' }}
-      camera={{ position: [handle.sim.x, 3.3, handle.sim.z + 8], fov: 58, near: 0.3, far: 1100 }}
-      onCreated={({ gl }) => { if (import.meta.env.DEV) (window as unknown as { __gl?: unknown }).__gl = gl; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 0.95; gl.setClearColor('#cfe3f3'); gl.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); setCkey((k) => k + 1); }, { once: true }); }}
+      camera={{ position: [handle.sim.x, 3.3, handle.sim.z + 8], fov: 58, near: 0.4, far: 1000 }}
+      onCreated={({ gl }) => { if (import.meta.env.DEV) (window as unknown as { __gl?: unknown }).__gl = gl; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.0; gl.setClearColor('#cfdbe2'); gl.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); setCkey((k) => k + 1); }, { once: true }); }}
     >
-      <PerformanceMonitor ms={350} iterations={8} flipflops={3} onDecline={() => setLvl((l) => clamp(l + 1, 0, 3))} onIncline={() => setLvl((l) => clamp(l - 1, 0, 3))} />
-      <Scene handle={handle} carId={carId} quality={quality} onComplete={onCompleteCb} onReady={() => setReady(true)} />
+      {!NO_PM && <PerformanceMonitor ms={350} iterations={8} flipflops={3} onDecline={() => setLvl((l) => clamp(l + 1, 0, 3))} onIncline={() => setLvl((l) => clamp(l - 1, 0, 3))} />}
+      <Scene handle={handle} carId={carId} quality={quality} lvl={lvl} onComplete={onCompleteCb} onReady={() => setReady(true)} />
     </Canvas>
     <Hud handle={handle as unknown as Parameters<typeof Hud>[0]['handle']} />
     <OpenHud handle={handle} />
