@@ -90,7 +90,7 @@ export class Traffic {
       const p = segAt(seg, s);
       const d = Math.hypot(p.x - px, p.z - pz);
       if (d < minD || d > maxD) continue;
-      if (minAhead) { const dot = ((p.x - px) * pfx + (p.z - pz) * pfz) / (d || 1); if (dot > 0.55 && d < 190) continue; }
+      if (minAhead) { const dot = ((p.x - px) * pfx + (p.z - pz) * pfz) / (d || 1); if ((dot > 0.55 && d < 200) || (dot > -0.25 && d < 150)) continue; }   // never appear where the driver is looking
       const kind = this.kindFor(c.edge.way.rank);
       const sz = SIZE[kind];
       let clear = true;
@@ -242,11 +242,17 @@ export class Traffic {
       if (gap < 0.6 && !ghost) c.v = Math.min(c.v, 0.2);
       c.brake = c.acc < -0.9 || (c.v < 0.3);
       c.blockedT = c.v < 0.3 ? c.blockedT + dt : 0;
-      if (c.blockedT > 22) { if (Math.hypot(c.x - plr.x, c.z - plr.z) > 70) c.s = c.seg.len + 1e9; else if (c.blockedT > 34) { c.ghostUntil = time + 7; c.blockedT = 0; } }
+      if (c.blockedT > 22) { if (this.unseen(c, plr, 70)) c.s = c.seg.len + 1e9; else if (c.blockedT > 34) { c.ghostUntil = time + 7; c.blockedT = 0; } }
       this.move(c, dt);
     }
     // ---- leave when the car has wandered far from the player or reached the end of the road
-    for (let i = cars.length - 1; i >= 0; i--) { const c = cars[i]!; if (Math.hypot(c.x - plr.x, c.z - plr.z) > 340 || c.seg.len < 0 || c.s > 1e8) cars.splice(i, 1); }
+    // (a car only leaves where the chase camera cannot see it: far away, or behind you)
+    for (let i = cars.length - 1; i >= 0; i--) { const c = cars[i]!; if (c.s > 1e8 || c.seg.len < 0 || (Math.hypot(c.x - plr.x, c.z - plr.z) > 340 && this.unseen(c, plr, 90))) cars.splice(i, 1); }
+  }
+  /** out of the driver's sight: well behind the car, or very far */
+  private unseen(c: Mover, plr: Mover, behind: number) {
+    const dx = c.x - plr.x, dz = c.z - plr.z, d = Math.hypot(dx, dz);
+    return d > 420 || (d > behind && (dx * Math.sin(plr.h) + dz * Math.cos(plr.h)) / (d || 1) < -0.3);
   }
 
   private targetSpeed(c: Car): number {

@@ -5,7 +5,7 @@
  */
 import { ScoreTracker, buildResult, type PointKey } from '../game/scoring';
 import { getDifficulty, type Difficulty, type DifficultyConfig, type LevelConfig, type LevelResult } from '../game/types';
-import { MPH, loadMap, wrapAngle, type Edge, type GameMap, type Node, type RoadHit } from './map';
+import { MPH, loadMap, pointOnPoly, wrapAngle, type Edge, type GameMap, type Node, type RoadHit } from './map';
 import { Traffic, signalState, type Mover, type SigState } from './traffic';
 import { makeRoutePlanner, type Route } from './route';
 import { Pedestrians } from './peds';
@@ -63,7 +63,7 @@ export class OpenSim {
   strikes = 0; strikes0 = 0;
   traveled = 0; cleanDist = 0;
   /** the road under the car */
-  hit: RoadHit | null = null; onRoad = false; dir: 1 | -1 = 1; roadName = ''; limit = 25; lane = 0; rightOff = 0;
+  hit: RoadHit | null = null; onRoad = false; inBox = false; dir: 1 | -1 = 1; roadName = ''; limit = 25; lane = 0; rightOff = 0;
   prompt = ''; promptAt = 0;
   mission: Mission | null = null; missions = 0; route: Route | null = null; routeAt = 0;
   paused = false;
@@ -94,28 +94,35 @@ export class OpenSim {
     this.planner = makeRoutePlanner(this.map);
     this.spawnPlayer();
     this.traffic.populate(this.x, this.z, Math.sin(this.h), Math.cos(this.h), this.traffic.max);
-    this.banner('CARROLLTON', 'Drive anywhere. Follow every rule. The streets are the real ones', 4200, 'gold');
-    this.newMission();
+    this.newMission(true);
   }
   private r() { this.rnd = (Math.imul(this.rnd, 1664525) + 1013904223) >>> 0; return this.rnd / 4294967296; }
 
   // ------------------------------------------------------------------ start
   private spawnPlayer() {
-    // start in the right lane of Newnan Street, just south of Adamson Square, heading north (the way the signs read)
-    const m = this.map;
-    let best: { e: Edge; s: number; d: number } | null = null;
-    const tx = 131, tz = 138;
-    for (const e of m.edges) if (e.way.rank >= 2 && e.way.name) for (let s = 0; s < e.len; s += 4) {
-      const i = Math.min(e.p.length / 2 - 1, Math.floor(s / e.len * (e.p.length / 2 - 1)));
-      const d = Math.hypot(e.p[i * 2]! - tx, e.p[i * 2 + 1]! - tz); if (!best || d < best.d) best = { e, s, d };
+    // start on a calm two-way street close to Adamson Square, in the right lane, with a long clear block ahead (no junction for at least 60 m)
+    const m = this.map, SQX = 131, SQZ = 138;
+    let best: { e: Edge; dir: 1 | -1; s: number; score: number } | null = null;
+    for (const e of m.edges) {
+      const w = e.way; if (!w.ai || w.oneway || !w.name || w.rank < 2 || w.rank > 4 || e.len < 95) continue;
+      for (const dir of [1, -1] as const) {
+        const startNode = dir === 1 ? e.a : e.b;
+        const s = startNode.clear + 14;                      // distance from the start node in the direction of travel
+        const ahead = e.len - s;
+        if (ahead < 62 || reachable(m, e, dir) < 300) continue;
+        const sAB = dir === 1 ? s : e.len - s, q = pointAt(e, sAB);
+        const fx = q.tx * dir, fz = q.tz * dir;
+        const toSq = Math.hypot(SQX - q.x, SQZ - q.z), facing = ((SQX - q.x) * fx + (SQZ - q.z) * fz) / (toSq || 1);
+        // near the square, facing towards it, on a quieter street
+        const score = toSq * (1.6 - 0.6 * facing) + (w.rank >= 4 ? 120 : 0);
+        if (!best || score < best.score) best = { e, dir, s: sAB, score };
+      }
     }
-    const e = best!.e;
-    const at = (s: number) => { let i = 0; while (i < e.cum.length - 2 && e.cum[i + 1]! < s) i++; const l = e.cum[i + 1]! - e.cum[i]! || 1, t = (s - e.cum[i]!) / l; return { x: e.p[i * 2]! + (e.p[i * 2 + 2]! - e.p[i * 2]!) * t, z: e.p[i * 2 + 1]! + (e.p[i * 2 + 3]! - e.p[i * 2 + 1]!) * t, tx: (e.p[i * 2 + 2]! - e.p[i * 2]!) / l, tz: (e.p[i * 2 + 3]! - e.p[i * 2 + 1]!) / l }; };
-    const s0 = Math.min(Math.max(8, best!.s), e.len - 8);
-    const p = at(s0);
-    const lw = e.way.lw; const off = (e.way.turnLane ? lw / 2 : 0) + lw / 2;
-    this.h = Math.atan2(p.tx, p.tz);
-    this.x = p.x - p.tz * off; this.z = p.z + p.tx * off;
+    const e = best!.e, dir = best!.dir, p = pointAt(e, best!.s);
+    const lw = e.way.lw, off = (e.way.turnLane ? lw / 2 : 0) + lw / 2;
+    const tx = p.tx * dir, tz = p.tz * dir;
+    this.h = Math.atan2(tx, tz);
+    this.x = p.x - tz * off; this.z = p.z + tx * off;
     this.v = 0; this.tx0 = this.x; this.tz0 = this.z;
   }
   private tx0 = 0; private tz0 = 0;
@@ -198,13 +205,13 @@ export class OpenSim {
     let a = 0;
     if (c.gas && !c.brake) {
       if (this.v < -0.3) { a = 11; this.braking = true; }
-      else { const vmax = VMAX * (grass ? 0.55 : 1); a = 5.4 * Math.max(0, 1 - Math.pow(Math.max(0, this.v) / vmax, 1.7)); this.reverseHold = 0; }
+      else { const vmax = VMAX * (grass ? 0.6 : 1); a = 5.4 * Math.max(0, 1 - Math.pow(Math.max(0, this.v) / vmax, 1.7)); this.reverseHold = 0; }
     } else if (c.brake) {
       if (this.v > 0.4) { a = -10.5; this.braking = true; this.reverseHold = 0; }
       else { this.reverseHold += dt; if (this.reverseHold > 0.35 || this.v < -0.1) { a = -3.0 * Math.max(0, 1 - Math.abs(this.v) / VREV); } else { a = -Math.sign(this.v) * 3; this.braking = true; } }
     } else this.reverseHold = 0;
     // resistance: rolling, air and (off the road) grass
-    const drag = 0.18 + 0.0009 * this.v * this.v + (grass ? 3.6 : 0);
+    const drag = 0.18 + 0.0009 * this.v * this.v + (grass ? 2.2 : 0);
     if (!c.gas && !c.brake) a -= Math.sign(this.v) * Math.min(Math.abs(this.v) / Math.max(dt, 1e-3), drag + 0.6);
     else a -= Math.sign(this.v) * Math.min(Math.abs(this.v) / Math.max(dt, 1e-3), drag);
     this.accel += (a - this.accel) * Math.min(1, dt * 9);
@@ -212,14 +219,17 @@ export class OpenSim {
     if (Math.abs(this.v) < 0.04 && !c.gas && !c.brake) this.v = 0;
     this.reversing = this.v < -0.3;
     // steering: lock shrinks with speed, the wheels ease in and out
-    const lock = 0.62 / (1 + Math.pow(Math.abs(this.v) / 9.5, 1.6)) + 0.05;
+    // a city car turns a 90 degree corner at 10-15 mph on about two thirds lock; the lock shrinks gently with speed so the highway stays calm
+    const lock = 0.66 / (1 + Math.pow(Math.abs(this.v) / 10, 1.8)) + 0.06;
     const want = steerIn * lock;
-    const rate = (steerIn === 0 ? 3.6 : 1.9) * (1 + Math.min(1, Math.abs(this.v) / 25));
+    // the wheels turn in briskly and come back to centre faster still (a key or a thumb is all or nothing, so the car smooths it)
+    const back = steerIn === 0 || Math.sign(want) !== Math.sign(this.steer);
+    const rate = (back ? 4.8 : 2.9) * (1 + Math.min(1, Math.abs(this.v) / 25));
     this.steer += Math.max(-rate * dt, Math.min(rate * dt, want - this.steer));
     // bicycle model, limited by the grip of the tyres
     const L = CAR.wheelbase;
     let yaw = (this.v / L) * Math.tan(this.steer);
-    const grip = 8.4 * (grass ? 0.6 : 1);
+    const grip = 8.4 * (grass ? 0.72 : 1);
     const latA = Math.abs(yaw * this.v);
     if (latA > grip) { yaw *= grip / latA; this.lateral = Math.min(1, this.lateral + dt * 3); } else this.lateral = Math.max(0, this.lateral - dt * 3);
     this.yawRate += (yaw - this.yawRate) * Math.min(1, dt * 14);
@@ -259,9 +269,29 @@ export class OpenSim {
     this.banner('BACK ON THE ROAD', undefined, 1600, 'white');
   }
   private onRoadSurface() {
-    const hit = this.hit; if (!hit) return false;
-    return hit.dist <= hit.edge.way.width / 2 + 2.2 || this.nearPaved();
+    const hit = this.hit;
+    if (hit && hit.dist <= hit.edge.way.width / 2 + 2.3) return true;     // the road, its kerb and the sidewalk
+    return !!this.junctionAt(this.x, this.z, 2.5) || this.nearPaved();
   }
+  /** the junction box (the paved square where roads meet) the point is in, if any */
+  junctionAt(x: number, z: number, pad = 0): Node | null {
+    if (!this.jGrid) {
+      this.jGrid = new Map();
+      for (const n of this.map.nodes) {
+        if (n.arms.length < 3) continue;
+        let w = 0; for (const a of n.arms) w = Math.max(w, a.edge.way.width);
+        const r = Math.max(n.clear, w * 0.5 + 1.4) + 4;
+        for (let cx = Math.floor((n.x - r) / 24); cx <= Math.floor((n.x + r) / 24); cx++) for (let cz = Math.floor((n.z - r) / 24); cz <= Math.floor((n.z + r) / 24); cz++) { const k = cx * 100003 + cz; let l = this.jGrid.get(k); if (!l) { l = []; this.jGrid.set(k, l); } l.push(n); }
+      }
+    }
+    const l = this.jGrid.get(Math.floor(x / 24) * 100003 + Math.floor(z / 24)); if (!l) return null;
+    for (const n of l) {
+      let w = 0; for (const a of n.arms) w = Math.max(w, a.edge.way.width);
+      if (Math.hypot(n.x - x, n.z - z) < Math.max(n.clear, w * 0.5 + 1.4) + pad) return n;
+    }
+    return null;
+  }
+  private jGrid: Map<number, Node[]> | null = null;
   private nearPaved() { for (const l of this.map.lots) if (inPoly(l.p, this.x, this.z)) return true; return false; }
 
   private collideWalls() {
@@ -336,6 +366,8 @@ export class OpenSim {
     const along = fx * hit.tx + fz * hit.tz;
     this.dir = along >= 0 ? 1 : -1;
     this.onRoad = hit.dist <= w.width / 2 + 0.6;
+    if (!this.onRoad && this.junctionAt(this.x, this.z, 1)) { this.onRoad = true; this.inBox = true; return; }
+    this.inBox = false;
     if (this.onRoad) {
       this.roadName = w.name || (w.cls === 'service' ? 'Private drive' : 'Local street');
       // the limit of the road we are on, the busiest road at a junction
@@ -348,7 +380,8 @@ export class OpenSim {
 
   // ------------------------------------------------------------------ the examiner
   private rules(dt: number) {
-    const hit = this.hit; if (!hit || !this.onRoad) { this.offT = this.mph > 12 ? this.offT + dt : 0; this.sideT = 0; this.wrongT = 0; this.speedT = 0; if (this.offT > 2 && this.mph > 12) this.say('Stay on the road'); this.nearSignal = null; this.approach(dt); return; }
+    const hit = this.hit; if (this.inBox) { this.offT = 0; this.sideT = 0; this.wrongT = 0; this.approach(dt); this.junction(dt); return; }
+    if (!hit || !this.onRoad) { this.offT = this.mph > 12 ? this.offT + dt : 0; this.sideT = 0; this.wrongT = 0; this.speedT = 0; if (this.offT > 2 && this.mph > 12) this.say('Stay on the road'); this.nearSignal = null; this.approach(dt); return; }
     this.offT = 0;
     const w = hit.edge.way;
     const mph = this.mph;
@@ -503,7 +536,7 @@ export class OpenSim {
   }
 
   // ------------------------------------------------------------------ the mission: drive to a place by the book
-  newMission() {
+  newMission(quiet = false) {
     const m = this.map;
     const named = m.buildings.filter((b) => b.name && LANDMARK_NAMES.some((n) => b.name!.startsWith(n.slice(0, 12))));
     const cands = (named.length ? named : m.buildings.filter((b) => b.name)).filter((b) => Math.hypot(b.cx - this.x, b.cz - this.z) > 220);
@@ -516,7 +549,8 @@ export class OpenSim {
       if (!route) continue;
       this.mission = { name: b.name!, x: spot.x, z: spot.z, edge: spot.edge, s: spot.s, ang: spot.ang, t0: this.time };
       this.route = route; this.routeAt = this.time;
-      this.banner('NEW TRIP', `Drive to ${b.name}`, 3600, 'gold');
+      if (quiet) this.after(0.4, () => this.banner('YOUR FIRST TRIP', `Drive to ${b.name}. Follow the blue line`, 3800, 'gold'));
+      else this.banner('NEW TRIP', `Drive to ${b.name}`, 3600, 'gold');
       return;
     }
     this.mission = null;
@@ -567,6 +601,15 @@ export class OpenSim {
 }
 
 type LevelXKey = object;
+
+/** how many directed road pieces a car can legally reach from this one (a few pieces at the edge of the map lead nowhere) */
+export function reachable(m: GameMap, e0: Edge, d0: 1 | -1): number {
+  const ok = (e: Edge, d: 1 | -1) => { if (!e.way.drive) return false; if (!e.way.oneway) return true; return d === 1 ? e.a.arms.find((a) => a.edge === e && a.end === 0)?.outbound !== false : e.b.arms.find((a) => a.edge === e && a.end === 1)?.outbound !== false; };
+  const seen = new Set<number>([e0.id * 2 + (d0 === 1 ? 0 : 1)]); const q: [Edge, 1 | -1][] = [[e0, d0]];
+  while (q.length) { const [e, d] = q.pop()!; const out = d === 1 ? e.b : e.a, inEnd = d === 1 ? 1 : 0; for (const a of out.arms) { if (!a.outbound || (a.edge === e && a.end === inEnd && out.arms.length > 1)) continue; const nd: 1 | -1 = a.end === 0 ? 1 : -1; if (!ok(a.edge, nd)) continue; const k = a.edge.id * 2 + (nd === 1 ? 0 : 1); if (!seen.has(k)) { seen.add(k); q.push([a.edge, nd]); } } }
+  return seen.size;
+}
+export function pointAt(e: Edge, s: number) { const q = pointOnPoly(e.p, e.cum, Math.max(0, Math.min(e.len, s))); return { x: q.x, z: q.z, tx: q.tx, tz: q.tz }; }
 
 export function nearestDrivable(m: GameMap, x: number, z: number, maxD: number): { edge: Edge; s: number; x: number; z: number; ang: number } | null {
   let best: { edge: Edge; s: number; x: number; z: number; ang: number; d: number } | null = null;

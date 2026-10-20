@@ -2,7 +2,7 @@
 .cr-root .cr-hud { pointer-events: none; }
 .cr-hud .atl-road.cr-roadbar { gap: 8px; }
 .cr-hud .cr-street { max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cr-hud .cr-clock { opacity: .8; font-style: normal; }
+.cr-hud .cr-clock { opacity: .8; font-style: normal; white-space: nowrap; }
 
 .cr-trip {
   position: absolute; left: 50%; top: 96px; transform: translateX(-50%) translateY(-8px); opacity: 0;
@@ -26,13 +26,40 @@
   position: absolute; left: 14px; bottom: 14px; right: auto; top: auto; width: 168px !important; height: 168px !important; border-radius: 50%;
   box-shadow: 0 6px 22px rgba(0, 0, 0, .45); pointer-events: none;
 }
-.cr-attrib { position: absolute; left: 14px; bottom: 2px; font-size: 9px; color: rgba(255, 255, 255, .7); text-shadow: 0 1px 2px rgba(0, 0, 0, .8); pointer-events: none; }
+.cr-attrib { position: absolute; right: 8px; bottom: 4px; padding: 2px 7px; border-radius: 6px; background: rgba(8, 10, 14, .55); font-family: Inter, system-ui, sans-serif; font-size: 10px; letter-spacing: 0; color: rgba(255, 255, 255, .9); pointer-events: none; z-index: 9; }
 .cr-light { position: absolute; left: 50%; bottom: 120px; width: 0; height: 0; pointer-events: none; }
+/* the open world has no course to finish: the level name and the distance bar of the lessons are replaced by the street bar and the trip card */
+.cr-root .rt3d-top { display: none; }
+.cr-trip .cr-lane { display: block; margin-top: 3px; font-size: 11px; letter-spacing: .08em; color: #8fd0ff; font-weight: 700; text-transform: uppercase; font-style: normal; }
+.cr-trip .cr-lane:empty { display: none; }
 
-@media (max-width: 760px) {
-  .cr-root .cr-hud canvas.cr-map { left: 10px; top: 262px; bottom: auto; width: 96px !important; height: 96px !important; }
-  .cr-attrib { left: auto; right: 8px; bottom: 2px; }
-  .cr-trip { top: 204px; min-width: 0; width: calc(100% - 24px); padding: 7px 12px 7px 10px; }
-  .cr-trip b { font-size: 14px; }
-  .cr-trip .cr-gps-a { font-size: 28px; width: 30px; }
+/* phones: one clean stack. The GPS card owns the top, the score and the speed sit under it, the map and the reset button under the speed,
+   the street you are on sits between the signal buttons, the pedals own the bottom */
+@container (max-width: 760px) {
+  .cr-trip { top: 8px; width: calc(100% - 16px); padding: 7px 12px 7px 10px; border-radius: 14px; }
+  .cr-trip b { font-size: 15px; line-height: 1.15; }
+  .cr-trip small { font-size: 11.5px; }
+  .cr-trip .cr-gps-a { font-size: 30px; width: 32px; }
+  .cr-root .rt3d-tl, .cr-root .rt3d-tr { top: 82px; }
+  .cr-root .rt3d-streak { display: none; }
+  .cr-root .rt3d-deltas { top: 150px; }
+  .cr-root .rt3d-intro { padding-top: 46%; }
+  .cr-hud .atl-road.cr-roadbar { left: 50%; right: auto; top: auto; bottom: 214px; transform: translateX(-50%); max-width: calc(100% - 150px); justify-content: center; }
+  .cr-hud .atl-road.cr-roadbar em { display: inline; }
+  .cr-hud .cr-street { max-width: 46vw; }
+  .cr-root .cr-hud canvas.cr-map { left: auto; right: 10px; top: 250px; bottom: auto; width: 100px !important; height: 100px !important; }
+  .cr-hud .cr-reset { left: 10px; right: auto; top: 250px; }
+  .cr-root .atl-prompt { bottom: 268px; }
+  .cr-root .rt3d-banners { top: 46%; }
+}
+@container (max-width: 760px) and (max-height: 640px) {
+  .cr-root .cr-hud canvas.cr-map { width: 78px !important; height: 78px !important; top: 230px; }
+  .cr-hud .cr-reset { top: 230px; }
+}
+/* desktop: the site header's gold band hangs over the top of the game frame, so the stack starts below it */
+@media (min-width: 761px) {
+  .cr-root .cr-trip { top: 60px; }
+  .cr-root .rt3d-tl, .cr-root .rt3d-tr { top: 132px; }
+  .cr-root .cr-hud canvas.cr-map { top: 296px; }
+  .cr-root .cr-hud .cr-reset { top: 296px; }
 }

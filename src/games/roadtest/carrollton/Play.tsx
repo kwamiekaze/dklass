@@ -130,49 +130,67 @@ function Driver({ handle, onComplete, onReady }: { handle: OpenHandle; onComplet
 }
 
 // ------------------------------------------------------------ the camera ---
+/** is the line from (x0,y0,z0) to (x1,y1,z1) blocked by a building taller than the line at that point? */
+function blocked(map: GameMap, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number): boolean {
+  const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(2, Math.ceil(L / 1.2));
+  for (let i = 1; i <= n; i++) {
+    const f = i / n, x = x0 + (x1 - x0) * f, z = z0 + (z1 - z0) * f, y = y0 + (y1 - y0) * f;
+    const b = buildingAt(map, x, z, 0.35);
+    if (b && y < Math.max(3.4, Math.round(b.h / 3.4) * 3.4) + 0.9) return true;
+  }
+  return false;
+}
+/** the chase positions to try, nearest-to-ideal first: when a building is in the way the camera climbs and closes in, so the car never drops out of the frame */
+const CAM_STEPS = [[1, 1], [0.82, 1.25], [0.66, 1.55], [0.52, 1.95], [0.4, 2.4]] as const;
+
 function CameraRig({ handle, map }: { handle: OpenHandle; map: GameMap }) {
   const { sim } = handle;
-  const st = useRef({ hd: sim.h, fov: 58, dist: 9, lx: sim.x, lz: sim.z, fin: 0, sx: 0, sz: 0 });
+  const st = useRef({ hd: sim.h, fov: 58, k: 0, lx: sim.x, lz: sim.z, fin: 0 });
   const tmp = useMemo(() => ({ p: new THREE.Vector3(), l: new THREE.Vector3() }), []);
   useFrame(({ camera, size, clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05), c = st.current, pc = camera as THREE.PerspectiveCamera;
-    const asp = size.width / size.height, k = clamp((1.15 - asp) / 0.65, 0, 1);
-    const back = lerp(8.4, 12.5, k), up = lerp(3.3, 7.4, k), fovB = lerp(58, 68, k);
+    const asp = size.width / size.height, port = clamp((1.15 - asp) / 0.65, 0, 1);
+    const back = lerp(8.2, 11.2, port), up = lerp(3.2, 5.6, port), fovB = lerp(58, 66, port);
     const sp = clamp(sim.mph / 80, 0, 1);
-    // the camera trails the heading of the car, a little late, so a turn is something you see
+    // the camera trails the heading of the car a little, so a turn is something you see; in reverse it holds still
     let dh = sim.h - c.hd; dh = Math.atan2(Math.sin(dh), Math.cos(dh));
-    c.hd += dh * (1 - Math.exp(-(sim.v < -0.5 ? 1.2 : 4.2) * dt));
-    c.lx = damp(c.lx, sim.x, 18, dt); c.lz = damp(c.lz, sim.z, 18, dt);
+    c.hd += dh * (1 - Math.exp(-(sim.v < -0.5 ? 1.0 : 5.0) * dt));
+    c.lx = damp(c.lx, sim.x, 22, dt); c.lz = damp(c.lz, sim.z, 22, dt);
     const fx = Math.sin(c.hd), fz = Math.cos(c.hd);
     const e = smooth(0, 1, clamp(handle.introT * 1.1, 0, 1));
-    let px: number, pz: number, py: number, lookY = 1.25;
-    const R = back + sp * 1.6;
+    const R = back + sp * 1.8, Hh = up + sp * 0.4;
+    // pick the first chase position that sees the car over the roofs
+    let want = CAM_STEPS.length - 1;
+    for (let i = 0; i < CAM_STEPS.length; i++) {
+      const [kr, kh] = CAM_STEPS[i]!;
+      if (!blocked(map, sim.x, 1.1, sim.z, c.lx - fx * R * kr, Hh * kh, c.lz - fz * R * kr)) { want = i; break; }
+    }
+    // snap in quickly when a wall is coming, ease back out
+    c.k = want > c.k ? Math.min(want, c.k + dt * 9) : Math.max(want, c.k - dt * 1.6);
+    const i0 = Math.floor(c.k), i1 = Math.min(CAM_STEPS.length - 1, i0 + 1), fr = c.k - i0;
+    const kr = lerp(CAM_STEPS[i0]![0], CAM_STEPS[i1]![0], fr), kh = lerp(CAM_STEPS[i0]![1], CAM_STEPS[i1]![1], fr);
+    let px = c.lx - fx * R * kr, pz = c.lz - fz * R * kr, py = Hh * kh;
+    // look a little ahead of the car; the closer and higher the camera, the nearer the aim, so the car stays in the lower third of the picture
+    const close = clamp((1 - kr) / 0.6, 0, 1);
+    let ahead = lerp(9 + sp * 10, 3.5, close), lookY = lerp(1.1, 0.6, close);
     if (e < 0.999) {
       // the opening: swing round from the front-left to the chase position behind
-      const a = lerp(2.3, 0, e), RR = lerp(7.2, R, e), s = Math.sin(c.hd + a), co = Math.cos(c.hd + a);
-      px = sim.x - s * RR; pz = sim.z - co * RR; py = lerp(1.5, up, e); lookY = lerp(0.9, 1.25, e);
-    } else { px = c.lx - fx * R; pz = c.lz - fz * R; py = up + sp * 0.5; }
-    if (sim.finished) {
-      c.fin = Math.min(1.5, c.fin + dt); const a = c.fin * 0.8, RR = lerp(R, 8, smooth(0, 1.2, c.fin));
-      px = sim.x - Math.sin(c.hd + a) * RR; pz = sim.z - Math.cos(c.hd + a) * RR; py = lerp(up, 2.8, smooth(0, 1.2, c.fin)); lookY = 1;
+      const a = lerp(2.3, 0, e), RR = lerp(7.2, R * kr, e), s = Math.sin(c.hd + a), co = Math.cos(c.hd + a);
+      px = sim.x - s * RR; pz = sim.z - co * RR; py = lerp(1.6, py, e); ahead = lerp(0, ahead, e); lookY = lerp(0.9, lookY, e);
     }
-    // do not look through a building: pull the camera in along the line to the car
-    const tx = sim.x, tz = sim.z;
-    let t = 1;
-    for (let i = 1; i <= 6; i++) { const f = i / 6, sx = tx + (px - tx) * f, sz = tz + (pz - tz) * f; if (buildingAt(map, sx, sz, 0.8)) { t = Math.max(0.25, (i - 1.2) / 6); break; } }
-    const cur = c.dist; c.dist = t < cur ? t : damp(cur, t, 3, dt);   // snaps in, eases out
-    const f = c.dist > 1 ? 1 : c.dist;
-    const cx = tx + (px - tx) * f, cz = tz + (pz - tz) * f, cy = py * lerp(0.55, 1, f);
-    tmp.p.set(cx, cy, cz);
-    const ahead = 10 + sp * 12;
+    if (sim.finished) {
+      c.fin = Math.min(1.5, c.fin + dt); const a = c.fin * 0.8, RR = lerp(R * kr, 8, smooth(0, 1.2, c.fin));
+      px = sim.x - Math.sin(c.hd + a) * RR; pz = sim.z - Math.cos(c.hd + a) * RR; py = lerp(py, 3.2, smooth(0, 1.2, c.fin)); ahead = lerp(ahead, 0, smooth(0, 1.2, c.fin)); lookY = 1;
+    }
+    tmp.p.set(px, py, pz);
     tmp.l.set(sim.x + fx * ahead, lookY, sim.z + fz * ahead);
     if (shake.t > 0) { shake.t -= dt; const fz2 = Math.max(0, shake.t / shake.dur) * shake.amp; tmp.p.x += (Math.random() - 0.5) * 0.3 * fz2; tmp.p.y += (Math.random() - 0.5) * 0.22 * fz2; if (shake.t <= 0) shake.amp = 0; }
     shake.punch = damp(shake.punch, 0, 7, dt);
-    const rumble = sp * 0.012 * (sim.mph > 5 ? 1 : 0);
+    const rumble = sp * 0.01 * (sim.mph > 5 ? 1 : 0);
     tmp.p.y += Math.sin(clock.elapsedTime * 41) * rumble;
     if (import.meta.env.DEV) { const o = (window as unknown as { __cam?: { p: number[]; l: number[] } }).__cam; if (o) { tmp.p.set(o.p[0]!, o.p[1]!, o.p[2]!); tmp.l.set(o.l[0]!, o.l[1]!, o.l[2]!); } }
-    camera.position.copy(tmp.p); camera.lookAt(tmp.l); camera.rotateZ(clamp(-sim.yawRate * 0.02, -0.04, 0.04) * e);
-    c.fov = damp(c.fov, fovB + sp * 10 + shake.punch * 6, 5, dt);
+    camera.position.copy(tmp.p); camera.lookAt(tmp.l); camera.rotateZ(clamp(-sim.yawRate * 0.015, -0.03, 0.03) * e);
+    c.fov = damp(c.fov, fovB + sp * 9 + shake.punch * 6, 5, dt);
     if (Math.abs(pc.fov - c.fov) > 0.01) { pc.fov = c.fov; pc.updateProjectionMatrix(); }
     pc.near = 0.3;
   });
@@ -243,7 +261,7 @@ function OpenHud({ handle }: { handle: OpenHandle }) {
       // the trip card and the GPS
       const ms = sim.mission, r = sim.route;
       const card = q('.cr-trip');
-      let gps = '', arrow = '', sub = '';
+      let gps = '', arrow = '', sub = '', lane = '';
       if (ms && r) {
         if (r !== lastRoute) { lastRoute = r; hint = 0; }
         const pr = routeProgress(r, sim.x, sim.z, hint); hint = Math.max(0, pr.idx - 20);
@@ -254,12 +272,14 @@ function OpenHud({ handle }: { handle: OpenHandle }) {
           const d = nt.at - pr.s, word = nt.dir === -1 ? 'Turn left' : nt.dir === 1 ? 'Turn right' : nt.dir === 2 ? 'Make a U-turn' : 'Continue straight';
           gps = d < 35 ? `${word}${nt.street ? ` onto ${nt.street}` : ''}` : `In ${distText(d)}, ${word.toLowerCase()}${nt.street ? ` onto ${nt.street}` : ''}`;
           arrow = ARROWS[String(nt.dir)] ?? '↑';
+          // lane guidance on roads with more than one lane each way
+          if (nt.lanes > 1 && d < 260 && (nt.dir === -1 || nt.dir === 1)) lane = nt.lane === 0 ? 'Use the left lane' : nt.lane === nt.lanes - 1 ? 'Use the right lane' : 'Use a middle lane';
         } else { gps = left < 40 ? `Arriving at ${ms.name}` : `Continue ${distText(left)} to ${ms.name}`; arrow = '↑'; }
         sub = `${ms.name} · ${distText(left)}`;
       } else if (ms) { gps = ms.name; sub = ms.name; arrow = '↑'; }
       if (card) { card.dataset.on = ms ? '1' : ''; }
-      const key = gps + '|' + arrow + '|' + sub;
-      if (key !== lastGps) { lastGps = key; const a = q('.cr-gps-a'), t = q('.cr-gps-t'), s = q('.cr-gps-s'); if (a) a.textContent = arrow; if (t) t.textContent = gps; if (s) s.textContent = sub; }
+      const key = gps + '|' + arrow + '|' + sub + '|' + lane;
+      if (key !== lastGps) { lastGps = key; const a = q('.cr-gps-a'), t = q('.cr-gps-t'), s = q('.cr-gps-s'), l = q('.cr-lane'); if (a) a.textContent = arrow; if (t) t.textContent = gps; if (s) s.textContent = sub; if (l) l.textContent = lane; }
       const mk = ms ? ms.name + sim.missions : ''; if (mk !== lastMission) { lastMission = mk; const m = q('.cr-trips'); if (m) m.textContent = `Trips ${sim.missions}`; }
       // the signal countdown / state at the next light
       const ns = sim.nearSignal, sg = q('.cr-light');
@@ -276,7 +296,7 @@ function OpenHud({ handle }: { handle: OpenHandle }) {
     <div className="atl-road cr-roadbar"><i className="atl-wx">☀</i><span className="cr-street">Carrollton</span><em className="cr-clock">9:30 AM</em></div>
     <div className="cr-trip" data-on="">
       <i className="cr-gps-a">↑</i>
-      <div><b className="cr-gps-t" /><small className="cr-gps-s" /></div>
+      <div><b className="cr-gps-t" /><small className="cr-gps-s" /><i className="cr-lane" /></div>
       <em className="cr-trips">Trips 0</em>
     </div>
     <div className="atl-sig">

@@ -17,7 +17,7 @@ import { ALL_KINDS, MAX_PER_KIND, vehicleGeo } from '../atl/vehicles';
 import { buildingAt, loadMap, pointOnPoly, rand01, type GameMap } from './map';
 import { Acc, box, buildBuildings, buildRail, buildRoads, cone, prism, type Corner } from './build';
 import { asphaltTexture, clockTexture, concreteTexture, facadeTextures, glowDot, grassTexture, shopSignTexture } from './tex';
-import { bladeAtlasFor, buildSigns, signFaceAtlas } from './signs';
+import { bladeAtlasFor, buildSigns, signBackAtlas, signFaceAtlas } from './signs';
 import { signalState } from './traffic';
 import type { OpenSim } from './sim';
 
@@ -203,19 +203,25 @@ function ShopSigns({ geo, env }: { geo: TownGeo; env: Env }) {
 }
 
 /** street name blades, stop signs, speed limits and railroad warning signs: three draw calls */
-function Signage({ geo, map }: { geo: TownGeo; map: GameMap }) {
+function Signage({ geo, map, env }: { geo: TownGeo; map: GameMap; env: Env }) {
   const parts = useMemo(() => buildSigns(map, geo.corners), [map, geo]);
   const objs = useMemo(() => {
     const face = signFaceAtlas(), blade = bladeAtlasFor(parts.names);
+    const back = signBackAtlas();
     return {
-      face: parts.face.geo(), blade: parts.blade.geo(), pole: parts.pole.geo(),
-      faceMat: new THREE.MeshStandardMaterial({ map: face, roughness: 0.5, metalness: 0.1, side: THREE.DoubleSide, emissiveMap: face, emissive: new THREE.Color('#ffffff'), emissiveIntensity: 0 }),
-      bladeMat: new THREE.MeshStandardMaterial({ map: blade, roughness: 0.5, metalness: 0.1, side: THREE.DoubleSide }),
+      face: parts.face.geo(), back: parts.back.geo(), blade: parts.blade.geo(), pole: parts.pole.geo(),
+      // single sided: a sign is only readable from the front; the grey back covers the other side
+      faceMat: new THREE.MeshStandardMaterial({ map: face, roughness: 0.45, metalness: 0.05, alphaTest: 0.5, emissiveMap: face, emissive: new THREE.Color('#ffffff'), emissiveIntensity: 0 }),
+      backMat: new THREE.MeshStandardMaterial({ map: back, roughness: 0.6, metalness: 0.4, alphaTest: 0.5 }),
+      bladeMat: new THREE.MeshStandardMaterial({ map: blade, roughness: 0.5, metalness: 0.1, emissiveMap: blade, emissive: new THREE.Color('#ffffff'), emissiveIntensity: 0 }),
       poleMat: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.6 }),
     };
   }, [parts]);
+  // retroreflective sheeting: the faces stay readable in the headlights at night
+  useFrame(() => { const n = env.night; objs.faceMat.emissiveIntensity = n * 0.35; objs.bladeMat.emissiveIntensity = n * 0.3; });
   return <group>
-    <mesh geometry={objs.face} material={objs.faceMat} castShadow /><mesh geometry={objs.blade} material={objs.bladeMat} /><mesh geometry={objs.pole} material={objs.poleMat} castShadow />
+    <mesh geometry={objs.face} material={objs.faceMat} castShadow /><mesh geometry={objs.back} material={objs.backMat} castShadow />
+    <mesh geometry={objs.blade} material={objs.bladeMat} /><mesh geometry={objs.pole} material={objs.poleMat} castShadow />
   </group>;
 }
 
@@ -344,7 +350,7 @@ function Signals({ map, sim }: { map: GameMap; sim: OpenSim }) {
         // the mast arm reaches over the approach lanes
         const armLen = hw * 0.9, hx = bx - rx * armLen, hz = bz - rz * armLen;
         box(pole, (bx + hx) / 2, 6.1, (bz + hz) / 2, Math.abs(rx) * armLen + 0.14, 0.14, Math.abs(rz) * armLen + 0.14, metal);
-        for (const [px, pz, py] of [[hx, hz, 5.2], [bx - rx * 0.15, bz - rz * 0.15, 2.9]] as [number, number, number][]) {
+        for (const [px, pz, py] of [[hx, hz, 5.2], [bx + ux * 0.3, bz + uz * 0.3, 2.9]] as [number, number, number][]) {
           // a vertical three-lamp head facing the traffic (towards +u)
           const rotY = Math.atan2(ux, uz);
           box(headBody, px, py - 0.55, pz, 0.38, 1.1, 0.32, black, rotY);
@@ -402,7 +408,14 @@ function RailGates({ map, sim }: { map: GameMap; sim: OpenSim }) {
             {Array.from({ length: 7 }).map((_, j) => <mesh key={j} position={[0, 0, (armLen / 7) * (j + 0.5)]}><boxGeometry args={[0.08, 0.14, armLen / 7]} /><meshStandardMaterial color={j % 2 ? '#f4f4f0' : '#d4281c'} roughness={0.6} /></mesh>)}
           </group>
         </group>
-        {[0, 1].map((j) => <mesh key={j} ref={(m) => { if (m) lamps.current[(i * 2 + k) * 2 + j] = m; }} position={[0.28 * (j ? 1 : -1) * Math.abs(dirz) + 0.0, 2.1, 0.28 * (j ? 1 : -1) * Math.abs(dirx)]} material={lampOff}><circleGeometry args={[0.1, 12]} /></mesh>)}
+        {/* the flashers: a crossarm in front of the post, facing the traffic that comes towards the tracks on this side */}
+        <group position={[0, 2.1, 0]} rotation-y={Math.atan2(s.tx * sd, s.tz * sd)}>
+          <mesh position={[0, 0, 0.11]}><boxGeometry args={[0.86, 0.07, 0.05]} /><meshStandardMaterial color="#1c1d20" roughness={0.6} /></mesh>
+          {[0, 1].map((j) => <group key={j} position={[0.3 * (j ? 1 : -1), 0, 0.14]}>
+            <mesh><circleGeometry args={[0.2, 18]} /><meshStandardMaterial color="#111214" roughness={0.7} /></mesh>
+            <mesh position={[0, 0, 0.01]} ref={(m) => { if (m) lamps.current[(i * 2 + k) * 2 + j] = m; }} material={lampOff}><circleGeometry args={[0.11, 14]} /></mesh>
+          </group>)}
+        </group>
       </group>;
     }))}
   </group>;
@@ -611,7 +624,7 @@ export function OpenWorld({ sim, env, quality }: { sim: OpenSim; env: Env; quali
     <Ground />
     <Town geo={geo} env={env} shadow={shadow} />
     <ShopSigns geo={geo} env={env} />
-    <Signage geo={geo} map={map} />
+    <Signage geo={geo} map={map} env={env} />
     <Courthouse geo={geo} />
     <Trees map={map} count={quality.lite ? 3000 : quality.tier === 'high' ? 7000 : 5000} />
     <Lamps map={map} env={env} />
