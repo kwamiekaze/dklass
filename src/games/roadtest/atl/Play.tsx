@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Difficulty, LevelResult } from '../game/types';
 import { AtlGame, makeAtlHandle, resolveRun, useAtlScene, type AtlHandle } from './Game';
 import { FREE_ID, freeLeg, getFreeStart, nextLegId } from './freeroam';
@@ -8,8 +8,12 @@ import type { TimeOfDay } from '../g3d/themes';
 import { ScoreTracker } from '../game/scoring';
 import type { LegEnd } from './sim';
 
+const CarrolltonPlay = lazy(() => import('../carrollton/Play'));
+const OPEN_WORLD_ID = 'atl-carrollton-open';
+
 /** Mounts one Atlanta run and hands its controls up to the page (pause, finish early). Loaded on demand, so the other lessons never pay for it. */
 export default function AtlPlay({ levelId, difficulty, onHandle, onComplete, onLost }: { levelId: string; difficulty: Difficulty; onHandle: (h: AtlHandle) => void; onComplete: (r: LevelResult) => void; onLost: () => void }) {
+  if (levelId === OPEN_WORLD_ID) return <Suspense fallback={<div className="rt3d-loading"><div className="rt3d-spin" /><h3>Carrollton</h3><p>Loading the town…</p></div>}><CarrolltonPlay difficulty={difficulty} onHandle={onHandle as never} onComplete={onComplete} onLost={onLost} /></Suspense>;
   if (levelId === FREE_ID) return <FreeRoam difficulty={difficulty} onHandle={onHandle} onComplete={onComplete} onLost={onLost} />;
   return <SingleRun levelId={levelId} difficulty={difficulty} onHandle={onHandle} onComplete={onComplete} onLost={onLost} />;
 }

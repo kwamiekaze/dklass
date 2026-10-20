@@ -23,7 +23,7 @@ export interface TrafficSlot { group: THREE.Group; wheels: { current: WheelState
 const glow = () => glowTexture();
 
 /** A red glow at each tail lamp that comes on with the brake (and dimly with the headlights). */
-function BrakeGlow({ id, brake }: { id: GarageId; brake: { current: number } }) {
+export function BrakeGlow({ id, brake }: { id: GarageId; brake: { current: number } }) {
   const lamps = fleetFiles(id)?.lamps?.rear;
   const refs = useRef<(THREE.Sprite | null)[]>([]);
   useFrame(() => {
@@ -40,7 +40,7 @@ function BrakeGlow({ id, brake }: { id: GarageId; brake: { current: number } }) 
 
 
 /** Headlight beams: each lamp throws a soft, tapering cone (hot and warm at the lamp, cool and faint far away), a pool of light on the road ahead, and a lens flare. They fade up in the dark, fog, rain and snow. */
-function Beams({ id, sim }: { id: GarageId; sim: RunSim }) {
+export function Beams({ id, sim }: { id: GarageId; sim: { finished: boolean } }) {
   const night = useContext(NightCtx);
   const lamps = fleetFiles(id)?.lamps?.front;
   const grp = useRef<THREE.Group>(null), spot = useRef<THREE.SpotLight>(null), tgt = useRef<THREE.Object3D>(null), pool = useRef<THREE.Mesh>(null);

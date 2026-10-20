@@ -191,6 +191,17 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
             <span>Your focus skills: {weakLabels.join(', ')}. Stages marked <em>FOR YOU</em> practice them.</span>
           </div>
         )}
+        <div className="atl-group atl-free cr-open">
+          <h3>Carrollton Open World<small>NEW · the real map · drive anywhere · every rule applies</small></h3>
+          <p className="atl-free-note">The whole town of Carrollton, Georgia, built from the real street map: Adamson Square, Bradley Street, Newnan Street, the railroad, every stop sign and traffic light. Drive wherever you like, take trips with GPS, stop for people in the crosswalks and for the train. Day turns to night as you drive.</p>
+          <div className="atl-free-starts" role="group" aria-label="Open world">
+            <button className="atl-card atl-free-card next" onClick={() => startLevel('atl-carrollton-open')}>
+              <span className="atl-lim"><small>OPEN</small><b>GO</b></span>
+              <span className="atl-info"><strong>Carrollton, GA</strong><small>Free drive · trips · day and night · real traffic</small></span>
+              <span className="atl-best">{bestScores['atl-carrollton-open'] ? `Best ${bestScores['atl-carrollton-open']}` : 'Drive →'}</span>
+            </button>
+          </div>
+        </div>
         <div className="atl-group atl-free">
           <h3>Free Roam<small>Endless · real Atlanta roads · exits, merges and left turns</small></h3>
           <p className="atl-free-note">No finish line. Take any exit, turn at any cross street, merge from the ramps and keep going. The real exit numbers and street names are on the signs. Three crashes ends the drive; a clean road drops one strike.</p>

@@ -197,11 +197,11 @@ export function GameCanvas({ levelId, difficulty, onComplete, onQuit }: Props) {
           <AudioSettingsButton />
         </>}
       />
-      <div className="game-topbar-hint">{levelId.startsWith('atl-') ? '↑ gas · ↓ brake · ←→ steer · Q/E signal' : '↑ gas · ↓ brake · ←→ steer'}</div>
+      <div className="game-topbar-hint">{levelId.startsWith('atl-') ? (levelId === 'atl-carrollton-open' ? '↑ gas · ↓ brake/reverse · ←→ steer · Q/E signal · R back on road' : '↑ gas · ↓ brake · ←→ steer · Q/E signal') : '↑ gas · ↓ brake · ←→ steer'}</div>
       {use3d
         ? <div className="game-host rt3d-host">
             {levelId.startsWith('atl-')
-              ? <Suspense fallback={<div className="rt3d-loading"><div className="rt3d-spin" /><h3>Atlanta</h3><p>Loading the interstate…</p></div>}>
+              ? <Suspense fallback={<div className="rt3d-loading"><div className="rt3d-spin" /><h3>{levelId === 'atl-carrollton-open' ? 'Carrollton' : 'Atlanta'}</h3><p>{levelId === 'atl-carrollton-open' ? 'Loading the town…' : 'Loading the interstate…'}</p></div>}>
                   <AtlPlay levelId={levelId} difficulty={difficulty} onHandle={setHandle} onComplete={(r) => onCompleteRef.current(r)} onLost={goFlat} />
                 </Suspense>
               : <Play3D levelId={levelId} difficulty={difficulty} onHandle={setHandle} onComplete={(r) => onCompleteRef.current(r)} onLost={goFlat} />}

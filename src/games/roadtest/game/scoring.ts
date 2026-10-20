@@ -25,6 +25,8 @@ export const POINTS = {
   NO_CRASH_BONUS: 250,
   SPOTLESS_BONUS: 300,
   STREAK_MASTER: 150,
+  MISSION: 250,
+  PARKED_WELL: 60,
 
   // Minor: flat, costs one streak tier.
   HIT_CONE: -50,
@@ -54,6 +56,10 @@ export const POINTS = {
   HIT_PEDESTRIAN: 0,
   HIT_ANIMAL: 0,
   HIT_TRAIN: 0,
+  WRONG_WAY: -200,
+  HIT_BUILDING: -100,
+  PED_FAIL: -300,
+  WRONG_SIDE: -60,
 } as const;
 
 const LABELS: Record<string, string> = {
@@ -75,6 +81,12 @@ const LABELS: Record<string, string> = {
   HIT_PEDESTRIAN: '🛑 HIT A PEDESTRIAN, run ended',
   HIT_ANIMAL: '🛑 HIT AN ANIMAL, run ended',
   HIT_TRAIN: '🛑 STRUCK BY A TRAIN, run ended',
+  MISSION: 'Reached the destination',
+  PARKED_WELL: 'Stopped right at the destination',
+  WRONG_WAY: 'Drove the wrong way on a one-way street',
+  HIT_BUILDING: 'Hit a building or a pole',
+  PED_FAIL: 'Did not yield to a pedestrian',
+  WRONG_SIDE: 'Drove on the wrong side of the road',
   SIGNALLED: 'Signalled before changing lanes',
   SAFE_GAP: 'Kept a safe following gap',
   MOVE_OVER: 'Moved over for emergency vehicles',
@@ -110,13 +122,13 @@ export type PointKey = keyof typeof POINTS;
 export const labelOf = (k: PointKey): string => LABELS[k] ?? k;
 
 /** Positive events that build the clean streak. */
-const POSITIVE_COMBO: PointKey[] = ['SIGNALLED', 'SAFE_GAP', 'MOVE_OVER', 'RAIL_STOP', 'CIRCLE_YIELD', 'WORK_ZONE_OK', 'EXIT_TAKEN', 'LEFT_YIELD', 'STAR', 'CHECKPOINT', 'FULL_STOP', 'GREEN_LIGHT', 'SMOOTH_DRIVING', 'NEAR_MISS', 'PED_SAFE_PASS', 'MERGE_CLEAN', 'MERGE_YIELD', 'KEEP_RIGHT', 'WEATHER_CARE'];
+const POSITIVE_COMBO: PointKey[] = ['SIGNALLED', 'SAFE_GAP', 'MOVE_OVER', 'RAIL_STOP', 'CIRCLE_YIELD', 'WORK_ZONE_OK', 'EXIT_TAKEN', 'LEFT_YIELD', 'MISSION', 'PARKED_WELL', 'STAR', 'CHECKPOINT', 'FULL_STOP', 'GREEN_LIGHT', 'SMOOTH_DRIVING', 'NEAR_MISS', 'PED_SAFE_PASS', 'MERGE_CLEAN', 'MERGE_YIELD', 'KEEP_RIGHT', 'WEATHER_CARE'];
 /** Flat bonuses paid when a course is finished. They never touch the streak. */
 const FINISH_KEYS: PointKey[] = ['FINISH_BONUS', 'NO_CRASH_BONUS', 'SPOTLESS_BONUS', 'STREAK_MASTER'];
 
 export type Severity = 'reward' | 'minor' | 'major' | 'strike' | 'critical';
-const MINOR: PointKey[] = ['HIT_CONE', 'LANE_CROSS', 'SPEEDING', 'NO_SIGNAL', 'TAILGATE', 'HOV_SOLO', 'BLOCK_PASSING', 'TURN_TOO_FAST', 'MERGE_TOO_SLOW'];
-const MAJOR: PointKey[] = ['RAN_STOP_SIGN', 'NO_MOVE_OVER', 'CIRCLE_CUTOFF', 'SPEEDING_TICKET', 'LEFT_NO_YIELD', 'PULLED_OVER', 'MERGE_CUTOFF'];
+const MINOR: PointKey[] = ['HIT_CONE', 'LANE_CROSS', 'SPEEDING', 'NO_SIGNAL', 'TAILGATE', 'HOV_SOLO', 'BLOCK_PASSING', 'TURN_TOO_FAST', 'MERGE_TOO_SLOW', 'WRONG_SIDE', 'HIT_BUILDING'];
+const MAJOR: PointKey[] = ['RAN_STOP_SIGN', 'NO_MOVE_OVER', 'CIRCLE_CUTOFF', 'SPEEDING_TICKET', 'LEFT_NO_YIELD', 'PULLED_OVER', 'MERGE_CUTOFF', 'WRONG_WAY', 'PED_FAIL'];
 /** Strike events: share of the banked score that is lost. Collisions cost half, the first two times and the third. */
 const STRIKE_SHARE: Partial<Record<PointKey, number>> = { HIT_PARKED_CAR: 0.5, HIT_TRAFFIC: 0.5, RAN_RAIL: 0.3, RAN_RED_LIGHT: 0.15 };
 /** Critical events: share of the banked score that survives. */
