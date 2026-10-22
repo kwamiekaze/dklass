@@ -26,10 +26,17 @@ import {
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
 import { getDisplayName } from "@/lib/profileUtils";
+import { createSignedPermitUrl } from "@/lib/permitDocuments";
+import { normalizeDocStatus } from "@/lib/documentStatus";
 
 interface PermitWithProfile {
+  /** where the record lives: the documents table (every upload since the documents feature) or the older permits table */
+  kind: 'document' | 'legacy';
   id: string;
   user_id: string;
+  bucket?: string | null;
+  file_path?: string | null;
+  mime_type?: string | null;
   file_url: string;
   file_name: string | null;
   upload_source: string;
@@ -63,6 +70,7 @@ function AdminPermitQueueContent() {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewIsPdf, setPreviewIsPdf] = useState(false);
   const [rejectNote, setRejectNote] = useState("");
   const [rejectingId, setRejectingId] = useState<string | null>(null);
 
@@ -73,43 +81,36 @@ function AdminPermitQueueContent() {
   const fetchPermits = async () => {
     setLoading(true);
     try {
-      // First fetch permits
-      let permitsQuery = supabase
-        .from('permits')
-        .select('*')
-        .order('uploaded_at', { ascending: false });
+      // Uploads are saved in the documents table, older ones in the permits table. The queue lists both, so an uploaded permit never goes missing from review.
+      let permitsQuery = supabase.from('permits').select('*').order('uploaded_at', { ascending: false });
+      if (statusFilter !== 'all') permitsQuery = permitsQuery.eq('verified_status', statusFilter);
+      let docsQuery = supabase.from('permit_documents').select('id, student_id, bucket, file_path, file_name, mime_type, source, status, review_note, uploaded_at').eq('is_current', true).order('uploaded_at', { ascending: false });
+      if (statusFilter === 'pending') docsQuery = docsQuery.in('status', ['pending', 'pending_review']);
+      else if (statusFilter !== 'all') docsQuery = docsQuery.eq('status', statusFilter);
 
-      if (statusFilter !== 'all') {
-        permitsQuery = permitsQuery.eq('verified_status', statusFilter);
-      }
+      const [{ data: permitsData, error: permitsError }, { data: docsData, error: docsError }] = await Promise.all([permitsQuery, docsQuery]);
+      if (permitsError && docsError) throw permitsError;
 
-      const { data: permitsData, error: permitsError } = await permitsQuery;
-      if (permitsError) throw permitsError;
+      const rows: Omit<PermitWithProfile, 'profile'>[] = [
+        ...((permitsData || []) as any[]).map((p) => ({ ...p, kind: 'legacy' as const })),
+        ...((docsData || []) as any[]).map((d) => ({
+          kind: 'document' as const, id: d.id, user_id: d.student_id, bucket: d.bucket, file_path: d.file_path, mime_type: d.mime_type,
+          file_url: '', file_name: d.file_name, upload_source: d.source, uploaded_at: d.uploaded_at,
+          verified_status: normalizeDocStatus(d.status), admin_note: d.review_note ?? null,
+        })),
+      ].sort((x, y) => new Date(y.uploaded_at).getTime() - new Date(x.uploaded_at).getTime());
 
-      // Then fetch profiles for all user_ids
-      const userIds = [...new Set(permitsData?.map(p => p.user_id) || [])];
-      
-      if (userIds.length > 0) {
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, full_name, first_name, last_name, email')
-          .in('id', userIds);
+      const userIds = [...new Set(rows.map(p => p.user_id))];
+      if (userIds.length === 0) { setPermits([]); return; }
 
+      const profilesData: { id: string; full_name: string | null; first_name: string | null; last_name: string | null; email: string | null }[] = [];
+      for (let i = 0; i < userIds.length; i += 150) {
+        const { data, error: profilesError } = await supabase.from('profiles').select('id, full_name, first_name, last_name, email').in('id', userIds.slice(i, i + 150));
         if (profilesError) throw profilesError;
-
-        // Map profiles by id
-        const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
-
-        // Combine permits with profiles
-        const permitsWithProfiles: PermitWithProfile[] = (permitsData || []).map(permit => ({
-          ...permit,
-          profile: profilesMap.get(permit.user_id) || null
-        }));
-
-        setPermits(permitsWithProfiles);
-      } else {
-        setPermits([]);
+        profilesData.push(...(data || []));
       }
+      const profilesMap = new Map(profilesData.map(p => [p.id, p]));
+      setPermits(rows.map(permit => ({ ...permit, profile: profilesMap.get(permit.user_id) || null })));
     } catch (error: any) {
       console.error('Error fetching permits:', error);
       toast({
@@ -122,20 +123,39 @@ function AdminPermitQueueContent() {
     }
   };
 
+  /** a link that opens the file: the stored address for older permits, a fresh signed link for documents */
+  const resolveUrl = async (permit: PermitWithProfile): Promise<string | null> => {
+    if (permit.kind === 'legacy' && permit.file_url) return permit.file_url;
+    if (permit.file_path) {
+      const res = await createSignedPermitUrl({ bucket: permit.bucket, storagePath: permit.file_path, expiresInSeconds: 3600 });
+      if (res.ok) return res.signedUrl;
+    }
+    return permit.file_url || null;
+  };
+
+  const handlePreview = async (permit: PermitWithProfile) => {
+    const url = await resolveUrl(permit);
+    if (!url) { toast({ title: "Could not open file", description: "The file could not be found in storage.", variant: "destructive" }); return; }
+    setPreviewUrl(url);
+    setPreviewIsPdf(permit.mime_type === 'application/pdf' || /\.pdf(\?|#|$)/i.test(permit.file_name || permit.file_path || permit.file_url || ''));
+    setPreviewOpen(true);
+  };
+
+  const handleDownloadPermit = async (permit: PermitWithProfile) => {
+    const url = await resolveUrl(permit);
+    if (!url) { toast({ title: "Could not download", description: "The file could not be found in storage.", variant: "destructive" }); return; }
+    await handleDownload(url, permit.file_name);
+  };
+
   const handleVerify = async (permitId: string, status: 'approved' | 'rejected', note?: string) => {
     setActionLoading(permitId);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      const { error } = await supabase
-        .from('permits')
-        .update({
-          verified_status: status,
-          reviewed_by: user?.id,
-          reviewed_at: new Date().toISOString(),
-          admin_note: note || null,
-        })
-        .eq('id', permitId);
+      const target = permits.find((p) => p.id === permitId);
+
+      const { error } = target?.kind === 'document'
+        ? await supabase.from('permit_documents').update({ status, reviewed_by: user?.id, reviewed_at: new Date().toISOString(), review_note: note || null }).eq('id', permitId)
+        : await supabase.from('permits').update({ verified_status: status, reviewed_by: user?.id, reviewed_at: new Date().toISOString(), admin_note: note || null }).eq('id', permitId);
 
       if (error) throw error;
 
@@ -177,7 +197,11 @@ function AdminPermitQueueContent() {
 
   const getSourceLabel = (source: string) => {
     switch (source) {
-      case 'intake': return 'Intake Form';
+      case 'intake':
+      case 'intake_form': return 'Intake Form';
+      case 'profile_upload': return 'Profile Upload';
+      case 'message_upload': return 'Chat/Message';
+      case 'storage_repair': return 'Recovered File';
       case 'chat': return 'Chat/Message';
       case 'admin': return 'Admin Upload';
       case 'profile': return 'Profile Update';
@@ -194,11 +218,6 @@ function AdminPermitQueueContent() {
       default:
         return <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30">Pending</Badge>;
     }
-  };
-
-  const isImageFile = (url: string) => {
-    const ext = url.toLowerCase().split('.').pop() || '';
-    return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
   };
 
   const filteredPermits = permits.filter(permit => {
@@ -310,7 +329,7 @@ function AdminPermitQueueContent() {
                       'Unknown';
 
                     return (
-                      <TableRow key={permit.id}>
+                      <TableRow key={`${permit.kind}-${permit.id}`}>
                         <TableCell>
                           <div>
                             <p className="font-medium text-sm">{displayName}</p>
@@ -338,10 +357,7 @@ function AdminPermitQueueContent() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => {
-                                setPreviewUrl(permit.file_url);
-                                setPreviewOpen(true);
-                              }}
+                              onClick={() => handlePreview(permit)}
                               title="Preview"
                             >
                               <Eye className="h-4 w-4" />
@@ -349,7 +365,7 @@ function AdminPermitQueueContent() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleDownload(permit.file_url, permit.file_name)}
+                              onClick={() => handleDownloadPermit(permit)}
                               title="Download"
                             >
                               <Download className="h-4 w-4" />
@@ -413,7 +429,7 @@ function AdminPermitQueueContent() {
           </DialogHeader>
           <div className="p-4 overflow-auto max-h-[calc(95vh-80px)]">
             {previewUrl && (
-              isImageFile(previewUrl) ? (
+              !previewIsPdf ? (
                 <img 
                   src={previewUrl} 
                   alt="Permit preview" 

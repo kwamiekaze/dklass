@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { effectiveDocStatus, fetchDocSummaries, hasDocumentOnFile, type DocSummary } from "@/lib/documentStatus";
 import { StudentDocumentSection } from "./StudentDocumentSection";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -68,6 +69,7 @@ export function AdminUserProfileModal({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [permitViewerOpen, setPermitViewerOpen] = useState(false);
+  const [docSummary, setDocSummary] = useState<DocSummary | null>(null);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [studentSessions, setStudentSessions] = useState<StudentSession[]>([]);
   const [assignedInstructors, setAssignedInstructors] = useState<AssignedInstructor[]>([]);
@@ -120,6 +122,7 @@ export function AdminUserProfileModal({
       };
 
       setProfile(fullProfile);
+      fetchDocSummaries([id]).then((m) => setDocSummary(m.get(id) ?? { count: 0, status: null }));
       setFullName(fullProfile.full_name || `${fullProfile.first_name || ''} ${fullProfile.last_name || ''}`.trim());
       setPhone(fullProfile.phone || "");
       setHoursRemaining((fullProfile.hours_remaining ?? 0).toString());
@@ -492,7 +495,12 @@ export function AdminUserProfileModal({
                     Permit Documents
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {profile.permit_number ? `Permit #${profile.permit_number}` : 'No permit number on file'}
+                    {(() => {
+                      const onFile = hasDocumentOnFile(docSummary, profile.permit_file_url);
+                      const st = effectiveDocStatus(docSummary, profile.permit_file_url);
+                      const label = !onFile ? 'No document uploaded yet' : `${docSummary?.count && docSummary.count > 1 ? `${docSummary.count} documents` : 'Document'} on file${st === 'approved' ? ', verified' : st === 'rejected' ? ', rejected' : ', awaiting review'}`;
+                      return profile.permit_number ? `${label} · Permit #${profile.permit_number}` : label;
+                    })()}
                   </p>
                 </div>
                 <Button
@@ -678,14 +686,18 @@ export function AdminUserProfileModal({
                       <span className="text-muted-foreground text-xs">Permit Number</span>
                       <p>{profile.permit_number || 'Not provided'}</p>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground text-xs">Permit Issue Date</span>
-                      <p>{profile.permit_issue_date ? format(parseISO(profile.permit_issue_date), 'MMM d, yyyy') : 'Not provided'}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground text-xs">Permit Expiration</span>
-                      <p>{profile.permit_expiration_date ? format(parseISO(profile.permit_expiration_date), 'MMM d, yyyy') : 'Not provided'}</p>
-                    </div>
+                    {profile.permit_issue_date && (
+                      <div>
+                        <span className="text-muted-foreground text-xs">Permit Issue Date</span>
+                        <p>{format(parseISO(profile.permit_issue_date), 'MMM d, yyyy')}</p>
+                      </div>
+                    )}
+                    {profile.permit_expiration_date && (
+                      <div>
+                        <span className="text-muted-foreground text-xs">Permit Expiration</span>
+                        <p>{format(parseISO(profile.permit_expiration_date), 'MMM d, yyyy')}</p>
+                      </div>
+                    )}
                     <div>
                       <span className="text-muted-foreground text-xs">Guardian Name</span>
                       <p>{profile.guardian_name || 'Not provided'}</p>
@@ -780,6 +792,7 @@ export function AdminUserProfileModal({
           onOpenChange={setPermitViewerOpen}
           userId={profile.id}
           userName={getDisplayName(profile, 'User')}
+          onStatusChange={() => fetchDocSummaries([profile.id]).then((m) => setDocSummary(m.get(profile.id) ?? { count: 0, status: null }))}
         />
       )}
     </>

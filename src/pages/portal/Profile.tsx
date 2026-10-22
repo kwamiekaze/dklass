@@ -252,10 +252,15 @@ function ProfileContent() {
         if (userCanEditPermit) {
           Object.assign(updatePayload, {
             permit_number: formData.permit_number,
-            permit_issue_date: formData.permit_issue_date || null,
-            permit_expiration_date: formData.permit_expiration_date || null,
             permit_file_url: permitUrl,
           });
+          // Students never enter issue or expiration dates (the uploaded, verified document is the record), so their save must not touch them. Staff can still edit them.
+          if (isStaffOrAdmin) {
+            Object.assign(updatePayload, {
+              permit_issue_date: formData.permit_issue_date || null,
+              permit_expiration_date: formData.permit_expiration_date || null,
+            });
+          }
         }
 
         // Instructor stats — instructors can edit their own; admins any (RLS enforces)
@@ -521,9 +526,9 @@ function ProfileContent() {
               )}
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className={`grid grid-cols-1 gap-4 ${isStaffOrAdmin ? 'sm:grid-cols-3' : ''}`}>
                 <div className="space-y-2">
-                  <Label htmlFor="permit_number" className="text-sm">Permit Number</Label>
+                  <Label htmlFor="permit_number" className="text-sm">Permit Number{!isStaffOrAdmin && <span className="text-muted-foreground font-normal"> (Optional)</span>}</Label>
                   <Input
                     id="permit_number"
                     name="permit_number"
@@ -534,6 +539,8 @@ function ProfileContent() {
                   />
                   {errors.permit_number && <p className="text-xs text-destructive">{errors.permit_number}</p>}
                 </div>
+                {/* Issue and expiration dates are staff-only: a student's uploaded, verified document is the record */}
+                {isStaffOrAdmin && (<>
                 <div className="space-y-2">
                   <Label htmlFor="permit_issue_date" className="text-sm">Issue Date</Label>
                   <Input
@@ -560,6 +567,7 @@ function ProfileContent() {
                   />
                   {errors.permit_expiration_date && <p className="text-xs text-destructive">{errors.permit_expiration_date}</p>}
                 </div>
+                </>)}
               </div>
             </CardContent>
           </Card>
