@@ -14,7 +14,7 @@ import { SessionTypeBadge } from "@/components/portal/SessionTypeBadge";
 import { ProposalBuilder } from "@/components/portal/ProposalBuilder";
 import { format, parseISO } from "date-fns";
 import { getDisplayName } from "@/lib/profileUtils";
-import { resolveProposalPackage, sumProposalHours } from "@/lib/packageSelection";
+import { resolveProposalPackages, sumProposalHours } from "@/lib/packageSelection";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -411,20 +411,23 @@ function AdminProposalsContent() {
 
               {items.length > 0 && (() => {
                 const { totalHours, includesRoadTest } = sumProposalHours(items as any);
-                const { pkg, isExplicit } = resolveProposalPackage({
+                const { pkgs, isExplicit, totalPrice } = resolveProposalPackages({
                   packageId: selectedProposal.package_id,
                   totalHours,
                   includesRoadTest,
                 });
                 return (
                   <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
-                    <p className="text-xs text-muted-foreground">Package sent to student</p>
-                    <p className="text-sm font-medium">
-                      {pkg.label.replace(/\n/g, ' ')} · {pkg.price}
-                      <span className="ml-2 text-xs text-muted-foreground">
-                        {isExplicit ? 'Selected by admin' : 'Auto-matched'}
-                      </span>
+                    <p className="text-xs text-muted-foreground">
+                      {pkgs.length > 1 ? `Packages sent to student (${pkgs.length})` : 'Package sent to student'}
+                      <span className="ml-2">{isExplicit ? 'Selected by admin' : 'Auto-matched'}</span>
                     </p>
+                    {pkgs.map((pkg, i) => (
+                      <p key={`${pkg.id}-${i}`} className="text-sm font-medium">
+                        {pkg.label.replace(/\n/g, ' ')} · {pkg.price}
+                      </p>
+                    ))}
+                    {pkgs.length > 1 && <p className="text-sm font-semibold mt-1">Total: {totalPrice}</p>}
                   </div>
                 );
               })()}

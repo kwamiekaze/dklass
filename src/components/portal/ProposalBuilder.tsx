@@ -18,7 +18,7 @@ import { ProfileCombobox } from "@/components/portal/ProfileCombobox";
 import { DdsLocationPicker } from "@/components/portal/DdsLocationPicker";
 
 import { toast } from "sonner";
-import { resolveProposalPackage, sumProposalHours } from "@/lib/packageSelection";
+import { parsePackageIds, resolveProposalPackages, serializePackageIds, sumProposalHours } from "@/lib/packageSelection";
 import { PACKAGES } from "@/data/packages";
 import { format, parseISO } from "date-fns";
 
@@ -79,7 +79,8 @@ export function ProposalBuilder({
   const [acceptanceMode, setAcceptanceMode] = useState(existingAcceptanceMode || 'pending_admin_finalize');
   const [noteToStudent, setNoteToStudent] = useState(existingNote || '');
   const [items, setItems] = useState<ProposalItem[]>([createEmptyItem()]);
-  const [packageId, setPackageId] = useState<string>(existingPackageId || 'auto');
+  // the packages sent with the proposal (empty = auto-match by total hours)
+  const [packageIds, setPackageIds] = useState<string[]>(() => parsePackageIds(existingPackageId));
   const [sending, setSending] = useState(false);
   const [locationErrors, setLocationErrors] = useState<string[]>([]);
   const [studentAvailability, setStudentAvailability] = useState<{days: string[], windows: string[], notes: string | null} | null>(null);
@@ -109,7 +110,7 @@ export function ProposalBuilder({
     }
     if (existingNote !== undefined) setNoteToStudent(existingNote || '');
     if (existingAcceptanceMode) setAcceptanceMode(existingAcceptanceMode);
-    if (isEditing) setPackageId(existingPackageId || 'auto');
+    if (isEditing) setPackageIds(parsePackageIds(existingPackageId));
   }, [isEditing, existingItems, existingNote, existingAcceptanceMode, existingPackageId]);
 
   // Fetch student availability when student is selected
@@ -205,7 +206,8 @@ export function ProposalBuilder({
       const { data: studentProfile } = await supabase.from('profiles').select('pickup_address, dropoff_address, email, full_name, first_name, last_name').eq('id', studentId).single();
 
       // The proposal email (dates, package and the Square pay link): sent for a new proposal and again for a revised one. Fire and forget, so a mail hiccup never blocks the proposal itself.
-      const sendProposalEmail = (proposalId: string, pkg: { label: string; price: string; squareUrl: string }, totalHours: number, revised: boolean) => {
+      const sendProposalEmail = (proposalId: string, pkgs: { id: string; label: string; price: string; squareUrl: string }[], totalPrice: string, totalHours: number, revised: boolean) => {
+        const pkg = pkgs[0]!;
         try {
           const instructorProfile = instructors.find(i => i.id === instructorId);
           const studentEmail = studentProfile?.email;
@@ -226,10 +228,11 @@ export function ProposalBuilder({
                 instructorName: instructorProfile ? (profileFirstName(instructorProfile as any) || 'Your Instructor') : undefined,
                 noteToStudent: noteToStudent || undefined,
                 items: emailItems,
-                packageLabel: pkg.label,
+                packageLabel: pkgs.map(p => p.label.replace(/\n/g, ' ')).join(' + '),
                 packageHours: totalHours,
-                packagePrice: pkg.price,
+                packagePrice: pkgs.length > 1 ? totalPrice : pkg.price,
                 paymentUrl: pkg.squareUrl,
+                packages: pkgs.map(p => ({ label: p.label.replace(/\n/g, ' '), price: p.price, paymentUrl: p.squareUrl })),
                 revised,
               },
             },
@@ -270,7 +273,7 @@ export function ProposalBuilder({
             proposal_status: 'revised_and_resent',
             note_to_student: noteToStudent || null,
             acceptance_mode: acceptanceMode,
-            package_id: packageId === 'auto' ? null : packageId,
+            package_id: serializePackageIds(packageIds),
             updated_at: new Date().toISOString(),
           })
           .eq('id', editingProposalId!);
@@ -295,8 +298,8 @@ export function ProposalBuilder({
 
         {
           const { totalHours, includesRoadTest } = sumProposalHours(validItems);
-          const { pkg } = resolveProposalPackage({ packageId: packageId === 'auto' ? null : packageId, totalHours, includesRoadTest });
-          sendProposalEmail(editingProposalId!, pkg, totalHours, true);
+          const { pkgs, totalPrice } = resolveProposalPackages({ packageId: serializePackageIds(packageIds), totalHours, includesRoadTest });
+          sendProposalEmail(editingProposalId!, pkgs, totalPrice, totalHours, true);
         }
 
         toast.success(`Revised proposal sent with ${validItems.length} date(s)`);
@@ -312,7 +315,7 @@ export function ProposalBuilder({
             proposal_status: 'sent',
             acceptance_mode: acceptanceMode,
             note_to_student: noteToStudent || null,
-            package_id: packageId === 'auto' ? null : packageId,
+            package_id: serializePackageIds(packageIds),
           })
           .select()
           .single();
@@ -337,12 +340,15 @@ export function ProposalBuilder({
 
         // Resolve package + payment link based on total hours
         const { totalHours, includesRoadTest } = sumProposalHours(validItems);
-        const { pkg } = resolveProposalPackage({
-          packageId: packageId === 'auto' ? null : packageId,
+        const { pkgs, totalPrice } = resolveProposalPackages({
+          packageId: serializePackageIds(packageIds),
           totalHours,
           includesRoadTest,
         });
-        const packageMsg = `Recommended package: ${pkg.label.replace(/\n/g, ' ')} (${pkg.price}). Complete payment to confirm your slot: ${pkg.squareUrl}`;
+        const pkg = pkgs[0]!;
+        const packageMsg = pkgs.length > 1
+          ? `Packages: ${pkgs.map(p => `${p.label.replace(/\n/g, ' ')} (${p.price}): ${p.squareUrl}`).join('; ')}. Total ${totalPrice}. Complete payment to confirm your slot.`
+          : `Recommended package: ${pkg.label.replace(/\n/g, ' ')} (${pkg.price}). Complete payment to confirm your slot: ${pkg.squareUrl}`;
 
         await supabase.from('notifications').insert({
           user_id: studentId,
@@ -358,10 +364,12 @@ export function ProposalBuilder({
             package_price: pkg.price,
             payment_url: pkg.squareUrl,
             total_hours: totalHours,
+            packages: pkgs.map(p => ({ id: p.id, label: p.label, price: p.price, payment_url: p.squareUrl })),
+            total_price: totalPrice,
           } as any,
         });
 
-        sendProposalEmail(proposal.id, pkg, totalHours, false);
+        sendProposalEmail(proposal.id, pkgs, totalPrice, totalHours, false);
 
         toast.success(`Proposal sent with ${validItems.length} date(s)`);
       }
@@ -371,6 +379,7 @@ export function ProposalBuilder({
       if (!isEditing) {
         setItems([createEmptyItem()]);
         setNoteToStudent('');
+        setPackageIds([]);
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to send proposal');
@@ -418,22 +427,62 @@ export function ProposalBuilder({
             </div>
 
             <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-sm">Package</Label>
-              <Select value={packageId} onValueChange={setPackageId}>
-                <SelectTrigger className="min-h-[44px]">
-                  <SelectValue placeholder="Auto (match by total hours)" />
-                </SelectTrigger>
-                <SelectContent className="max-h-72">
-                  <SelectItem value="auto">Auto (match by total hours)</SelectItem>
-                  {PACKAGES.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.label.replace(/\n/g, ' ')} — {p.price}
-                    </SelectItem>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-sm">Packages</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1"
+                  onClick={() => {
+                    if (packageIds.length >= 10) { toast.error('Maximum 10 packages per proposal'); return; }
+                    setPackageIds(prev => [...prev, PACKAGES[0]!.id]);
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add package
+                </Button>
+              </div>
+              {packageIds.length === 0 ? (
+                <div className="rounded-md border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground">
+                  Auto (match by total hours)
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {packageIds.map((pid, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <Select value={pid} onValueChange={(v) => setPackageIds(prev => prev.map((x, k) => (k === idx ? v : x)))}>
+                        <SelectTrigger className="min-h-[44px] flex-1">
+                          <SelectValue placeholder="Select package" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-72">
+                          {PACKAGES.map(p => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.label.replace(/\n/g, ' ')} — {p.price}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-11 w-11 shrink-0 text-destructive"
+                        aria-label="Remove package"
+                        onClick={() => setPackageIds(prev => prev.filter((_, k) => k !== idx))}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
+                  {packageIds.length > 1 && (
+                    <p className="text-xs font-medium">
+                      Total: {resolveProposalPackages({ packageId: serializePackageIds(packageIds), totalHours: 0, includesRoadTest: false }).totalPrice}
+                    </p>
+                  )}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
-                Sets the payment link sent to the student. Auto keeps the current hour-based match.
+                Sets the payment link(s) sent to the student. Add more than one package if needed; remove them all to auto-match by total hours.
               </p>
             </div>
           </div>

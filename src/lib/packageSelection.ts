@@ -1,6 +1,38 @@
 import { PACKAGES, getPackageById, type Package } from "@/data/packages";
 
 /**
+ * A proposal can carry several packages. They are stored in the existing
+ * `schedule_proposals.package_id` text column as a comma-separated list of
+ * package ids (a single id, as before, still reads as one package).
+ */
+export function parsePackageIds(raw?: string | null): string[] {
+  if (!raw) return [];
+  return raw.split(",").map((s) => s.trim()).filter((id) => !!getPackageById(id));
+}
+export function serializePackageIds(ids: string[]): string | null {
+  const clean = ids.filter((id) => !!getPackageById(id));
+  return clean.length ? clean.join(",") : null;
+}
+const priceValue = (p: Package) => parseFloat(p.price.replace(/[^0-9.]/g, "")) || 0;
+
+/**
+ * Resolve every package of a proposal. With no explicit selection, falls back
+ * to the single auto-matched package.
+ */
+export function resolveProposalPackages(opts: {
+  packageId?: string | null;
+  totalHours: number;
+  includesRoadTest: boolean;
+}): { pkgs: Package[]; isExplicit: boolean; totalPrice: string } {
+  const ids = parsePackageIds(opts.packageId);
+  const pkgs = ids.length
+    ? ids.map((id) => getPackageById(id)!)
+    : [resolvePackageForProposal({ totalHours: opts.totalHours, includesRoadTest: opts.includesRoadTest })];
+  const total = pkgs.reduce((sum, p) => sum + priceValue(p), 0);
+  return { pkgs, isExplicit: ids.length > 0, totalPrice: `$${total.toFixed(2)}` };
+}
+
+/**
  * Resolve the package for a proposal, honoring an explicit admin selection
  * when present. Falls back to the existing auto-match logic otherwise.
  */
@@ -9,7 +41,8 @@ export function resolveProposalPackage(opts: {
   totalHours: number;
   includesRoadTest: boolean;
 }): { pkg: Package; isExplicit: boolean } {
-  const explicit = opts.packageId ? getPackageById(opts.packageId) : undefined;
+  const first = parsePackageIds(opts.packageId)[0];
+  const explicit = first ? getPackageById(first) : undefined;
   if (explicit) return { pkg: explicit, isExplicit: true };
   return {
     pkg: resolvePackageForProposal({

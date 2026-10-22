@@ -14,7 +14,7 @@ import { SessionTypeBadge } from "@/components/portal/SessionTypeBadge";
 import { format, parseISO } from "date-fns";
 import { getDisplayName } from "@/lib/profileUtils";
 import { toast } from "sonner";
-import { resolveProposalPackage, sumProposalHours } from "@/lib/packageSelection";
+import { resolveProposalPackages, sumProposalHours } from "@/lib/packageSelection";
 
 /** Convert "HH:MM" or "HH:MM:SS" (24h) to "h:MM AM/PM" display */
 function formatTime24to12(time: string): string {
@@ -278,7 +278,7 @@ function StudentProposalsContent() {
               {/* Payment CTA — show for any active/pending/finalized proposal */}
               {items.length > 0 && !['declined'].includes(selectedProposal.proposal_status) && (() => {
                 const { totalHours, includesRoadTest } = sumProposalHours(items as any);
-                const { pkg } = resolveProposalPackage({
+                const { pkgs, totalPrice } = resolveProposalPackages({
                   packageId: selectedProposal.package_id,
                   totalHours,
                   includesRoadTest,
@@ -286,20 +286,27 @@ function StudentProposalsContent() {
                 return (
                   <Card className="border-primary/40 bg-primary/5">
                     <CardContent className="p-3 space-y-2">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <p className="text-sm font-semibold">
-                          Package: {pkg.label.replace(/\n/g, ' ')} · {pkg.price}
-                        </p>
-                        <span className="text-xs text-muted-foreground">{totalHours} hr</span>
-                      </div>
+                      {pkgs.map((pkg, i) => (
+                        <div key={`${pkg.id}-${i}`} className="space-y-2">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <p className="text-sm font-semibold">
+                              Package{pkgs.length > 1 ? ` ${i + 1}` : ''}: {pkg.label.replace(/\n/g, ' ')} · {pkg.price}
+                            </p>
+                            {i === 0 && <span className="text-xs text-muted-foreground">{totalHours} hr</span>}
+                          </div>
+                          <Button asChild className="w-full min-h-[44px] gap-2">
+                            <a href={pkg.squareUrl} target="_blank" rel="noopener noreferrer">
+                              {pkgs.length > 1 ? `Pay for Package ${i + 1}` : 'Complete Your Payment'}
+                            </a>
+                          </Button>
+                        </div>
+                      ))}
+                      {pkgs.length > 1 && (
+                        <p className="text-sm font-semibold">Total: {totalPrice}</p>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         Your slot is confirmed once payment is received.
                       </p>
-                      <Button asChild className="w-full min-h-[44px] gap-2">
-                        <a href={pkg.squareUrl} target="_blank" rel="noopener noreferrer">
-                          Complete Your Payment
-                        </a>
-                      </Button>
                     </CardContent>
                   </Card>
                 );
