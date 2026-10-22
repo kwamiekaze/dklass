@@ -281,23 +281,26 @@ function IntakeFormContent({ isAdminEdit = false }: { isAdminEdit?: boolean }) {
         permitSize = permitFile.size;
       }
 
-      // Insert/upsert permit_documents
+      // Insert/upsert permit_documents. A failure here used to be swallowed, which is how an uploaded permit ended up "missing": say so and retry as a plain insert.
       if (permitPath) {
-        await supabase.from("permit_documents").upsert(
-          {
-            student_id: targetUserId,
-            uploaded_by: user.id,
-            bucket: "permits",
-            file_path: permitPath,
-            file_name: permitName,
-            mime_type: permitMime || "image/jpeg",
-            size_bytes: permitSize,
-            source: "intake_form",
-            status: "pending_review",
-            is_current: true,
-          } as any,
-          { onConflict: "student_id,source", ignoreDuplicates: false }
-        );
+        const row = {
+          student_id: targetUserId,
+          uploaded_by: user.id,
+          bucket: "permits",
+          file_path: permitPath,
+          file_name: permitName,
+          mime_type: permitMime || "image/jpeg",
+          size_bytes: permitSize,
+          source: "intake_form",
+          status: "pending_review",
+          is_current: true,
+        } as any;
+        const { error: docErr } = await supabase.from("permit_documents").upsert(row, { onConflict: "student_id,source", ignoreDuplicates: false });
+        if (docErr) {
+          console.warn("permit document upsert failed, retrying as insert", docErr);
+          const { error: insErr } = await supabase.from("permit_documents").insert(row);
+          if (insErr && !/duplicate|unique/i.test(insErr.message)) throw insErr;
+        }
       }
 
       // Split full name into first/last for backward compat
@@ -318,6 +321,9 @@ function IntakeFormContent({ isAdminEdit = false }: { isAdminEdit?: boolean }) {
         intake_updated_by: user.id,
         intake_last_edit_role: role,
       };
+
+      // keep the profile's link to the permit in step, so every screen sees that a document is on file
+      if (permitPath) update.permit_file_url = permitPath;
 
       if (!isEditMode) {
         update.intake_submitted = true;

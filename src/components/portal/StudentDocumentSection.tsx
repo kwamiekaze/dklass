@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Camera, FileText, Eye, Loader2, CheckCircle, Archive, Clock, Download } from "lucide-react";
 import { PermitPreview } from "./PermitPreview";
+import { findPermitForStudent } from "@/lib/permitDocuments";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,8 @@ export function StudentDocumentSection({ studentId, isOwnProfile, isStaffOrAdmin
   const [uploading, setUploading] = useState(false);
   const [docType, setDocType] = useState<string>("permit");
   const [previewDoc, setPreviewDoc] = useState<DocumentRecord | null>(null);
+  /** a permit saved before the documents list existed (profile link, older permits table, or storage only) */
+  const [earlierPermit, setEarlierPermit] = useState(false);
 
   const fetchDocuments = useCallback(async () => {
     setLoading(true);
@@ -58,6 +61,10 @@ export function StudentDocumentSection({ studentId, isOwnProfile, isStaffOrAdmin
 
     if (!error && data) {
       setDocuments(data as DocumentRecord[]);
+      if (data.length === 0) {
+        // nothing in the documents list: look where older uploads were saved before saying there is nothing on file
+        try { setEarlierPermit(!!(await findPermitForStudent(studentId, null))); } catch { setEarlierPermit(false); }
+      } else setEarlierPermit(false);
     }
     setLoading(false);
   }, [studentId]);
@@ -243,7 +250,16 @@ export function StudentDocumentSection({ studentId, isOwnProfile, isStaffOrAdmin
         )}
 
         {/* No documents */}
-        {!loading && documents.length === 0 && (
+        {!loading && documents.length === 0 && earlierPermit && (
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium flex items-center gap-1.5">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              Permit on File
+            </h4>
+            <PermitPreview permitFileUrl={null} studentId={studentId} className="max-w-full sm:max-w-md" />
+          </div>
+        )}
+        {!loading && documents.length === 0 && !earlierPermit && (
           <p className="text-sm text-muted-foreground text-center py-4">
             No documents on file
           </p>
@@ -302,7 +318,15 @@ function DocumentRow({ doc, onView, onDownload, isCurrent }: { doc: DocumentReco
           ) : (
             <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">Archived</Badge>
           )}
-          {doc.status === 'pending_review' && (
+          {doc.status === 'approved' && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-green-500/50 text-green-600">
+              <CheckCircle className="h-2.5 w-2.5 mr-0.5" />Verified
+            </Badge>
+          )}
+          {doc.status === 'rejected' && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-red-500/50 text-red-600">Rejected</Badge>
+          )}
+          {doc.status !== 'approved' && doc.status !== 'rejected' && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-500/50 text-amber-600">
               <Clock className="h-2.5 w-2.5 mr-0.5" />Pending
             </Badge>

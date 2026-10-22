@@ -16,6 +16,7 @@ import { RejectUserModal } from "@/components/portal/RejectUserModal";
 import { IntakePreviewModal } from "@/components/portal/IntakePreviewModal";
 import { BatchDownloadModal } from "@/components/portal/BatchDownloadModal";
 import { PermitViewerModal, PermitStatusBadge } from "@/components/portal/PermitViewerModal";
+import { effectiveDocStatus, fetchDocSummaries, hasDocumentOnFile } from "@/lib/documentStatus";
 import { AdminUserProfileModal, OpenProfileButton, ClickableUserName } from "@/components/portal/AdminUserProfileModal";
 import { sendApprovalNotification, sendRejectionNotification } from "@/lib/notifications";
 import { format } from "date-fns";
@@ -33,7 +34,7 @@ export default function AdminApprovals() {
 
 function AdminApprovalsContent() {
   const { toast } = useToast();
-  const [profiles, setProfiles] = useState<(Profile & { role?: string; permitStatus?: string })[]>([]);
+  const [profiles, setProfiles] = useState<(Profile & { role?: string; permitStatus?: string | null; hasPermitOnFile?: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -59,24 +60,8 @@ function AdminApprovalsContent() {
       .order('created_at', { ascending: false });
 
     if (data) {
-      // Fetch all permits for status
-      const userIds = data.map(p => p.id);
-      const { data: permitsData } = await supabase
-        .from('permits')
-        .select('user_id, verified_status')
-        .in('user_id', userIds);
-
-      // Create a map of user_id to best permit status
-      const permitStatusMap = new Map<string, string>();
-      permitsData?.forEach(permit => {
-        const existing = permitStatusMap.get(permit.user_id);
-        // Priority: approved > pending > rejected
-        if (!existing || 
-            (permit.verified_status === 'approved') ||
-            (permit.verified_status === 'pending' && existing === 'rejected')) {
-          permitStatusMap.set(permit.user_id, permit.verified_status);
-        }
-      });
+      // One answer for "is a permit on file": the documents table, the older permits table and the profile link together
+      const docSummaries = await fetchDocSummaries(data.map(p => p.id));
 
       const profilesWithRoles = await Promise.all(
         data.map(async (profile) => {
@@ -90,8 +75,9 @@ function AdminApprovalsContent() {
             ...profile, 
             role: roleData?.role || undefined,
             approval_status: (profile as any).approval_status || (profile.approved ? 'approved' : 'pending'),
-            permitStatus: permitStatusMap.get(profile.id) || null,
-          } as Profile & { role?: string; permitStatus?: string };
+            permitStatus: effectiveDocStatus(docSummaries.get(profile.id), profile.permit_file_url),
+            hasPermitOnFile: hasDocumentOnFile(docSummaries.get(profile.id), profile.permit_file_url),
+          } as Profile & { role?: string; permitStatus?: string | null; hasPermitOnFile?: boolean };
         })
       );
       setProfiles(profilesWithRoles);
@@ -136,9 +122,12 @@ function AdminApprovalsContent() {
         submittedAt: profile.created_at,
       };
 
-      const files = profile.permit_file_url 
-        ? { permitFile: profile.permit_file_url }
-        : null;
+      let permitFilePath: string | null = profile.permit_file_url || null;
+      if (!permitFilePath) {
+        const { data: cur } = await supabase.from('permit_documents').select('file_path').eq('student_id', profile.id).order('is_current', { ascending: false }).order('uploaded_at', { ascending: false }).limit(1).maybeSingle();
+        permitFilePath = cur?.file_path || null;
+      }
+      const files = permitFilePath ? { permitFile: permitFilePath } : null;
 
       // Save to approved_intakes table
       const { error } = await supabase
@@ -465,7 +454,7 @@ function AdminApprovalsContent() {
 }
 
 interface UserApprovalCardProps {
-  profile: Profile & { role?: string; needs_review?: boolean; permitStatus?: string };
+  profile: Profile & { role?: string; needs_review?: boolean; permitStatus?: string | null; hasPermitOnFile?: boolean };
   onApprove: () => void;
   onReject: () => void;
   onRoleChange: (id: string, role: UserRole) => void;
@@ -501,7 +490,7 @@ function UserApprovalCard({ profile, onApprove, onReject, onRoleChange, onPrevie
               </Badge>
             )}
             <PermitStatusBadge 
-              hasPermit={!!profile.permit_file_url} 
+              hasPermit={profile.hasPermitOnFile ?? !!profile.permit_file_url} 
               verifiedStatus={profile.permitStatus} 
             />
           </div>
@@ -597,7 +586,7 @@ function UserApprovalCard({ profile, onApprove, onReject, onRoleChange, onPrevie
 }
 
 interface ApprovedUserCardProps {
-  profile: Profile & { role?: string; needs_review?: boolean; permitStatus?: string };
+  profile: Profile & { role?: string; needs_review?: boolean; permitStatus?: string | null; hasPermitOnFile?: boolean };
   onRoleChange: (id: string, role: UserRole) => void;
   onPreviewIntake: () => void;
   onViewPermits: () => void;
