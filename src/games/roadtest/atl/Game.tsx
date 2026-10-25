@@ -257,9 +257,9 @@ function AtlHud({ handle }: { handle: AtlHandle }) {
   return <div className="atl-hud" ref={root}>
     <div className="atl-road"><i className="atl-wx">{WX_ICON[sim.weatherKind] ?? ''}</i><span>{sim.stage.roadName}</span><em>{KIND_LABEL[sim.weatherKind as WeatherKind] ?? ''}</em></div>
     <div className="atl-sig">
-      <button className="atl-sig-l" onPointerDown={press(-1)} aria-label="Left signal (Q)">◀</button>
+      <button className="atl-sig-l" onPointerDown={press(-1)} aria-label="Left signal (Q)">◀<small>SIGNAL</small></button>
       <div className="atl-gap" data-s="none"><small>GAP</small><b>--</b></div>
-      <button className="atl-sig-r" onPointerDown={press(1)} aria-label="Right signal (E)">▶</button>
+      <button className="atl-sig-r" onPointerDown={press(1)} aria-label="Right signal (E)">▶<small>SIGNAL</small></button>
     </div>
     <div className="atl-radar" data-s="off"><small>🚨</small><b>SPEED WATCH</b><i><u /></i><span><s /><s /></span></div>
     <div className="atl-copflash" data-on="" />

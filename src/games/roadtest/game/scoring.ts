@@ -60,6 +60,8 @@ export const POINTS = {
   HIT_BUILDING: -100,
   PED_FAIL: -300,
   WRONG_SIDE: -60,
+  SCRAPE: -40,
+  RECOVERY: -30,
 } as const;
 
 const LABELS: Record<string, string> = {
@@ -84,9 +86,11 @@ const LABELS: Record<string, string> = {
   MISSION: 'Reached the destination',
   PARKED_WELL: 'Stopped right at the destination',
   WRONG_WAY: 'Drove the wrong way on a one-way street',
-  HIT_BUILDING: 'Hit a building or a pole',
+  HIT_BUILDING: 'Crashed into a building or a pole',
   PED_FAIL: 'Did not yield to a pedestrian',
   WRONG_SIDE: 'Drove on the wrong side of the road',
+  SCRAPE: 'Scraped a wall, pole or parked car',
+  RECOVERY: 'Needed the back-on-road reset',
   SIGNALLED: 'Signalled before changing lanes',
   SAFE_GAP: 'Kept a safe following gap',
   MOVE_OVER: 'Moved over for emergency vehicles',
@@ -127,10 +131,10 @@ const POSITIVE_COMBO: PointKey[] = ['SIGNALLED', 'SAFE_GAP', 'MOVE_OVER', 'RAIL_
 const FINISH_KEYS: PointKey[] = ['FINISH_BONUS', 'NO_CRASH_BONUS', 'SPOTLESS_BONUS', 'STREAK_MASTER'];
 
 export type Severity = 'reward' | 'minor' | 'major' | 'strike' | 'critical';
-const MINOR: PointKey[] = ['HIT_CONE', 'LANE_CROSS', 'SPEEDING', 'NO_SIGNAL', 'TAILGATE', 'HOV_SOLO', 'BLOCK_PASSING', 'TURN_TOO_FAST', 'MERGE_TOO_SLOW', 'WRONG_SIDE', 'HIT_BUILDING'];
+const MINOR: PointKey[] = ['HIT_CONE', 'LANE_CROSS', 'SPEEDING', 'NO_SIGNAL', 'TAILGATE', 'HOV_SOLO', 'BLOCK_PASSING', 'TURN_TOO_FAST', 'MERGE_TOO_SLOW', 'WRONG_SIDE', 'SCRAPE', 'RECOVERY'];
 const MAJOR: PointKey[] = ['RAN_STOP_SIGN', 'NO_MOVE_OVER', 'CIRCLE_CUTOFF', 'SPEEDING_TICKET', 'LEFT_NO_YIELD', 'PULLED_OVER', 'MERGE_CUTOFF', 'WRONG_WAY', 'PED_FAIL'];
 /** Strike events: share of the banked score that is lost. Collisions cost half, the first two times and the third. */
-const STRIKE_SHARE: Partial<Record<PointKey, number>> = { HIT_PARKED_CAR: 0.5, HIT_TRAFFIC: 0.5, RAN_RAIL: 0.3, RAN_RED_LIGHT: 0.15 };
+const STRIKE_SHARE: Partial<Record<PointKey, number>> = { HIT_PARKED_CAR: 0.5, HIT_TRAFFIC: 0.5, HIT_BUILDING: 0.35, RAN_RAIL: 0.3, RAN_RED_LIGHT: 0.15 };
 /** Critical events: share of the banked score that survives. */
 const CRITICAL_KEEP: Partial<Record<PointKey, number>> = { HIT_PEDESTRIAN: 0.1, HIT_ANIMAL: 0.25, HIT_TRAIN: 0.05, FAILED_TO_YIELD: 0.4 };
 
@@ -287,7 +291,7 @@ export class ScoreTracker {
     this.settled = true;
     let total = 0;
     const faults = [...this.counts.keys()].filter((k) => severityOf(k) !== 'reward' && severityOf(k) !== 'critical');
-    if (this.countOf('HIT_PARKED_CAR') + this.countOf('HIT_TRAFFIC') + this.countOf('RAN_RAIL') === 0) total += this.add('NO_CRASH_BONUS');
+    if (this.countOf('HIT_PARKED_CAR') + this.countOf('HIT_TRAFFIC') + this.countOf('HIT_BUILDING') + this.countOf('RAN_RAIL') === 0) total += this.add('NO_CRASH_BONUS');
     if (faults.length === 0) total += this.add('SPOTLESS_BONUS');
     if (this.maxCombo >= 5) total += this.add('STREAK_MASTER');
     return total;
@@ -358,7 +362,7 @@ export function buildResult(
   if (c('FAILED_TO_YIELD')) feedback.push('🛑 When an officer signals you, signal, slow down and pull to the right shoulder.');
   if (!tracker.voided && tracker.strikes >= MAX_STRIKES) feedback.push('Three strikes. The exam ends when the safety record runs out, so a bad habit cost the whole run.');
 
-  const crashes = c('HIT_PARKED_CAR') + c('HIT_TRAFFIC');
+  const crashes = c('HIT_PARKED_CAR') + c('HIT_TRAFFIC') + c('HIT_BUILDING');
   if (crashes === 0) feedback.push('Zero collisions. Excellent vehicle control.');
   else if (crashes <= 2) feedback.push(`${crashes === 1 ? 'A collision' : 'Two collisions'} cost you half of your points each time. Leave more space.`);
   else feedback.push('Too many collisions. Slow down and scan further ahead.');

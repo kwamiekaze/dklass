@@ -12,6 +12,7 @@ import { fleetFiles } from '../../../components/nuhome2/world/Fleet';
 import { touchControls } from '../game/controls';
 import type { Difficulty, LevelResult } from '../game/types';
 import { sound } from '../sound';
+import { TIER_NAMES } from '../game/scoring';
 import { Hud } from '../g3d/Hud';
 import { SPEC_IDS } from '../g3d/cars';
 import { newHud, type HudState } from '../g3d/hudBus';
@@ -89,6 +90,7 @@ function Driver({ handle, onComplete, onReady }: { handle: OpenHandle; onComplet
       case 'shake': shake.amp = Math.max(shake.amp, e.amp); shake.t = shake.dur = e.dur; break;
       case 'flash': hud.flashes.push({ color: e.color, dur: e.dur, born: now }); break;
       case 'banner': hud.banners.push({ title: e.title, sub: e.sub, ms: e.ms, tone: e.tone ?? 'gold', born: now }); break;
+      case 'delta': hud.deltas.push({ kind: e.kind, chip: e.chip, sub: e.sub, born: now }); if (hud.deltas.length > 6) hud.deltas.shift(); if (e.tierUp) hud.toasts.push({ text: e.sub ?? 'STREAK UP', born: now }); break;
       case 'toast': hud.toasts.push({ text: e.text, born: now }); break;
       case 'finish': hud.finished = true; break;
       case 'catastrophe': hud.catastrophe = true; break;
@@ -122,7 +124,7 @@ function Driver({ handle, onComplete, onReady }: { handle: OpenHandle; onComplet
       const diff = hud.score - hud.display;
       if (diff !== 0) { const step = Math.sign(diff) * Math.max(1, Math.ceil(Math.abs(diff) * Math.min(1, dt * 6))); hud.display = Math.abs(step) >= Math.abs(diff) ? hud.score : hud.display + step; }
       hud.mph = sim.mph; hud.over = sim.speeding; hud.combo = sim.tracker.combo; hud.maxCombo = sim.tracker.maxCombo; hud.stars = sim.tracker.starsCollected;
-      hud.progress = 0; hud.strikes = sim.strikes; hud.limit = sim.speedLimitNow; hud.distance = sim.travelPx; hud.endless = true;
+      hud.progress = 0; hud.strikes = sim.strikes; hud.limit = sim.speedLimitNow; hud.distance = sim.travelPx; hud.endless = true; hud.tierProg = sim.tracker.tierProgress; hud.tierName = TIER_NAMES[sim.tracker.combo - 1] ?? '';
     } catch (err) {
       if (import.meta.env.DEV) console.error('carrollton frame', err);
       if (++errs.current > 24 && !sim.isComplete) { errs.current = 0; try { sim.forceComplete(); for (const e of sim.drain()) dispatch(e); } catch { /* ignore */ } }
@@ -309,9 +311,9 @@ function OpenHud({ handle }: { handle: OpenHandle }) {
       <em className="cr-trips">Trips 0</em>
     </div>
     <div className="atl-sig">
-      <button className="atl-sig-l" onPointerDown={press(-1)} aria-label="Left signal (Q)">◀</button>
+      <button className="atl-sig-l" onPointerDown={press(-1)} aria-label="Left signal (Q)">◀<small>SIGNAL</small></button>
       <button className="cr-reset" onPointerDown={reset} aria-label="Back on the road (R)" title="Back on the road (R)">⟲</button>
-      <button className="atl-sig-r" onPointerDown={press(1)} aria-label="Right signal (E)">▶</button>
+      <button className="atl-sig-r" onPointerDown={press(1)} aria-label="Right signal (E)">▶<small>SIGNAL</small></button>
     </div>
     <div className="cr-light" data-s="" />
     <div className="atl-prompt" />

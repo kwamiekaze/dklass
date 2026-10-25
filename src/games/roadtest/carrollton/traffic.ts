@@ -167,7 +167,9 @@ export class Traffic {
     // the player counts too
     const dx = node.x - plr.x, dz = node.z - plr.z, d = Math.hypot(dx, dz);
     if (d < node.clear * 0.9) return false;
-    if (d < 50 && plr.v > 2) { const toward = (dx * Math.sin(plr.h) + dz * Math.cos(plr.h)) / (d || 1); if (toward > 0.55 && d / plr.v < 3.4) return false; }
+    // a car pulling out needs a real gap: a left turn from a standstill across the player's lane takes the longest, going straight the least
+    const turn = c.nextConn?.turn ?? 0, need = turn === -1 ? 6.2 : turn === 1 ? 4.8 : 4.4;
+    if (d < Math.max(50, plr.v * need + 8) && plr.v > 2) { const toward = (dx * Math.sin(plr.h) + dz * Math.cos(plr.h)) / (d || 1); if (toward > 0.55 && d / plr.v < need) return false; }
     return true;
   }
   private oncomingLeft(node: Node, c: Car, plr: Mover): boolean {
@@ -243,6 +245,8 @@ export class Traffic {
       c.brake = c.acc < -0.9 || (c.v < 0.3);
       c.blockedT = c.v < 0.3 ? c.blockedT + dt : 0;
       if (c.blockedT > 22) { if (this.unseen(c, plr, 70)) c.s = c.seg.len + 1e9; else if (c.blockedT > 34) { c.ghostUntil = time + 7; c.blockedT = 0; } }
+      // a car waiting on the player's own parked car does not wait for ever: the queue behind it would never move again
+      else if (leadId === -1 && c.blockedT > 14 && plr.v < 0.3) { c.ghostUntil = time + 5; c.blockedT = 0; }
       this.move(c, dt);
     }
     // ---- leave when the car has wandered far from the player or reached the end of the road

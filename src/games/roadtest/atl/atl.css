@@ -1,12 +1,14 @@
 /* The Atlanta mode's own HUD extras. Scoped to .atl-root so nothing here can reach the homepage or the other lessons. */
 .atl-hud { position: absolute; inset: 0; pointer-events: none; z-index: 6; font-family: var(--display, 'Bebas Neue', Impact, sans-serif); color: #fff; }
-.atl-road { position: absolute; left: 10px; top: 112px; display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 8px; border-radius: 99px; background: #00694a; border: 2px solid #fff; box-shadow: 0 6px 16px rgba(0,0,0,.4); font-size: 16px; letter-spacing: 1.5px; }
+.atl-road { position: absolute; left: 10px; top: 180px; display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 8px; border-radius: 99px; background: #00694a; border: 2px solid #fff; box-shadow: 0 6px 16px rgba(0,0,0,.4); font-size: 16px; letter-spacing: 1.5px; }
 .atl-road i { font-style: normal; font-size: 16px; line-height: 1; }
 .atl-road em { font-style: normal; font-size: 12px; letter-spacing: 1px; opacity: .85; padding-left: 8px; border-left: 1px solid rgba(255,255,255,.5); }
 .atl-sig { position: absolute; inset: 0; }
 .atl-sig .atl-sig-l { position: absolute; left: 12px; bottom: 206px; } .atl-sig .atl-sig-r { position: absolute; right: 12px; bottom: 206px; }
-.atl-sig .atl-gap { position: absolute; left: 10px; top: 150px; }
+.atl-sig .atl-gap { position: absolute; left: 10px; top: 216px; }
 .atl-sig button { pointer-events: auto; width: 54px; height: 54px; border-radius: 50%; border: 2px solid rgba(242,193,78,.55); background: rgba(16,16,20,.62); color: #ffe08a; font-size: 22px; line-height: 1; box-shadow: 0 6px 16px rgba(0,0,0,.4); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); touch-action: manipulation; }
+.atl-sig button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0; width: 58px; height: 58px; }
+.atl-sig button small { font-size: 8px; letter-spacing: 1px; line-height: 1; opacity: .85; font-family: var(--display, 'Bebas Neue', Impact, sans-serif); }
 .atl-sig button.armed { border-color: #29e069; color: #29e069; }
 .atl-sig button.on { background: #29e069; color: #06210f; box-shadow: 0 0 22px rgba(41,224,105,.9); }
 .atl-gap { min-width: 74px; padding: 5px 10px; border-radius: 12px; background: rgba(16,16,20,.62); border: 1px solid rgba(255,255,255,.3); text-align: center; line-height: .95; transition: opacity .2s, border-color .2s; }
@@ -20,7 +22,9 @@
 .atl-loading h3 { color: #f2c14e; }
 .atl-load-wx { font-weight: 600; letter-spacing: .5px; }
 .atl-load-tip { max-width: 420px; text-align: center; padding: 8px 18px; border-radius: 12px; background: rgba(0,105,74,.35); border: 1px solid rgba(255,255,255,.35); line-height: 1.35; }
-@media (max-width: 700px) { .atl-sig .atl-sig-l, .atl-sig .atl-sig-r { bottom: 196px; } .atl-prompt { bottom: 250px; font-size: 13px; } .atl-road { top: 108px; font-size: 14px; } }
+@media (max-width: 700px) { .atl-sig .atl-sig-l, .atl-sig .atl-sig-r { bottom: 196px; } .atl-prompt { bottom: 250px; font-size: 13px; } .atl-road { font-size: 14px; } }
+/* a phone: the lesson title sits under the score panel, the road pill and the gap meter under the title */
+@media (max-width: 520px) { .atl-road { top: 204px; } .atl-sig .atl-gap { top: 240px; } }
 
 /* ---- the Atlanta Drive section of the menu ---- */
 .atl-menu { margin: 14px 0 18px; padding: 14px; border-radius: 18px; background: linear-gradient(160deg, #0b1d3f, #08122a); border: 1px solid rgba(242,193,78,.45); box-shadow: 0 10px 30px rgba(0,0,0,.35); }

@@ -3,7 +3,7 @@
  * streets of the real map. The traffic, the signals and the stop signs are the map's; the sim watches the player against them the way a licence examiner would:
  * the speed limit of the road you are on, the stop line, the red light, the one-way arrow, the centre line, the turn signal, the person in the crosswalk.
  */
-import { ScoreTracker, buildResult, type PointKey } from '../game/scoring';
+import { ScoreTracker, buildResult, deltaCue, type PointKey } from '../game/scoring';
 import { getDifficulty, type Difficulty, type DifficultyConfig, type LevelConfig, type LevelResult } from '../game/types';
 import { MPH, loadMap, pointOnPoly, wrapAngle, type Edge, type GameMap, type Node, type RoadHit } from './map';
 import { Traffic, signalState, type Mover, type SigState } from './traffic';
@@ -27,6 +27,7 @@ export type OSimEvent =
   | { k: 'finish' }
   | { k: 'catastrophe' }
   | { k: 'speedWarn' }
+  | { k: 'delta'; kind: 'up' | 'down' | 'strike' | 'crit'; chip: string; sub?: string; tierUp: boolean; tierDown: boolean; tier: number; strikes: number; points: number }
   | { k: 'complete'; result: LevelResult };
 
 const CAR = { len: 4.6, w: 1.86, wheelbase: 2.75, mass: 1400 };
@@ -61,7 +62,8 @@ export class OpenSim {
   signalDir: -1 | 0 | 1 = 0; signalAt = -99;
   invulnUntil = 0;
   maxMph = VMAX * M_PER_S_TO_MPH;
-  strikes = 0; strikes0 = 0;
+  /** strikes live on the tracker, so the score, the streak and the safety record always agree */
+  get strikes() { return this.tracker.strikes; }
   traveled = 0; cleanDist = 0;
   /** the road under the car */
   hit: RoadHit | null = null; onRoad = false; inBox = false; dir: 1 | -1 = 1; roadName = ''; limit = 25; lane = 0; rightOff = 0;
@@ -73,7 +75,7 @@ export class OpenSim {
   gapSec = 0;
 
   private ap: { edge: Edge; end: 0 | 1; node: Node; minV: number; stopped: boolean; h0: number; sig: number; seen: number; judged: boolean } | null = null;
-  private inJunction: { node: Node; h0: number; sig: -1 | 0 | 1; at: number } | null = null;
+  private inJunction: { node: Node; h0: number; sig: -1 | 0 | 1; at: number; name: string } | null = null;
   private speedT = 0; private speedCool = 0; private wrongT = 0; private wrongCool = 0; private sideT = 0; private sideCool = 0; private crashCool = 0; private offT = 0;
   private lastTurnSig = -99;
   private planner;
@@ -133,11 +135,24 @@ export class OpenSim {
   drain(): OSimEvent[] { const e = this.events; this.events = []; return e; }
   private float(text: string, good: boolean, x = this.x, z = this.z) { this.emit({ k: 'float', text, good, x, z }); }
   banner(title: string, sub?: string, ms = 2600, tone: 'gold' | 'red' | 'white' = 'gold') { this.emit({ k: 'banner', title, sub, ms, tone }); }
-  private award(key: PointKey, text?: string) {
+  /** One place where every point changes hands: the float, the HUD chip, the sounds, the strike banner and the end of the exam. */
+  private award(key: PointKey, text?: string, why?: string) {
     const pts = this.tracker.add(key);
-    if (text) this.float(`${pts >= 0 ? '+' : ''}${pts} ${text}`, pts >= 0);
-    if (pts > 0) this.snd.checkpoint?.(); else this.snd.yieldBuzz?.();
-    if (pts < 0) { this.cleanDist = 0; }
+    const d = this.tracker.last!, cue = deltaCue(d), good = d.severity === 'reward';
+    if (text) this.float(`${text} ${cue.chip}${good && this.tracker.combo > 1 ? ` x${this.tracker.combo}` : ''}`, good);
+    this.emit({ k: 'delta', kind: cue.kind, chip: cue.chip, sub: cue.sub, tierUp: cue.tierUp, tierDown: cue.tierDown, tier: cue.tier, strikes: cue.strikes, points: pts });
+    if (good) { this.snd.checkpoint?.(); if (cue.tierUp) this.snd.tierUp?.(); }
+    else {
+      this.cleanDist = 0;
+      if (cue.kind === 'strike') this.snd.strikeHit?.(); else if (cue.tierDown) this.snd.tierDown?.(); else this.snd.yieldBuzz?.();
+    }
+    this.snd.setSfxPitchStep?.(Math.max(0, this.tracker.combo - 1));
+    if (cue.kind === 'strike') {
+      this.invulnUntil = this.time + 2.2;
+      this.emit({ k: 'flash', color: 0xff3a2a, dur: 0.5 });
+      this.banner(d.examOver ? 'EXAM OVER' : `STRIKE ${d.strikes} OF 3`, why, 2800, 'red');
+      if (d.examOver) this.after(1.4, () => this.finish('SUSPENDED'));
+    }
     return pts;
   }
   private after(sec: number, fn: () => void) { this.timers.push({ at: this.time + sec, fn }); }
@@ -153,16 +168,6 @@ export class OpenSim {
   get sim() { return this; }
   endEarly() { this.finish(); }
   asMover(): Mover { return { x: this.x, z: this.z, h: this.h, v: this.v, len: CAR.len, w: CAR.w }; }
-
-  /** strike: three of them end the drive; a long clean stretch drops one */
-  private strike(why: string) {
-    if (this.time < this.invulnUntil) return;
-    this.strikes++; this.cleanDist = 0;
-    this.invulnUntil = this.time + 2.2;
-    this.emit({ k: 'flash', color: 0xff3a2a, dur: 0.5 });
-    this.banner(`STRIKE ${this.strikes} OF 3`, why, 2800, 'red');
-    if (this.strikes >= 3) this.after(1.4, () => this.finish('SUSPENDED'));
-  }
 
   // ------------------------------------------------------------------ the step
   step(dt: number, c: Controls) {
@@ -187,7 +192,7 @@ export class OpenSim {
     this.missionStep(dt);
     // clean driving heals a strike
     this.cleanDist += Math.abs(this.v) * dt;
-    if (this.strikes > 0 && this.cleanDist > 1900) { this.strikes--; this.cleanDist = 0; this.banner('CLEAN DRIVING', 'One strike off your record', 2400, 'white'); }
+    if (this.strikes > 0 && this.cleanDist > 1900) { this.tracker.forgive(); this.cleanDist = 0; this.banner('CLEAN DRIVING', 'One strike off your record', 2400, 'white'); }
     if (this.time - this.promptAt > 6) this.prompt = '';
     // auto-cancel the turn signal once the turn is made
     if (this.signalDir !== 0 && this.time - this.signalAt > 4 && Math.abs(this.steer) < 0.05 && !this.inJunction && this.mph > 8) {
@@ -267,7 +272,7 @@ export class OpenSim {
     this.x = hit.x - sz * off; this.z = hit.z + sx * off; this.h = wrapAngle(ang);
     this.v = 0; this.yawRate = 0; this.steer = 0; this.signalDir = 0;
     this.invulnUntil = this.time + 2.5; this.ap = null; this.inJunction = null;
-    this.tracker.add('WRONG_SIDE' as PointKey); this.float('-60 RESET', false);
+    this.award('RECOVERY', 'RESET');
     this.banner('BACK ON THE ROAD', undefined, 1600, 'white');
   }
   private onRoadSurface() {
@@ -354,9 +359,11 @@ export class OpenSim {
     this.snd.collision?.();
     this.emit({ k: 'shake', amp: Math.min(1.6, 0.4 + speed / 8), dur: 0.4 });
     this.emit({ k: 'crash', x: this.x, z: this.z, big });
-    if (kind === 'building') { if (speed > 2.5) { this.award('HIT_BUILDING', 'HIT'); if (big) this.strike('You hit a building'); } }
-    else if (kind === 'parked') { if (speed > 1.5) { this.award('HIT_TRAFFIC', 'COLLISION'); if (speed > 3.5) this.strike('You hit a parked car'); } }
-    else { this.award('HIT_TRAFFIC', 'COLLISION'); if (speed > 2.5) this.strike('You hit another car'); }
+    if (this.time < this.invulnUntil) return;
+    if (kind === 'building') { if (speed > 5) this.award('HIT_BUILDING', 'CRASH', 'You hit a building or a pole'); else if (speed > 2.5) this.award('SCRAPE', 'SCRAPE'); }
+    else if (kind === 'parked') { if (speed > 3.5) this.award('HIT_PARKED_CAR', 'PARKED CAR', 'You hit a parked car'); else if (speed > 1.5) this.award('SCRAPE', 'SCRAPE'); }
+    else if (speed > 2.5) this.award('HIT_TRAFFIC', 'COLLISION', 'You hit another car');
+    else if (speed > 1.2) this.award('SCRAPE', 'BUMP');
   }
   private collideCars() {
     const cs = Math.cos(this.h), sn = Math.sin(this.h);
@@ -376,9 +383,11 @@ export class OpenSim {
             const rvx = Math.sin(this.h) * this.v - Math.sin(car.h) * car.v, rvz = Math.cos(this.h) * this.v - Math.cos(car.h) * car.v;
             const into = -(rvx * nx + rvz * nz);
             if (into > 1.1) {
+              // how fast the player's own car is closing on the other one: a car that drives into you while you sit still is not your fault
+              const own = Math.max(0, -(Math.sin(this.h) * this.v * nx + Math.cos(this.h) * this.v * nz));
               this.v *= Math.max(0.15, 1 - into / 16);
               car.hit = 2.8; car.v *= 0.2;
-              this.onHit('car', into);
+              if (own > 0.7) this.onHit('car', own + (into - own) * 0.4); else { this.crashCool = this.time + 1.3; this.snd.collision?.(); this.emit({ k: 'shake', amp: 0.3, dur: 0.25 }); }
             }
           }
         }
@@ -416,12 +425,12 @@ export class OpenSim {
     const mph = this.mph;
     // ---- speed
     const over = mph - this.limit;
-    if (over > 3.5 && this.v > 0) { this.speedT += dt; if (this.speedT > 2.0 && this.time > this.speedCool) { this.speedCool = this.time + 7; this.award('SPEEDING', `${Math.round(mph)} IN A ${this.limit}`); this.emit({ k: 'speedWarn' }); if (over > 20) this.strike(`${Math.round(mph)} mph in a ${this.limit}`); } }
+    if (over > 3.5 && this.v > 0) { this.speedT += dt; if (this.speedT > 2.0 && this.time > this.speedCool) { this.speedCool = this.time + 7; this.award(over > 20 ? 'SPEEDING_TICKET' : 'SPEEDING', `${Math.round(mph)} IN A ${this.limit}`); this.emit({ k: 'speedWarn' }); } }
     else this.speedT = Math.max(0, this.speedT - dt * 2);
     // ---- one-way streets, driven the wrong way
     if (w.oneway && this.dir === -1 && this.v > 2.2) {
       this.wrongT += dt;
-      if (this.wrongT > 1.1 && this.time > this.wrongCool) { this.wrongCool = this.time + 9; this.award('WRONG_WAY', 'WRONG WAY'); this.strike('Wrong way on a one-way street'); }
+      if (this.wrongT > 1.1 && this.time > this.wrongCool) { this.wrongCool = this.time + 9; this.award('WRONG_WAY', 'WRONG WAY'); this.say('One-way street: you are facing the wrong way'); }
     } else this.wrongT = 0;
     // ---- the right side of a two-way road
     if (!w.oneway && this.v > 3 && !this.nearJunction(hit)) {
@@ -470,7 +479,7 @@ export class OpenSim {
     if (!ap.judged && nd < line - 0.9 && ahead > -2) {
       ap.judged = true;
       if (node.signal) {
-        if (sig === 'red') { this.award('RAN_RED_LIGHT', 'RED LIGHT'); this.strike('You ran a red light'); }
+        if (sig === 'red') { this.award('RAN_RED_LIGHT', 'RED LIGHT', 'You ran a red light'); }
         else if (sig === 'green') this.award('GREEN_LIGHT', 'GREEN');
         else this.float('YELLOW: stop if you can', true);
       } else if (e.stop[ap.end]) {
@@ -478,7 +487,7 @@ export class OpenSim {
         else { this.award('RAN_STOP_SIGN', 'STOP SIGN'); this.say('Come to a full stop at the line'); }
       }
       // the junction starts here
-      this.inJunction = { node, h0: this.h, sig: ap.sig as -1 | 0 | 1, at: this.time };
+      this.inJunction = { node, h0: this.h, sig: ap.sig as -1 | 0 | 1, at: this.time, name: ap.edge.way.name || '' };
     }
     if (ap.judged && nd < node.clear * 0.6) this.ap = null;
     // prompts as the line comes up
@@ -497,7 +506,7 @@ export class OpenSim {
       const e = hit.edge, end: 0 | 1 = this.dir === 1 ? 1 : 0, node = end === 1 ? e.b : e.a;
       if (node.arms.length >= 3) {
         const nd = Math.hypot(node.x - this.x, node.z - this.z);
-        if (nd < node.clear * 0.8) this.inJunction = { node, h0: this.h, sig: this.signalDir, at: this.time };
+        if (nd < node.clear * 0.8) this.inJunction = { node, h0: this.h, sig: this.signalDir, at: this.time, name: e.way.name || '' };
       }
       return;
     }
@@ -505,9 +514,11 @@ export class OpenSim {
     if (this.signalDir !== 0 && this.time - this.signalAt < 8) j.sig = this.signalDir;
     if (nd > n.clear + 4) {
       const dh = wrapAngle(this.h - j.h0);
-      if (Math.abs(dh) > 0.7 && this.v > 0) {
+      // a street that simply bends through the junction is not a turn: no signal needed to follow it round
+      const bend = !!j.name && this.hit?.edge.way.name === j.name && Math.abs(dh) < 1.25;
+      if (Math.abs(dh) > 0.7 && this.v > 0 && !bend) {
         // right turns make the heading smaller, left turns larger
-        if (j.sig !== 0 && ((dh < 0 && j.sig === 1) || (dh > 0 && j.sig === -1))) { this.award('SIGNALLED', 'SIGNALLED'); this.signalDir = 0; }
+        if (j.sig !== 0 && (Math.abs(dh) > 2.4 || (dh < 0 && j.sig === 1) || (dh > 0 && j.sig === -1))) { this.award('SIGNALLED', 'SIGNALLED'); this.signalDir = 0; }
         else if (j.sig === 0) { this.award('NO_SIGNAL', 'NO SIGNAL'); }
         this.lastTurnSig = this.time;
       }
@@ -524,7 +535,7 @@ export class OpenSim {
     for (const p of this.peds.list) {
       const dx = p.x - this.x, dz = p.z - this.z, d = Math.hypot(dx, dz);
       if (d < 1.5 && this.mph > 2 && p.state === 'walk' && !p.hit) {
-        p.hit = true; this.tracker.zeroOut('HIT_PEDESTRIAN'); this.emit({ k: 'catastrophe' }); this.snd.catastrophe?.();
+        p.hit = true; this.award('HIT_PEDESTRIAN', 'PEDESTRIAN'); this.emit({ k: 'catastrophe' }); this.snd.catastrophe?.();
         this.emit({ k: 'crash', x: p.x, z: p.z, big: true });
         this.after(1.6, () => this.finish('PEDESTRIAN')); this.finished = true; this.after(0.1, () => 0);
       }
@@ -554,9 +565,9 @@ export class OpenSim {
       if (d > 60) { st.stopped = false; st.judged = false; continue; }
       const down = lx.gate > 0.55;
       if (down && d < 22 && d > 7 && this.mph < 1) { if (!st.stopped) { st.stopped = true; this.award('RAIL_STOP', 'STOPPED FOR THE TRAIN'); } }
-      if (down && d < 5 && this.v > 1 && !st.judged) { st.judged = true; this.award('RAN_RAIL', 'GATES DOWN'); this.strike('You drove around the gates'); }
+      if (down && d < 5 && this.v > 1 && !st.judged && !(lx.trainAt && d < 4.2)) { st.judged = true; this.award('RAN_RAIL', 'GATES DOWN', 'You drove around the gates'); }
       if (lx.trainAt && d < 4.2 && this.mph > 0.5) {
-        this.tracker.zeroOut('HIT_PEDESTRIAN'); this.emit({ k: 'catastrophe' }); this.snd.catastrophe?.(); this.emit({ k: 'crash', x: this.x, z: this.z, big: true });
+        this.award('HIT_TRAIN', 'TRAIN'); this.emit({ k: 'catastrophe' }); this.snd.catastrophe?.(); this.emit({ k: 'crash', x: this.x, z: this.z, big: true });
         this.banner('HIT BY A TRAIN', 'Never cross with the gates down', 3600, 'red');
         this.v = 0; this.after(1.8, () => this.finish('TRAIN')); this.finished = true;
       }
@@ -590,6 +601,7 @@ export class OpenSim {
     const d = Math.hypot(ms.x - this.x, ms.z - this.z);
     // re-plan the route now and then (you took a different turn)
     if (this.time - this.routeAt > 2.5 && this.hit && this.onRoad) { this.routeAt = this.time; const r = this.planner(this.x, this.z, this.h, ms.edge, ms.s); if (r) this.route = r; }
+    if (d > 14 && d < 70 && this.mph > 16 && this.time - this.promptAt > 2.5) this.say('Your destination is close: slow down and pull in');
     if (d < 14 && this.mph < 10) {
       this.missions++;
       const t = this.time - ms.t0;
@@ -609,12 +621,23 @@ export class OpenSim {
     this.finished = true;
     this.snd.fanfare?.();
     this.emit({ k: 'finish' });
-    const result = buildResult(this.level, this.tracker, this.difficulty, { distance: this.traveled * 10 });
+    // an open drive has no fixed length: par grows with the trips you finish, so one flawless trip is not graded against five
+    const lvl = { ...this.level, parScore: 450 * Math.max(1, this.missions) } as LevelConfig;
+    const result = buildResult(lvl, this.tracker, this.difficulty, { distance: this.traveled * 10 });
     const t = this.tracker, out: string[] = [];
     out.push(`You drove ${(this.traveled / 1609).toFixed(1)} miles around Carrollton and finished ${this.missions} trip${this.missions === 1 ? '' : 's'}.`);
+    const crashes = t.countOf('HIT_TRAFFIC') + t.countOf('HIT_PARKED_CAR') + t.countOf('HIT_BUILDING');
+    if (crashes > 0) out.push(`${crashes === 1 ? 'A crash' : crashes + ' crashes'} cost you a big share of your points. Scan a block ahead, leave a gap and slow down near parked cars and driveways.`);
+    else out.push('Zero crashes. Good vehicle control.');
+    if (t.countOf('SCRAPE') > 0) out.push('You scraped a wall, a pole or a parked car. Give them a full car width.');
+    if (t.countOf('PED_FAIL') > 0) out.push('Stop and wait for every person in a crosswalk until they are all the way across.');
+    if (t.countOf('RAN_RAIL') > 0) out.push('Never drive around lowered railroad gates. Stop 15 feet back until the lights stop flashing.');
+    if (t.countOf('TURN_TOO_FAST') > 0) out.push('Slow down before a turn, then steer through it.');
+    if (t.countOf('RECOVERY') > 0) out.push('You needed the back-on-road reset. Watch the edge of the road and keep clear of the grass.');
     if (why === 'SUSPENDED') out.push('Three strikes: your licence is suspended. Slow down, read the road and give every car a gap.');
     if (why === 'PEDESTRIAN') out.push('Instant fail: always stop for people in a crosswalk.');
     if (why === 'TRAIN') out.push('Instant fail: never cross railroad tracks with the gates down or the lights flashing.');
+    if (t.maxCombo >= 2) out.push(`Best streak: x${t.maxCombo}. Clean driving multiplies your points and any fault cuts it.`);
     if (t.countOf('RAN_RED_LIGHT') + t.countOf('RAN_STOP_SIGN') > 0) out.push('A complete stop means no movement at all, and a red light means stop behind the line.');
     else out.push('Every stop sign and signal obeyed.');
     if (t.countOf('SPEEDING') > 0) out.push('The posted limit changes from street to street. Check the sign every block.'); else out.push('Always at or below the posted limit.');
