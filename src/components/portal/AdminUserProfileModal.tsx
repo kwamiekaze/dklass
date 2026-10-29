@@ -20,6 +20,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { StudentProgressSection } from "./StudentProgressSection";
 import { SecondaryEmailsSection } from "./SecondaryEmailsSection";
 import { MergeAccountDialog } from "./MergeAccountDialog";
+import { StudentHoursBreakdown } from "./StudentHoursBreakdown";
 
 interface AdminUserProfileModalProps {
   open: boolean;
@@ -46,6 +47,7 @@ interface StudentSession {
   pickup_address: string | null;
   dropoff_address: string | null;
   report_card_id: string | null;
+  actual_minutes?: number | null;
   instructor: { full_name: string | null; first_name: string | null; last_name: string | null; email: string | null } | null;
 }
 
@@ -140,7 +142,7 @@ export function AdminUserProfileModal({
   const fetchStudentSessions = async (id: string) => {
     const { data } = await supabase
       .from('sessions')
-      .select('id, starts_at, ends_at, status, session_type, duration_minutes, pickup_address, dropoff_address, report_card_id, instructor:profiles!sessions_instructor_id_fkey(full_name, first_name, last_name, email)')
+      .select('id, starts_at, ends_at, status, session_type, duration_minutes, pickup_address, dropoff_address, report_card_id, actual_minutes, instructor:profiles!sessions_instructor_id_fkey(full_name, first_name, last_name, email)')
       .eq('student_id', id)
       .order('starts_at', { ascending: false });
     if (data) setStudentSessions(data as unknown as StudentSession[]);
@@ -268,7 +270,7 @@ export function AdminUserProfileModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[min(92vw,560px)] max-w-[560px] max-h-[85vh] overflow-y-auto mx-auto p-4 sm:p-6">
+        <DialogContent className="max-w-[560px] p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-lg flex items-center gap-2">
               <User className="h-5 w-5 text-primary" />
@@ -541,6 +543,16 @@ export function AdminUserProfileModal({
                   </p>
                 </div>
               </div>
+
+              {profile.role === 'student' && (
+                <StudentHoursBreakdown
+                  studentId={profile.id}
+                  sessions={studentSessions}
+                  hoursRemaining={Number(profile.hours_remaining ?? 0)}
+                  purchasedHours={Number(profile.purchased_hours ?? 0)}
+                  hoursCompletedStored={Number((profile as any)?.hours_completed ?? 0)}
+                />
+              )}
 
               {/* Scheduled Sessions Section */}
               {profile.role === 'student' && (
