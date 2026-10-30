@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, X, FileText, User, MapPin, Shield, Phone, Calendar, Download } from "lucide-react";
 import { format } from "date-fns";
 import { Profile } from "@/types/portal";
+import { findPermitForStudent } from "@/lib/permitDocuments";
 
 interface IntakePreviewModalProps {
   open: boolean;
@@ -27,14 +28,23 @@ export function IntakePreviewModal({
   const [permitImageUrl, setPermitImageUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
 
+  const [permitIsPdf, setPermitIsPdf] = useState(false);
+  const [permitLookup, setPermitLookup] = useState<'idle' | 'loading' | 'found' | 'none'>('idle');
+
+  // find the permit wherever it was saved (documents table, profile link, older permits, storage), so an uploaded permit always shows here
   useEffect(() => {
-    if (open && profile?.permit_file_url) {
-      // If it's already a public URL, use it directly
-      if (profile.permit_file_url.startsWith('http')) {
-        setPermitImageUrl(profile.permit_file_url);
-      }
-    }
-  }, [open, profile]);
+    if (!open || !profile?.id) return;
+    let cancelled = false;
+    setPermitLookup('loading'); setPermitImageUrl(null); setPermitIsPdf(false);
+    findPermitForStudent(profile.id, profile.permit_file_url)
+      .then((found) => {
+        if (cancelled) return;
+        if (found) { setPermitImageUrl(found.signedUrl); setPermitIsPdf(found.isPdf); setPermitLookup('found'); }
+        else setPermitLookup('none');
+      })
+      .catch(() => { if (!cancelled) setPermitLookup('none'); });
+    return () => { cancelled = true; };
+  }, [open, profile?.id, profile?.permit_file_url]);
 
   const handleDownloadIntake = async () => {
     if (!profile) return;
@@ -171,36 +181,42 @@ export function IntakePreviewModal({
                     <p className="text-muted-foreground text-xs">Permit Number</p>
                     <p className="font-medium">{profile.permit_number || '-'}</p>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">Issue Date</p>
-                    <p className="font-medium">
-                      {profile.permit_issue_date 
-                        ? format(new Date(profile.permit_issue_date), 'MMM d, yyyy')
-                        : '-'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">Expiration Date</p>
-                    <p className="font-medium">
-                      {profile.permit_expiration_date 
-                        ? format(new Date(profile.permit_expiration_date), 'MMM d, yyyy')
-                        : '-'}
-                    </p>
-                  </div>
+                  {profile.permit_issue_date && (
+                    <div>
+                      <p className="text-muted-foreground text-xs">Issue Date</p>
+                      <p className="font-medium">{format(new Date(profile.permit_issue_date), 'MMM d, yyyy')}</p>
+                    </div>
+                  )}
+                  {profile.permit_expiration_date && (
+                    <div>
+                      <p className="text-muted-foreground text-xs">Expiration Date</p>
+                      <p className="font-medium">{format(new Date(profile.permit_expiration_date), 'MMM d, yyyy')}</p>
+                    </div>
+                  )}
                 </div>
 
-                {/* Permit Image */}
-                {permitImageUrl && (
-                  <div className="mt-3">
-                    <p className="text-muted-foreground text-xs mb-2">Permit Photo</p>
-                    <img 
-                      src={permitImageUrl} 
-                      alt="Permit" 
-                      className="w-full max-w-xs rounded-lg border"
-                      onError={() => setPermitImageUrl(null)}
-                    />
-                  </div>
-                )}
+                {/* Permit document */}
+                <div className="mt-3">
+                  <p className="text-muted-foreground text-xs mb-2">Permit Document</p>
+                  {permitLookup === 'loading' && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" />Loading document…</p>
+                  )}
+                  {permitLookup === 'found' && permitImageUrl && (
+                    permitIsPdf ? (
+                      <Button variant="outline" size="sm" onClick={() => window.open(permitImageUrl, '_blank')} className="gap-2">
+                        <FileText className="h-4 w-4" />Open permit PDF
+                      </Button>
+                    ) : (
+                      <img
+                        src={permitImageUrl}
+                        alt="Permit"
+                        className="w-full max-w-xs rounded-lg border"
+                        onError={() => setPermitLookup('none')}
+                      />
+                    )
+                  )}
+                  {permitLookup === 'none' && <p className="text-xs text-muted-foreground">No document uploaded yet.</p>}
+                </div>
               </div>
 
               {/* Guardian Info */}

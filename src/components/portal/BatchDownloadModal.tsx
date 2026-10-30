@@ -72,6 +72,17 @@ export function BatchDownloadModal({ open, onOpenChange }: BatchDownloadModalPro
         return;
       }
 
+      // the current permit file for each person, from the documents table, for anyone whose profile has no link of its own
+      const docPathBy = new Map<string, string>();
+      try {
+        const ids = filteredProfiles.map(p => p.id);
+        for (let i = 0; i < ids.length; i += 150) {
+          const { data: docs } = await supabase.from('permit_documents').select('student_id, file_path, is_current, uploaded_at').in('student_id', ids.slice(i, i + 150)).order('uploaded_at', { ascending: false });
+          const rows = ((docs || []) as { student_id: string; file_path: string; is_current: boolean }[]).sort((x, y) => Number(y.is_current) - Number(x.is_current));
+          for (const d of rows) if (!docPathBy.has(d.student_id)) docPathBy.set(d.student_id, d.file_path);
+        }
+      } catch { /* export what we have */ }
+
       // Create combined export
       const exportData = {
         exportedAt: new Date().toISOString(),
@@ -95,7 +106,7 @@ export function BatchDownloadModal({ open, onOpenChange }: BatchDownloadModalPro
             number: profile.permit_number,
             issueDate: profile.permit_issue_date,
             expirationDate: profile.permit_expiration_date,
-            fileUrl: profile.permit_file_url,
+            fileUrl: profile.permit_file_url || docPathBy.get(profile.id) || null,
           },
           guardian: {
             name: profile.guardian_name,

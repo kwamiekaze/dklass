@@ -237,10 +237,12 @@ function InstructorStudentViewContent() {
                 <CardTitle>Permit Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-muted-foreground" />
-                  <span>#{student.permit_number || 'Not provided'}</span>
-                </div>
+                {student.permit_number && (
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                    <span>#{student.permit_number}</span>
+                  </div>
+                )}
                 {student.permit_issue_date && (
                   <p className="text-sm">
                     <span className="text-muted-foreground">Issued: </span>
