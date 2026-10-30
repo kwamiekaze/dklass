@@ -23,8 +23,6 @@ const profileSchema = z.object({
   pickup_address: z.string().min(5, "Pickup address is required").max(500),
   dropoff_address: z.string().min(5, "Drop-off address is required").max(500),
   permit_number: z.string().min(3, "Permit number is required").max(50),
-  permit_issue_date: z.string().min(1, "Issue date is required"),
-  permit_expiration_date: z.string().min(1, "Expiration date is required"),
   guardian_name: z.string().min(2, "Guardian name is required").max(100),
   guardian_phone: z.string().min(10, "Guardian phone is required").max(20),
   guardian_email: z.string().email("Invalid guardian email").max(255).optional().or(z.literal('')),
@@ -70,8 +68,6 @@ function StudentProfileContent() {
     pickup_address: profile?.pickup_address || '',
     dropoff_address: profile?.dropoff_address || '',
     permit_number: profile?.permit_number || '',
-    permit_issue_date: profile?.permit_issue_date || '',
-    permit_expiration_date: profile?.permit_expiration_date || '',
     guardian_name: profile?.guardian_name || '',
     guardian_phone: profile?.guardian_phone || '',
     guardian_email: profile?.guardian_email || '',
@@ -361,7 +357,7 @@ function StudentProfileContent() {
             <CardTitle className="text-base sm:text-lg">Permit Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="permit_number" className="text-sm">Permit Number *</Label>
                 <Input
@@ -373,32 +369,6 @@ function StudentProfileContent() {
                   required
                 />
                 {errors.permit_number && <p className="text-xs text-destructive">{errors.permit_number}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="permit_issue_date" className="text-sm">Issue Date *</Label>
-                <Input
-                  id="permit_issue_date"
-                  name="permit_issue_date"
-                  type="date"
-                  value={formData.permit_issue_date}
-                  onChange={handleInputChange}
-                  className="theme-input min-h-[44px]"
-                  required
-                />
-                {errors.permit_issue_date && <p className="text-xs text-destructive">{errors.permit_issue_date}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="permit_expiration_date" className="text-sm">Expiration Date *</Label>
-                <Input
-                  id="permit_expiration_date"
-                  name="permit_expiration_date"
-                  type="date"
-                  value={formData.permit_expiration_date}
-                  onChange={handleInputChange}
-                  className="theme-input min-h-[44px]"
-                  required
-                />
-                {errors.permit_expiration_date && <p className="text-xs text-destructive">{errors.permit_expiration_date}</p>}
               </div>
             </div>
 

@@ -290,10 +290,8 @@ export function PermitViewerModal({
     }
 
     // Also update profiles.permit_file_url for consistency
-    const signedRes = await createSignedPermitUrl({ bucket: PERMITS_BUCKET, storagePath: filePath, expiresInSeconds: 3600 });
-    if (signedRes.ok) {
-      await supabase.from("profiles").update({ permit_file_url: signedRes.signedUrl }).eq("id", userId);
-    }
+    // store the stable storage path, not a signed link (those expire within the hour and left the profile pointing at nothing)
+    await supabase.from("profiles").update({ permit_file_url: filePath }).eq("id", userId);
 
     toast({ title: "Permit Located", description: `Found and linked: ${foundFile.name}` });
     await fetchDocs();
