@@ -18,6 +18,7 @@ import { template as adminNewContactSubmission } from './admin-new-contact-submi
 import { template as adminNewIntakeSubmission } from './admin-new-intake-submission.tsx'
 import { template as scheduleProposal } from './schedule-proposal.tsx'
 import { template as lessonPartiallyCompleted } from './lesson-partially-completed.tsx'
+import { template as gameInvite } from './game-invite.tsx'
 
 
 
@@ -27,6 +28,12 @@ export interface TemplateEntry {
   displayName?: string
   previewData?: Record<string, any>
   to?: string
+  /** Local part of the From address on the root domain (default 'noreply'). */
+  fromLocal?: string
+  /** Display name in the From header (default: site name). */
+  fromName?: string
+  /** Where replies go (default: none). */
+  replyTo?: string
 }
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
@@ -48,4 +55,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'admin-new-intake-submission': adminNewIntakeSubmission,
   'schedule-proposal': scheduleProposal,
   'lesson-partially-completed': lessonPartiallyCompleted,
+  'game-invite': gameInvite,
 }

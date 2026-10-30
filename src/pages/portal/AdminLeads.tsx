@@ -64,6 +64,7 @@ import {
 import { format } from 'date-fns';
 import { LeadScreenshotUploader } from '@/components/portal/LeadScreenshotUploader';
 import { ImportedLeadsPanel } from '@/components/portal/ImportedLeadsPanel';
+import { GameInviteCard } from '@/components/portal/GameInviteCard';
 
 
 // Helper component for inline field warnings
@@ -680,7 +681,7 @@ function AdminLeadsContent() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:inline-flex">
+        <TabsList className="w-full sm:w-auto grid grid-cols-4 sm:inline-flex">
           <TabsTrigger value="list" className="gap-1.5 text-sm">
             <Users className="h-4 w-4" />
             Leads List
@@ -694,7 +695,15 @@ function AdminLeadsContent() {
             <Plus className="h-4 w-4" />
             Add Lead
           </TabsTrigger>
+          <TabsTrigger value="invite" className="gap-1.5 text-sm">
+            <Send className="h-4 w-4" />
+            Invite
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="invite" className="mt-4">
+          <GameInviteCard />
+        </TabsContent>
 
         {/* Imported leads (server-side search + pagination) */}
         <TabsContent value="imported" className="mt-4">
