@@ -14,7 +14,7 @@ import {
 } from '@/lib/gameInvite';
 
 interface Outcome { email: string; status: string; detail?: string }
-interface Usage { used: number; limit: number; remaining: number }
+interface Usage { used: number; limit: number; remaining: number; configured?: boolean }
 
 export function GameInviteCard() {
   const { toast } = useToast();
@@ -43,7 +43,7 @@ export function GameInviteCard() {
       if (error || !data) throw new Error(error?.message || 'Send failed');
       if (data.error) throw new Error(data.error);
       setResults(data.outcomes as Outcome[]);
-      setUsage({ used: data.used, limit: data.limit, remaining: data.remaining });
+      setUsage({ used: data.used, limit: data.limit, remaining: data.remaining, configured: true });
       toast({ title: data.queued ? `${data.queued} invite${data.queued === 1 ? '' : 's'} on the way` : 'Nothing was sent', description: 'Sent from play@drivingklass.com' });
       return data.outcomes as Outcome[];
     } catch (e) {
@@ -63,7 +63,8 @@ export function GameInviteCard() {
   };
 
   const canOne = isInviteEmail(email) && !busy;
-  const left = usage ? usage.remaining : null;
+  const notReady = usage?.configured === false;
+  const left = notReady ? 0 : usage ? usage.remaining : null;
 
   return (
     <Card className="portal-card">
@@ -79,11 +80,16 @@ export function GameInviteCard() {
           )}
         </div>
         <CardDescription>
-          Invites someone to play the DrivingKlass game and tour the back parking lot. Sent from play@drivingklass.com,
-          the button opens the homepage, replies go to connect@drivingklass.com.
+          Invites someone to play the DrivingKlass game and tour the back parking lot. Sent from its own invite address,
+          kept apart from student emails. The button opens the homepage, replies go to connect@drivingklass.com.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
+        {notReady && (
+          <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm" role="alert">
+            Invite sender is not set up yet, so nothing can be sent. Student emails are not affected. Add the RESEND_API_KEY secret to turn it on.
+          </p>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.4fr_auto] gap-3 items-end">
           <div>
             <Label htmlFor="gi-name" className="text-xs text-muted-foreground">First name</Label>
@@ -94,7 +100,7 @@ export function GameInviteCard() {
             <Input id="gi-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="student@email.com" autoComplete="off"
               onKeyDown={(e) => { if (e.key === 'Enter' && canOne) void sendOne(); }} />
           </div>
-          <Button onClick={sendOne} disabled={!canOne || left === 0} className="gap-2">
+          <Button onClick={sendOne} disabled={!canOne || left === 0 || notReady} className="gap-2">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send invite
           </Button>
         </div>

@@ -18,7 +18,6 @@ import { template as adminNewContactSubmission } from './admin-new-contact-submi
 import { template as adminNewIntakeSubmission } from './admin-new-intake-submission.tsx'
 import { template as scheduleProposal } from './schedule-proposal.tsx'
 import { template as lessonPartiallyCompleted } from './lesson-partially-completed.tsx'
-import { template as gameInvite } from './game-invite.tsx'
 
 
 
@@ -55,5 +54,4 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'admin-new-intake-submission': adminNewIntakeSubmission,
   'schedule-proposal': scheduleProposal,
   'lesson-partially-completed': lessonPartiallyCompleted,
-  'game-invite': gameInvite,
 }
