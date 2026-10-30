@@ -43,6 +43,9 @@ verify_jwt = false
 [functions.send-intake-email]
 verify_jwt = true
 
+[functions.send-game-invite]
+verify_jwt = true
+
 [functions.dispatch-tracking-updates]
 verify_jwt = false
 
