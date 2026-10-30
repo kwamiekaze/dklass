@@ -7,9 +7,10 @@ import { brand, SITE, SITE_URL, SUPPORT_PHONE } from './_shared.ts'
 interface Props {
   recipientName?: string
   inviteUrl?: string
+  unsubscribeUrl?: string
 }
 
-const Email = ({ recipientName, inviteUrl = SITE_URL }: Props) => (
+const Email = ({ recipientName, inviteUrl = SITE_URL, unsubscribeUrl }: Props) => (
   <Html>
     <Head />
     <Preview>Test your driving skills in the DrivingKlass game, then tour the back parking lot</Preview>
@@ -38,6 +39,11 @@ const Email = ({ recipientName, inviteUrl = SITE_URL }: Props) => (
           Questions? Reply to this email or call us at {SUPPORT_PHONE}.
         </Text>
         <Text style={brand.footer}>{SITE} • {SITE_URL}</Text>
+        {unsubscribeUrl ? (
+          <Text style={{ ...brand.muted, margin: '14px 0 0', fontSize: '12px' }}>
+            You are getting this because you showed interest in {SITE}. <a href={unsubscribeUrl} style={{ color: '#6b7280' }}>Unsubscribe from game invites</a>.
+          </Text>
+        ) : null}
         <Text style={{ ...brand.text, textAlign: 'center' as const, fontWeight: 'bold' as const, color: '#b8860b', margin: '8px 0 0' }}>Where 5 star drivers are made</Text>
       </Container>
     </Body>

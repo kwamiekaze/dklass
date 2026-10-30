@@ -10,6 +10,7 @@ const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 export default function Unsubscribe() {
   const [params] = useSearchParams();
   const token = params.get("token");
+  const fn = params.get("scope") === "invite" ? "handle-invite-unsubscribe" : "handle-email-unsubscribe";
   const [state, setState] = useState<"validating" | "ready" | "already" | "invalid" | "submitting" | "done" | "error">("validating");
   const [msg, setMsg] = useState("");
 
@@ -17,20 +18,20 @@ export default function Unsubscribe() {
     if (!token) { setState("invalid"); return; }
     (async () => {
       try {
-        const r = await fetch(`${SUPABASE_URL}/functions/v1/handle-email-unsubscribe?token=${encodeURIComponent(token)}`, { headers: { apikey: ANON } });
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/${fn}?token=${encodeURIComponent(token)}`, { headers: { apikey: ANON } });
         const j = await r.json();
         if (r.ok && j.valid) setState("ready");
         else if (j.reason === "already_unsubscribed") setState("already");
         else setState("invalid");
       } catch (e: any) { setState("error"); setMsg(e?.message || "Network error"); }
     })();
-  }, [token]);
+  }, [token, fn]);
 
   const confirm = async () => {
     if (!token) return;
     setState("submitting");
     try {
-      const r = await fetch(`${SUPABASE_URL}/functions/v1/handle-email-unsubscribe`, {
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/${fn}`, {
         method: "POST", headers: { "Content-Type": "application/json", apikey: ANON },
         body: JSON.stringify({ token }),
       });
