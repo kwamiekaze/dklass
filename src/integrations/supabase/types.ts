@@ -943,6 +943,27 @@ export type Database = {
           },
         ]
       }
+      invite_optouts: {
+        Row: {
+          created_at: string
+          email: string
+          opted_out_at: string | null
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          opted_out_at?: string | null
+          token: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          opted_out_at?: string | null
+          token?: string
+        }
+        Relationships: []
+      }
       lead_activity: {
         Row: {
           action: string
