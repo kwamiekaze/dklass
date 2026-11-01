@@ -7,7 +7,7 @@ import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.20.0";
 
 // src/lib/mcp/tools/whoami.ts
 import { defineTool } from "npm:@lovable.dev/mcp-js@0.20.0";
-import { createClient } from "npm:@supabase/supabase-js@^2.89.0";
+import { createClient } from "npm:@supabase/supabase-js@^2.108.2";
 var whoami_default = defineTool({
   name: "whoami",
   title: "Who am I",
@@ -46,7 +46,7 @@ var whoami_default = defineTool({
 
 // src/lib/mcp/tools/list-my-sessions.ts
 import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.20.0";
-import { createClient as createClient2 } from "npm:@supabase/supabase-js@^2.89.0";
+import { createClient as createClient2 } from "npm:@supabase/supabase-js@^2.108.2";
 import { z } from "npm:zod@^3.25.76";
 var list_my_sessions_default = defineTool2({
   name: "list_my_sessions",
@@ -84,7 +84,7 @@ var list_my_sessions_default = defineTool2({
 
 // src/lib/mcp/tools/list-my-report-cards.ts
 import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.20.0";
-import { createClient as createClient3 } from "npm:@supabase/supabase-js@^2.89.0";
+import { createClient as createClient3 } from "npm:@supabase/supabase-js@^2.108.2";
 import { z as z2 } from "npm:zod@^3.25.76";
 var list_my_report_cards_default = defineTool3({
   name: "list_my_report_cards",
