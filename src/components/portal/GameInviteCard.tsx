@@ -16,6 +16,18 @@ import {
 interface Outcome { email: string; status: string; detail?: string }
 interface Usage { used: number; limit: number; remaining: number; configured?: boolean }
 
+// supabase-js hides the JSON body of a non 2xx reply: read it so the real reason is shown.
+async function readError(error: unknown): Promise<string> {
+  try {
+    const ctx = (error as { context?: Response })?.context;
+    if (ctx && typeof ctx.json === 'function') {
+      const j = await ctx.json();
+      if (j?.error) return String(j.error);
+    }
+  } catch { /* fall through */ }
+  return error instanceof Error ? error.message : 'Send failed';
+}
+
 export function GameInviteCard() {
   const { toast } = useToast();
   const [firstName, setFirstName] = useState('');
@@ -40,11 +52,15 @@ export function GameInviteCard() {
     setResults(null);
     try {
       const { data, error } = await supabase.functions.invoke('send-game-invite', { body: { invites, resend } });
-      if (error || !data) throw new Error(error?.message || 'Send failed');
+      if (error) throw new Error(await readError(error));
+      if (!data) throw new Error('Send failed');
       if (data.error) throw new Error(data.error);
       setResults(data.outcomes as Outcome[]);
       setUsage({ used: data.used, limit: data.limit, remaining: data.remaining, configured: true });
-      toast({ title: data.queued ? `${data.queued} invite${data.queued === 1 ? '' : 's'} on the way` : 'Nothing was sent', description: 'Sent from play@drivingklass.com' });
+      const first = (data.outcomes as Outcome[])[0];
+      toast(data.queued
+        ? { title: `${data.queued} invite${data.queued === 1 ? '' : 's'} sent`, description: 'Check the inbox, and spam or Promotions.' }
+        : { title: 'Nothing was sent', description: first ? `${OUTCOME_LABEL[first.status] ?? first.status}${first.detail ? `: ${first.detail}` : ''}` : undefined, variant: 'destructive' });
       return data.outcomes as Outcome[];
     } catch (e) {
       toast({ title: 'Could not send', description: e instanceof Error ? e.message : 'Try again', variant: 'destructive' });
@@ -130,7 +146,10 @@ export function GameInviteCard() {
             {results.map((o, i) => (
               <li key={`${o.email}-${i}`} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
                 <span className="break-all">{o.email || '(blank)'}</span>
-                <Badge variant={o.status === 'queued' ? 'default' : 'outline'}>{OUTCOME_LABEL[o.status] ?? o.status}</Badge>
+                <span className="flex flex-wrap items-center gap-2">
+                  {o.detail && o.status !== 'queued' && <span className="text-xs text-muted-foreground">{o.detail}</span>}
+                  <Badge variant={o.status === 'queued' ? 'default' : 'outline'}>{OUTCOME_LABEL[o.status] ?? o.status}</Badge>
+                </span>
               </li>
             ))}
           </ul>

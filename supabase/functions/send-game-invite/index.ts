@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
   const countToday = async (): Promise<number> => {
     const { count, error } = await admin.from('email_send_log').select('id', { count: 'exact', head: true })
-      .eq('template_name', LOG_NAME).eq('status', 'pending').gte('created_at', since)
+      .eq('template_name', LOG_NAME).eq('metadata->>via', 'resend').eq('status', 'pending').gte('created_at', since)
     if (error) throw new Error('count failed')
     return count ?? 0
   }
@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
     if (!body.resend && emails.length) {
       const cutoff = new Date(Date.now() - REPEAT_DAYS * 86400 * 1000).toISOString()
       const { data } = await admin.from('email_send_log').select('recipient_email')
-        .eq('template_name', LOG_NAME).eq('status', 'pending').gte('created_at', cutoff).in('recipient_email', emails)
+        .eq('template_name', LOG_NAME).eq('metadata->>via', 'resend').eq('status', 'pending').gte('created_at', cutoff).in('recipient_email', emails)
       for (const r of data ?? []) recent.add(String(r.recipient_email).toLowerCase())
     }
     const optedOut = new Set<string>()
