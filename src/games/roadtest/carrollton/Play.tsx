@@ -2,7 +2,7 @@
  * The Carrollton open world, the page around it: the canvas, the chase camera, the keys, the HUD, the minimap, the GPS and the loading screen.
  * It runs on its own rules engine (sim.ts) and touches nothing of the homepage.
  */
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PerformanceMonitor, useGLTF } from '@react-three/drei';
@@ -11,7 +11,7 @@ import { detectTier, qualityFor, type Quality } from '../../../components/nuhome
 import { fleetFiles } from '../../../components/nuhome2/world/Fleet';
 import { touchControls } from '../game/controls';
 import type { Difficulty, LevelResult } from '../game/types';
-import { sound } from '../sound';
+import { sound, type TrackId } from '../sound';
 import { TIER_NAMES } from '../game/scoring';
 import { Hud } from '../g3d/Hud';
 import { SPEC_IDS } from '../g3d/cars';
@@ -57,10 +57,18 @@ const readControls = () => ({
   right: !!(keys.ArrowRight || keys.KeyD) || touchControls.right,
 });
 
-export interface OpenHandle { sim: OpenSim; hud: HudState; paused: { current: boolean }; introT: number; skip: { current: boolean } }
+export interface OpenHandle {
+  sim: OpenSim; hud: HudState; paused: { current: boolean }; introT: number; skip: { current: boolean };
+  /** a race: the car is held on the grid until this moment (performance.now() ms), then the lights count it down */
+  holdUntil?: number;
+  /** true once the town is built and the first frames are drawn */
+  ready?: boolean;
+  /** every rules event of the drive, for a mode built on top (the race turns faults into time penalties) */
+  tap?: (e: OSimEvent) => void;
+}
 
-export function makeOpenHandle(difficulty: Difficulty): OpenHandle {
-  const sim = new OpenSim(difficulty, sound as unknown as Sfx);
+export function makeOpenHandle(difficulty: Difficulty, race?: { seed: number; trips: number; slot: number }): OpenHandle {
+  const sim = new OpenSim(difficulty, sound as unknown as Sfx, race ? { seed: race.seed, race: { trips: race.trips, slot: race.slot } } : {});
   const hud = newHud();
   hud.levelName = 'Carrollton'; hud.levelSub = 'Open world · the real streets'; hud.difficulty = sim.difficulty.label; hud.mult = sim.difficulty.scoreMul; hud.limit = 25; hud.endless = true; hud.best = 0;
   return { sim, hud, paused: { current: false }, introT: 0, skip: { current: false } };
@@ -84,6 +92,7 @@ function Driver({ handle, onComplete, onReady }: { handle: OpenHandle; onComplet
   const project = (x: number, y: number, z: number) => { v.set(x, y, z).project(camera); return { sx: (v.x * 0.5 + 0.5) * size.width, sy: (-v.y * 0.5 + 0.5) * size.height }; };
   const dispatch = (e: OSimEvent) => {
     const now = performance.now();
+    handle.tap?.(e);
     switch (e.k) {
       case 'float': { const p = project(e.x, 2.1, e.z); hud.floats.push({ text: e.text, good: e.good, sx: p.sx, sy: p.sy, born: now }); if (hud.floats.length > 8) hud.floats.shift(); break; }
       case 'crash': shake.punch = Math.max(shake.punch, e.big ? 1 : 0.4); break;
@@ -105,7 +114,16 @@ function Driver({ handle, onComplete, onReady }: { handle: OpenHandle; onComplet
       frames.current++;
       const dt = Math.min(rawDt, 0.05); waited.current += dt;
       if (!ready.current) { if (frames.current > 10 && waited.current > 1.2) { ready.current = true; onReady(); } else return; }
-      if (!handle.paused.current) {
+      if (handle.holdUntil != null) {
+        // a race: the camera swings round while the grid waits, then the lights go 3, 2, 1, GO for everybody at once
+        const left = (handle.holdUntil - performance.now()) / 1000;
+        intro.current = Math.min(INTRO_SECONDS, intro.current + dt); handle.introT = Math.min(1, intro.current / INTRO_SECONDS);
+        if (left > 0) { hud.countdown = left > 3 ? -1 : left > 2 ? 3 : left > 1 ? 2 : 1; sim.step(0.0001, { gas: false, brake: false, left: false, right: false }); }
+        else { hud.countdown = left > -0.8 ? 0 : -1; sim.step(dt, readControls()); }
+        for (const e of sim.drain()) dispatch(e);
+        sound.updateEngine(clamp(sim.mph / 90, 0, 1));
+        if (sim.lateral > 0.6 && sim.mph > 18 && Math.random() < dt * 1.5) sound.tireScreech(0.5);
+      } else if (!handle.paused.current) {
         if (intro.current < INTRO_SECONDS) {
           intro.current += dt;
           if (handle.skip.current && intro.current > 0.8) intro.current = INTRO_SECONDS;
@@ -207,7 +225,7 @@ export function shadowSizeFor(tier: Quality['tier']) {
   return tier === 'high' ? 2048 : tier === 'mid' ? 1536 : 1024;
 }
 
-function Scene({ handle, carId, quality, lvl, onComplete, onReady }: { handle: OpenHandle; carId: GarageId; quality: Quality; lvl: number; onComplete: (r: LevelResult) => void; onReady: () => void }) {
+function Scene({ handle, carId, quality, lvl, onComplete, onReady, extra3d }: { handle: OpenHandle; carId: GarageId; quality: Quality; lvl: number; onComplete: (r: LevelResult) => void; onReady: () => void; extra3d?: ReactNode }) {
   const sim = handle.sim, map = sim.map;
   const env = useMemo(() => makeEnv(), []);
   const mix = useRef(0);
@@ -219,6 +237,7 @@ function Scene({ handle, carId, quality, lvl, onComplete, onReady }: { handle: O
       <Atmosphere sim={sim} env={env} shadow={shadowSize} active={lvl < 2} mix={mix} lite={quality.tier === 'lite'} />
       <OpenWorld sim={sim} env={env} quality={quality} shadowOn={shadowSize > 0} />
       <PlayerRig sim={sim} carId={carId} lite={quality.lite} />
+      {extra3d}
     </Suspense>
     <Driver handle={handle} onComplete={onComplete} onReady={onReady} />
     <CameraRig handle={handle} map={map} />
@@ -291,7 +310,7 @@ function OpenHud({ handle }: { handle: OpenHandle }) {
       if (card) { card.dataset.on = ms ? '1' : ''; }
       const key = gps + '|' + arrow + '|' + sub + '|' + lane;
       if (key !== lastGps) { lastGps = key; const a = q('.cr-gps-a'), t = q('.cr-gps-t'), s = q('.cr-gps-s'), l = q('.cr-lane'); if (a) a.textContent = arrow; if (t) t.textContent = gps; if (s) s.textContent = sub; if (l) l.textContent = lane; }
-      const mk = ms ? ms.name + sim.missions : ''; if (mk !== lastMission) { lastMission = mk; const m = q('.cr-trips'); if (m) m.textContent = `Trips ${sim.missions}`; }
+      const mk = ms ? ms.name + sim.missions : ''; if (mk !== lastMission) { lastMission = mk; const m = q('.cr-trips'); const st = sim.tripStars.reduce((a, n) => a + n, 0); if (m) m.textContent = sim.plan ? `Trip ${Math.min(sim.missions + 1, sim.plan.length)}/${sim.plan.length}` : `Trips ${sim.missions}${st ? ` · ★${st}` : ''}`; }
       // the signal countdown / state at the next light
       const ns = sim.nearSignal, sg = q('.cr-light');
       if (sg) { sg.dataset.s = ns && ns.dist < 70 ? ns.state : ''; }
@@ -323,6 +342,8 @@ function OpenHud({ handle }: { handle: OpenHandle }) {
 }
 
 const RANK_W = [0, 1.2, 1.7, 2.3, 3, 3.6];
+/** extra dots for the minimap (the other racers in Carrollton Rush), set by the mode that needs them */
+export const minimapExtras: { dots: null | (() => { x: number; z: number; color: string }[]) } = { dots: null };
 function drawMap(cv: HTMLCanvasElement | null, sim: OpenSim, roads: { p: number[]; w: number; rank: number }[]) {
   if (!cv) return;
   const g = cv.getContext('2d'); if (!g) return;
@@ -354,6 +375,8 @@ function drawMap(cv: HTMLCanvasElement | null, sim: OpenSim, roads: { p: number[
   // the other cars
   g.fillStyle = 'rgba(255,255,255,.55)';
   for (const c of sim.traffic.cars) if (Math.abs(c.x - sim.x) < range && Math.abs(c.z - sim.z) < range) g.fillRect(c.x - 1.6, c.z - 1.6, 3.2, 3.2);
+  // the other racers, in their cars' colours
+  if (minimapExtras.dots) for (const d of minimapExtras.dots()) { g.fillStyle = d.color; g.strokeStyle = '#0b0e12'; g.lineWidth = 2.5; g.beginPath(); g.arc(d.x, d.z, 6.5, 0, Math.PI * 2); g.fill(); g.stroke(); }
   // the destination
   const ms = sim.mission;
   if (ms) {
@@ -369,9 +392,9 @@ function drawMap(cv: HTMLCanvasElement | null, sim: OpenSim, roads: { p: number[
 }
 
 // ------------------------------------------------------------ the page ---
-export function OpenGame({ handle, onComplete, onLost }: { handle: OpenHandle; onComplete: (r: LevelResult) => void; onLost: () => void }) {
+export function OpenGame({ handle, onComplete, onLost, extra3d, overlay, track = 'sunnyCruise', title = 'Carrollton, Georgia', carOverride }: { handle: OpenHandle; onComplete: (r: LevelResult) => void; onLost: () => void; extra3d?: ReactNode; overlay?: ReactNode; track?: TrackId; title?: string; carOverride?: GarageId }) {
   const [ready, setReady] = useState(false);
-  const [carId] = useState(() => selectedCar().id);
+  const [carId] = useState(() => carOverride ?? selectedCar().id);
   const done = useRef(onComplete); done.current = onComplete;
   const lost = useRef(onLost); useEffect(() => { lost.current = onLost; }, [onLost]);
   const tierName = useMemo(() => detectTier(), []);
@@ -394,12 +417,11 @@ export function OpenGame({ handle, onComplete, onLost }: { handle: OpenHandle; o
   useEffect(() => { if (import.meta.env.DEV) { (window as unknown as { __cr?: OpenHandle }).__cr = handle; return () => { delete (window as unknown as { __cr?: OpenHandle }).__cr; }; } }, [handle]);
   useEffect(() => { const f = fleetFiles(carId); if (f) useGLTF.preload(quality.lite ? f.lite : f.full); for (const s of SPEC_IDS) { const g = fleetFiles(s); if (g) useGLTF.preload(g.lite); } }, [carId, quality.lite]);
   useEffect(() => {
-    const track = 'sunnyCruise' as const;
     sound.init(); sound.startEngine(); if (!sound.muted && !sound.musicMuted) sound.playTrack(track);
     const unlock = () => { sound.init(); if (sound.isReady()) { sound.startEngine(); if (!sound.muted && !sound.musicMuted) sound.playTrack(track); } };
     window.addEventListener('keydown', unlock, { once: true }); window.addEventListener('pointerdown', unlock, { once: true });
     return () => { window.removeEventListener('keydown', unlock); window.removeEventListener('pointerdown', unlock); sound.stopEngine(); sound.stopMusic(); };
-  }, []);
+  }, [track]);
   useEffect(() => {
     const skip = () => { handle.skip.current = true; };
     window.addEventListener('keydown', skip); window.addEventListener('pointerdown', skip);
@@ -417,13 +439,14 @@ export function OpenGame({ handle, onComplete, onLost }: { handle: OpenHandle; o
       onCreated={({ gl }) => { if (import.meta.env.DEV) (window as unknown as { __gl?: unknown }).__gl = gl; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.0; gl.setClearColor('#cfdbe2'); gl.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); setCkey((k) => k + 1); }, { once: true }); }}
     >
       {!NO_PM && <PerformanceMonitor ms={350} iterations={8} flipflops={3} onDecline={() => setLvl((l) => clamp(l + 1, 0, 3))} onIncline={() => setLvl((l) => clamp(l - 1, 0, 3))} />}
-      <Scene handle={handle} carId={carId} quality={quality} lvl={lvl} onComplete={onCompleteCb} onReady={() => setReady(true)} />
+      <Scene handle={handle} carId={carId} quality={quality} lvl={lvl} onComplete={onCompleteCb} onReady={() => { handle.ready = true; setReady(true); }} extra3d={extra3d} />
     </Canvas>
     <Hud handle={handle as unknown as Parameters<typeof Hud>[0]['handle']} />
     <OpenHud handle={handle} />
+    {overlay}
     <div className={`rt3d-loading atl-loading${ready ? ' done' : ''}`} aria-hidden={ready}>
       <div className="rt3d-spin" />
-      <h3>Carrollton, Georgia</h3>
+      <h3>{title}</h3>
       <p>Open world · the real streets · every rule applies</p>
       <p className="atl-load-tip">Building the town… Q and E are your turn signals. Press R if you get stuck.</p>
     </div>

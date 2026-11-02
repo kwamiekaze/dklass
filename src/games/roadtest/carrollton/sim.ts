@@ -27,7 +27,9 @@ export type OSimEvent =
   | { k: 'finish' }
   | { k: 'catastrophe' }
   | { k: 'speedWarn' }
-  | { k: 'delta'; kind: 'up' | 'down' | 'strike' | 'crit'; chip: string; sub?: string; tierUp: boolean; tierDown: boolean; tier: number; strikes: number; points: number }
+  | { k: 'delta'; kind: 'up' | 'down' | 'strike' | 'crit'; chip: string; sub?: string; tierUp: boolean; tierDown: boolean; tier: number; strikes: number; points: number; key?: string; sev?: string; label?: string }
+  | { k: 'trip'; n: number; name: string; secs: number; last: boolean }
+  | { k: 'tripStars'; stars: number; clean: boolean; onTime: boolean; secs: number; par: number }
   | { k: 'complete'; result: LevelResult };
 
 const CAR = { len: 4.6, w: 1.86, wheelbase: 2.75, mass: 1400 };
@@ -83,7 +85,10 @@ export class OpenSim {
   private timers: { at: number; fn: () => void }[] = [];
   private rnd = 1;
 
-  constructor(difficulty: Difficulty, private snd: Sfx, opts: { seed?: number; tracker?: ScoreTracker } = {}) {
+  /** a race: the same trips in the same order for everyone, then the drive ends */
+  readonly plan: string[] | null;
+  private slot = 0;
+  constructor(difficulty: Difficulty, private snd: Sfx, opts: { seed?: number; tracker?: ScoreTracker; race?: { trips: number; slot: number } } = {}) {
     this.map = loadMap();
     this.difficulty = getDifficulty(difficulty);
     this.tracker = opts.tracker ?? new ScoreTracker();
@@ -95,14 +100,16 @@ export class OpenSim {
     this.peds = new Pedestrians(this.map, this.rnd + 11);
     this.trains = new Trains(this.map, this.rnd + 23);
     this.planner = makeRoutePlanner(this.map);
-    this.spawnPlayer();
+    this.slot = opts.race ? Math.max(0, Math.min(GRID - 1, opts.race.slot | 0)) : 0;
+    this.spawnPlayer(!!opts.race);
+    this.plan = opts.race ? racePlan(this.map, this.tx0, this.tz0, (opts.seed ?? 1) >>> 0, Math.max(1, Math.min(6, opts.race.trips | 0))) : null;
     this.traffic.populate(this.x, this.z, Math.sin(this.h), Math.cos(this.h), this.traffic.max);
     this.newMission(true);
   }
   private r() { this.rnd = (Math.imul(this.rnd, 1664525) + 1013904223) >>> 0; return this.rnd / 4294967296; }
 
   // ------------------------------------------------------------------ start
-  private spawnPlayer() {
+  private spawnPlayer(race = false) {
     // start on a calm two-way street close to Adamson Square, in the right lane, with a long clear block ahead (no junction for at least 60 m)
     const m = this.map, SQX = 131, SQZ = 138;
     let best: { e: Edge; dir: 1 | -1; s: number; score: number } | null = null;
@@ -112,7 +119,7 @@ export class OpenSim {
         const startNode = dir === 1 ? e.a : e.b;
         const s = startNode.clear + 14;                      // distance from the start node in the direction of travel
         const ahead = e.len - s;
-        if (ahead < 62 || reachable(m, e, dir) < 300) continue;
+        if (ahead < 62 + (race ? GRID_GAP * (GRID - 1) : 0) || reachable(m, e, dir) < 300) continue;
         const sAB = dir === 1 ? s : e.len - s, q = pointAt(e, sAB);
         const fx = q.tx * dir, fz = q.tz * dir;
         const toSq = Math.hypot(SQX - q.x, SQZ - q.z), facing = ((SQX - q.x) * fx + (SQZ - q.z) * fz) / (toSq || 1);
@@ -121,14 +128,21 @@ export class OpenSim {
         if (!best || score < best.score) best = { e, dir, s: sAB, score };
       }
     }
-    const e = best!.e, dir = best!.dir, p = pointAt(e, best!.s);
+    // on a race grid the cars line up one behind the other: slot 0 at the front, every other slot a car length and a half further back
+    const sGrid = best!.s + (race ? (GRID - 1 - this.slot) * GRID_GAP * best!.dir : 0);
+    const e = best!.e, dir = best!.dir, p = pointAt(e, sGrid);
+    if (race) { const q0 = pointAt(e, best!.s + (GRID - 1) * GRID_GAP * best!.dir); this.gridX = q0.x; this.gridZ = q0.z; }
     const lw = e.way.lw, off = (e.way.turnLane ? lw / 2 : 0) + lw / 2;
     const tx = p.tx * dir, tz = p.tz * dir;
     this.h = Math.atan2(tx, tz);
     this.x = p.x - tz * off; this.z = p.z + tx * off;
-    this.v = 0; this.tx0 = this.x; this.tz0 = this.z;
+    this.v = 0; this.tx0 = race ? this.gridX : this.x; this.tz0 = race ? this.gridZ : this.z;
   }
-  private tx0 = 0; private tz0 = 0;
+  private tx0 = 0; private tz0 = 0; private gridX = 0; private gridZ = 0;
+  /** faults since the current trip began, and the time to beat for it (a three-star trip is clean and on time) */
+  tripFaults = 0; tripPar = 0;
+  /** stars of every finished trip, for the HUD and the report */
+  tripStars: number[] = [];
 
   // ------------------------------------------------------------------ helpers
   private emit(e: OSimEvent) { this.events.push(e); }
@@ -140,10 +154,10 @@ export class OpenSim {
     const pts = this.tracker.add(key);
     const d = this.tracker.last!, cue = deltaCue(d), good = d.severity === 'reward';
     if (text) this.float(`${text} ${cue.chip}${good && this.tracker.combo > 1 ? ` x${this.tracker.combo}` : ''}`, good);
-    this.emit({ k: 'delta', kind: cue.kind, chip: cue.chip, sub: cue.sub, tierUp: cue.tierUp, tierDown: cue.tierDown, tier: cue.tier, strikes: cue.strikes, points: pts });
+    this.emit({ k: 'delta', kind: cue.kind, chip: cue.chip, sub: cue.sub, tierUp: cue.tierUp, tierDown: cue.tierDown, tier: cue.tier, strikes: cue.strikes, points: pts, key, sev: d.severity, label: why ?? text });
     if (good) { this.snd.checkpoint?.(); if (cue.tierUp) this.snd.tierUp?.(); }
     else {
-      this.cleanDist = 0;
+      this.cleanDist = 0; this.tripFaults++;
       if (cue.kind === 'strike') this.snd.strikeHit?.(); else if (cue.tierDown) this.snd.tierDown?.(); else this.snd.yieldBuzz?.();
     }
     this.snd.setSfxPitchStep?.(Math.max(0, this.tracker.combo - 1));
@@ -578,6 +592,7 @@ export class OpenSim {
   // ------------------------------------------------------------------ the mission: drive to a place by the book
   newMission(quiet = false) {
     const m = this.map;
+    if (this.plan) { this.nextPlanned(quiet); return; }
     const named = m.buildings.filter((b) => b.name && LANDMARK_NAMES.some((n) => b.name!.startsWith(n.slice(0, 12))));
     const cands = (named.length ? named : m.buildings.filter((b) => b.name)).filter((b) => Math.hypot(b.cx - this.x, b.cz - this.z) > 220);
     if (!cands.length) { this.mission = null; return; }
@@ -588,7 +603,7 @@ export class OpenSim {
       const route = this.planner(this.x, this.z, this.h, spot.edge, spot.s);
       if (!route) continue;
       this.mission = { name: b.name!, x: spot.x, z: spot.z, edge: spot.edge, s: spot.s, ang: spot.ang, t0: this.time };
-      this.route = route; this.routeAt = this.time;
+      this.route = route; this.routeAt = this.time; this.startTrip();
       if (quiet) this.after(0.4, () => this.banner('YOUR FIRST TRIP', `Drive to ${b.name}. Follow the blue line`, 3800, 'gold'));
       else this.banner('NEW TRIP', `Drive to ${b.name}`, 3600, 'gold');
       return;
@@ -605,13 +620,44 @@ export class OpenSim {
     if (d < 14 && this.mph < 10) {
       this.missions++;
       const t = this.time - ms.t0;
+      const clean = this.tripFaults === 0, onTime = t <= this.tripPar;
       this.award('MISSION', 'ARRIVED');
       if (this.mph < 1.5) this.award('PARKED_WELL', 'PERFECT STOP');
-      this.banner('ARRIVED', `${ms.name} · ${Math.round(t)}s`, 3200, 'gold');
+      if (clean) this.award('CLEAN_TRIP', 'CLEAN TRIP');
+      if (onTime) this.award('ON_TIME', 'ON TIME');
+      const stars = 1 + (clean ? 1 : 0) + (onTime ? 1 : 0);
+      this.tripStars.push(stars); this.tracker.starsCollected += stars;
+      this.emit({ k: 'tripStars', stars, clean, onTime, secs: t, par: this.tripPar });
+      const last = !!this.plan && this.missions >= this.plan.length;
+      this.emit({ k: 'trip', n: this.missions, name: ms.name, secs: t, last });
+      if (last) {
+        this.mission = null; this.route = null;
+        this.banner('FINISHED', `All ${this.plan!.length} trips · ${Math.round(this.time)}s`, 3600, 'gold');
+        this.snd.fanfare?.();
+        this.after(1.2, () => this.finish('RACE_DONE'));
+        return;
+      }
+      this.banner(stars === 3 ? '★★★ PERFECT TRIP' : stars === 2 ? '★★☆ ARRIVED' : '★☆☆ ARRIVED', `${ms.name} · ${Math.round(t)}s${onTime ? '' : ` (par ${this.tripPar}s)`}${clean ? '' : ' · drive it clean for another star'}`, 3400, 'gold');
       this.snd.fanfare?.();
       this.mission = null; this.route = null;
-      this.after(3.2, () => { if (!this.finished) this.newMission(); });
+      this.after(this.plan ? 1.4 : 3.2, () => { if (!this.finished) this.newMission(); });
     }
+  }
+
+  /** a new trip: no faults yet, and a par time from the length of the route at an easy town pace (about 20 mph) plus time for the lights */
+  private startTrip() { this.tripFaults = 0; this.tripPar = Math.round((this.route ? this.route.length : 400) / 8.5 + 15); }
+
+  /** the next trip of the race plan; the route comes from where the car is now */
+  private nextPlanned(quiet: boolean) {
+    const m = this.map, name = this.plan![this.missions];
+    const b = name ? m.buildings.find((x) => x.name === name) : undefined;
+    const spot = b ? nearestDrivable(m, b.cx, b.cz, 90) : null;
+    if (!b || !spot) { this.mission = null; return; }
+    this.mission = { name: b.name!, x: spot.x, z: spot.z, edge: spot.edge, s: spot.s, ang: spot.ang, t0: this.time };
+    this.route = this.planner(this.x, this.z, this.h, spot.edge, spot.s); this.routeAt = this.time; this.startTrip();
+    const n = this.missions + 1, of = this.plan!.length;
+    if (quiet) this.after(0.2, () => this.banner(`TRIP 1 OF ${of}`, `Drive to ${b.name}`, 3000, 'gold'));
+    else this.banner(`TRIP ${n} OF ${of}`, `Drive to ${b.name}`, 2600, 'gold');
   }
 
   // ------------------------------------------------------------------ the end
@@ -625,7 +671,8 @@ export class OpenSim {
     const lvl = { ...this.level, parScore: 450 * Math.max(1, this.missions) } as LevelConfig;
     const result = buildResult(lvl, this.tracker, this.difficulty, { distance: this.traveled * 10 });
     const t = this.tracker, out: string[] = [];
-    out.push(`You drove ${(this.traveled / 1609).toFixed(1)} miles around Carrollton and finished ${this.missions} trip${this.missions === 1 ? '' : 's'}.`);
+    out.push(`You drove ${(this.traveled / 1609).toFixed(1)} miles around Carrollton and finished ${this.missions} trip${this.missions === 1 ? '' : 's'}${this.plan ? ` of ${this.plan.length}` : ''}.`);
+    if (this.tripStars.length) { const three = this.tripStars.filter((n) => n === 3).length; out.push(`Trip stars: ${this.tripStars.map((n) => '★'.repeat(n) + '☆'.repeat(3 - n)).join('  ')}. ${three ? `${three} perfect trip${three === 1 ? '' : 's'}.` : 'A clean trip on time earns all three.'}`); }
     const crashes = t.countOf('HIT_TRAFFIC') + t.countOf('HIT_PARKED_CAR') + t.countOf('HIT_BUILDING');
     if (crashes > 0) out.push(`${crashes === 1 ? 'A crash' : crashes + ' crashes'} cost you a big share of your points. Scan a block ahead, leave a gap and slow down near parked cars and driveways.`);
     else out.push('Zero crashes. Good vehicle control.');
@@ -687,4 +734,33 @@ export function inPoly(p: number[], x: number, z: number): boolean {
     if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
   }
   return inside;
+}
+
+/** race grid: up to 6 cars, 7 m apart (a car and a half) */
+export const GRID = 6;
+const GRID_GAP = 7;
+
+/**
+ * The trips of a race, the same on every phone: only the map, the start and the seed decide them.
+ * Each leg goes to a named Carrollton landmark 260 to 900 m from the last stop, never one already used.
+ */
+export function racePlan(m: GameMap, x0: number, z0: number, seed: number, n: number): string[] {
+  let r = (seed >>> 0) || 1;
+  const rnd = () => { r = (Math.imul(r, 1664525) + 1013904223) >>> 0; return r / 4294967296; };
+  const seen = new Set<string>();
+  const named = m.buildings.filter((b) => b.name && LANDMARK_NAMES.some((nm) => b.name!.startsWith(nm.slice(0, 12))) && !seen.has(b.name) && (seen.add(b.name), true));
+  const pool = named.length >= n ? named : m.buildings.filter((b) => b.name);
+  const out: string[] = []; let px = x0, pz = z0;
+  for (let k = 0; k < n; k++) {
+    const ok = pool.filter((b) => !out.includes(b.name!)).map((b) => ({ b, d: Math.hypot(b.cx - px, b.cz - pz) }));
+    let cands = ok.filter((o) => o.d > 260 && o.d < 900);
+    if (!cands.length) cands = ok.filter((o) => o.d > 120);
+    if (!cands.length) cands = ok;
+    if (!cands.length) break;
+    cands.sort((a, b) => a.b.name!.localeCompare(b.b.name!));
+    const pick = cands[Math.floor(rnd() * cands.length)]!.b;
+    if (!nearestDrivable(m, pick.cx, pick.cz, 90)) { k--; pool.splice(pool.indexOf(pick), 1); if (!pool.length) break; continue; }
+    out.push(pick.name!); px = pick.cx; pz = pick.cz;
+  }
+  return out;
 }

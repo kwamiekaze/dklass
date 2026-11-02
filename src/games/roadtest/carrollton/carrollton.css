@@ -56,10 +56,19 @@
   .cr-root .cr-hud canvas.cr-map { width: 78px !important; height: 78px !important; top: 230px; }
   .cr-hud .cr-reset { top: 230px; }
 }
-/* desktop: the site header's gold band hangs over the top of the game frame, so the stack starts below it */
-@media (min-width: 761px) {
-  .cr-root .cr-trip { top: 60px; }
-  .cr-root .rt3d-tl, .cr-root .rt3d-tr { top: 132px; }
-  .cr-root .cr-hud canvas.cr-map { top: 296px; }
-  .cr-root .cr-hud .cr-reset { top: 296px; }
+/* wide screens (desktop, tablets): the game uses the whole window. GPS card top centre, score top left, speed and limit top right,
+   map bottom left with the left signal beside it, right signal bottom right, the street sign bottom centre.
+   The site header's gold band hangs about 32px over the top of the frame, so the top row starts below it. */
+@container (min-width: 761px) and (min-height: 521px) {
+  .cr-root .cr-trip { top: 46px; width: clamp(300px, 34%, 440px); }
+  .cr-root .rt3d-tl { top: 46px; left: 16px; }
+  .cr-root .rt3d-tr { top: 46px; right: 16px; }
+  .cr-hud .cr-reset { left: auto; right: 16px; top: 230px; }
+  .cr-hud .atl-road.cr-roadbar { left: 50%; right: auto; top: auto; bottom: 18px; transform: translateX(-50%); font-size: 18px; padding: 6px 16px 6px 12px; }
+  .cr-hud .cr-street { max-width: 34vw; }
+  .cr-root .cr-hud canvas.cr-map { left: 16px; right: auto; top: auto; bottom: 16px; width: 184px !important; height: 184px !important; }
+  .cr-root .atl-sig .atl-sig-l { left: 214px; right: auto; bottom: 22px; }
+  .cr-root .atl-sig .atl-sig-r { right: 16px; left: auto; bottom: 34px; }
+  .cr-root .atl-prompt { bottom: 82px; }
+  .cr-root .rt3d-banners { top: 30%; }
 }

@@ -1482,3 +1482,23 @@
 .report-ledger .shields i { width: 14px; height: 16px; background: linear-gradient(180deg, #f2c14e, #c9971f); clip-path: polygon(50% 0, 100% 18%, 100% 58%, 50% 100%, 0 58%, 0 18%); }
 .report-ledger .shields i.gone { background: linear-gradient(180deg, #ff6a5e, #8a1c14); opacity: .5; transform: scale(.75); }
 @media (max-width: 460px) { .report-ledger { grid-template-columns: repeat(2, 1fr); } }
+
+/* Carrollton Rush: the menu entry and its badge (the rest lives with the mode in carrollton/rush/rush.css) */
+.rush-badge { display: inline-flex; flex-direction: column; align-items: center; padding: 6px 12px 5px; border-radius: 8px; background: #00694a; border: 2px solid #fff; box-shadow: 0 6px 16px rgba(0,0,0,.35); line-height: 1; }
+.rush-badge b { font-family: var(--display, 'Bebas Neue', Impact, sans-serif); font-size: 22px; letter-spacing: 3px; color: #fff; }
+.rush-badge i { font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: 1.6px; color: #e8f5ef; margin-top: 3px; }
+/* the menu entry */
+.rush-cta { position: relative; display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; border-radius: 18px; text-align: left; cursor: pointer; color: #fff;
+  background: radial-gradient(120% 160% at 100% 0%, rgba(242,193,78,.3), transparent 55%), linear-gradient(150deg, #0b3b2a, #06130e); border: 1px solid rgba(242,193,78,.7);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 0 0 0 rgba(242,193,78,.5); animation: rush-glow 2.8s ease-in-out infinite; }
+.rush-cta:hover { transform: translateY(-1px); }
+.rush-cta .rush-badge { flex: none; }
+.rush-cta strong { display: block; font-family: var(--display, 'Bebas Neue', Impact, sans-serif); font-size: 26px; letter-spacing: 1px; line-height: 1; color: #ffe08a; }
+.rush-cta small { display: block; margin-top: 4px; font-size: 12.5px; line-height: 1.4; color: rgba(255,255,255,.85); }
+.rush-cta em { margin-left: auto; flex: none; font-style: normal; font-weight: 800; font-size: 13px; letter-spacing: 1px; padding: 8px 12px; border-radius: 10px; background: #f2c14e; color: #111; }
+@keyframes rush-glow { 50% { box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 0 22px 2px rgba(242,193,78,.35); } }
+@media (prefers-reduced-motion: reduce) { .rush-cta { animation: none; } }
+
+.rush-loading { min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #fff; }
+/* the homepage hides its Book button on phones (.n2-book); the game's Quit button borrows that look and must stay visible on every screen */
+.rt-site-header .n2-book.rt-quit { display: inline-flex; align-items: center; justify-content: center; }

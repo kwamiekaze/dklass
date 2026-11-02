@@ -153,6 +153,10 @@
 @keyframes rt3d-ddown { 0% { opacity: 0; transform: translateY(-14px) scale(1.3); } 12% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(16px); } }
 @media (max-width: 640px) { .rt3d-delta b { font-size: 20px; } .rt3d-delta.strike b, .rt3d-delta.crit b { font-size: 26px; } .rt3d-deltas { max-width: 44vw; top: 46px; } }
 
+/* the 3D drives use the whole window on every screen: the 560px menu column made a desktop drive a narrow strip */
+.app-shell:has(.game-wrap.rt3d-on) { max-width: none; }
+.game-wrap.rt3d-on .game-host { padding: 0 8px 8px; }
+
 /* landscape phones: use the whole screen. The portrait shell is capped at 560px and the header, hint line and key strip left only a sliver of road */
 @media (orientation: landscape) and (max-height: 520px) {
   .app-shell:has(.game-wrap.rt3d-on) { max-width: none; }
@@ -177,4 +181,12 @@
   .rt3d-root .rt3d-tr { top: 50px; transform: scale(.8); transform-origin: top right; }
   .cr-root .cr-hud canvas.cr-map { left: auto; right: 98px; top: 50px; width: 72px !important; height: 72px !important; }
   .cr-root .cr-hud .cr-reset { left: 10px; right: auto; top: 8px; }
+}
+
+/* wide screens: the site header's gold band hangs about 32px over the top of the game frame, so the top row of the HUD starts below it */
+@container (min-width: 761px) and (min-height: 521px) {
+  .rt3d-tl, .rt3d-tr { top: 42px; }
+  .rt3d-top { top: 40px; }
+  .atl-road { top: 214px; }
+  .atl-sig .atl-gap { top: 252px; }
 }

@@ -27,6 +27,9 @@ export const POINTS = {
   STREAK_MASTER: 150,
   MISSION: 250,
   PARKED_WELL: 60,
+  // open world trips: the two extra stars of a three-star trip
+  CLEAN_TRIP: 150,
+  ON_TIME: 100,
 
   // Minor: flat, costs one streak tier.
   HIT_CONE: -50,
@@ -85,6 +88,8 @@ const LABELS: Record<string, string> = {
   HIT_TRAIN: '🛑 STRUCK BY A TRAIN, run ended',
   MISSION: 'Reached the destination',
   PARKED_WELL: 'Stopped right at the destination',
+  CLEAN_TRIP: 'Clean trip: not one fault from start to stop',
+  ON_TIME: 'Arrived on time',
   WRONG_WAY: 'Drove the wrong way on a one-way street',
   HIT_BUILDING: 'Crashed into a building or a pole',
   PED_FAIL: 'Did not yield to a pedestrian',
@@ -126,7 +131,7 @@ export type PointKey = keyof typeof POINTS;
 export const labelOf = (k: PointKey): string => LABELS[k] ?? k;
 
 /** Positive events that build the clean streak. */
-const POSITIVE_COMBO: PointKey[] = ['SIGNALLED', 'SAFE_GAP', 'MOVE_OVER', 'RAIL_STOP', 'CIRCLE_YIELD', 'WORK_ZONE_OK', 'EXIT_TAKEN', 'LEFT_YIELD', 'MISSION', 'PARKED_WELL', 'STAR', 'CHECKPOINT', 'FULL_STOP', 'GREEN_LIGHT', 'SMOOTH_DRIVING', 'NEAR_MISS', 'PED_SAFE_PASS', 'MERGE_CLEAN', 'MERGE_YIELD', 'KEEP_RIGHT', 'WEATHER_CARE'];
+const POSITIVE_COMBO: PointKey[] = ['SIGNALLED', 'SAFE_GAP', 'MOVE_OVER', 'RAIL_STOP', 'CIRCLE_YIELD', 'WORK_ZONE_OK', 'EXIT_TAKEN', 'LEFT_YIELD', 'MISSION', 'PARKED_WELL', 'CLEAN_TRIP', 'ON_TIME', 'STAR', 'CHECKPOINT', 'FULL_STOP', 'GREEN_LIGHT', 'SMOOTH_DRIVING', 'NEAR_MISS', 'PED_SAFE_PASS', 'MERGE_CLEAN', 'MERGE_YIELD', 'KEEP_RIGHT', 'WEATHER_CARE'];
 /** Flat bonuses paid when a course is finished. They never touch the streak. */
 const FINISH_KEYS: PointKey[] = ['FINISH_BONUS', 'NO_CRASH_BONUS', 'SPOTLESS_BONUS', 'STREAK_MASTER'];
 
