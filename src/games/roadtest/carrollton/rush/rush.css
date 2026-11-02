@@ -1,0 +1,128 @@
+/* Carrollton Rush: the room (lobby), the race HUD and the results. Black glass and gold like the rest of the game, the green of a Georgia street sign for the brand. */
+
+/* ---------- the room ---------- */
+.rush-screen { padding: 14px 12px 28px; display: flex; flex-direction: column; gap: 14px; }
+.rush-hero { position: relative; overflow: hidden; padding: 20px 18px 18px; border-radius: 20px; color: #fff;
+  background: radial-gradient(120% 140% at 85% -10%, rgba(242,193,78,.28), transparent 55%), linear-gradient(160deg, #0b3b2a, #071f17 60%, #06130e);
+  border: 1px solid rgba(242,193,78,.55); box-shadow: 0 14px 36px rgba(0,0,0,.4); }
+.rush-hero h1 { margin: 10px 0 6px; font-family: var(--display, 'Bebas Neue', Impact, sans-serif); font-size: clamp(34px, 9vw, 48px); letter-spacing: 1.5px; line-height: .95; color: #ffe08a; text-shadow: 0 3px 14px rgba(0,0,0,.5); }
+.rush-hero p { margin: 0; font-size: 14px; line-height: 1.5; color: rgba(255,255,255,.88); max-width: 46ch; }
+
+.rush-card { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 18px; background: linear-gradient(160deg, rgba(16,16,22,.92), rgba(10,14,28,.92)); border: 1px solid rgba(242,193,78,.4); color: #fff; box-shadow: 0 10px 28px rgba(0,0,0,.35); }
+.rush-label { font-size: 11px; font-weight: 800; letter-spacing: 1.6px; text-transform: uppercase; color: #f2c14e; margin-top: 4px; }
+.rush-input { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.06); color: #fff; font-size: 17px; font-weight: 600; outline: none; }
+.rush-input:focus { border-color: #f2c14e; box-shadow: 0 0 0 3px rgba(242,193,78,.25); }
+.rush-cars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rush-car { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.04); color: #fff; font-size: 12.5px; font-weight: 600; text-align: left; cursor: pointer; min-width: 0; }
+.rush-car span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rush-car i { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255,255,255,.75); box-shadow: 0 0 0 2px rgba(0,0,0,.45); }
+.rush-car.on { border-color: #f2c14e; background: rgba(242,193,78,.14); box-shadow: inset 0 0 0 1px #f2c14e; }
+.rush-big { width: 100%; min-height: 54px; font-size: 18px !important; }
+.rush-or { display: flex; align-items: center; gap: 10px; color: rgba(255,255,255,.55); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
+.rush-or::before, .rush-or::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,.16); }
+.rush-join { display: flex; gap: 8px; }
+.rush-join .rush-code { text-transform: uppercase; letter-spacing: 8px; text-align: center; font-family: var(--display, 'Bebas Neue', Impact, sans-serif); font-size: 26px; padding: 8px 10px; }
+.rush-join .dk-btn { flex: none; min-width: 96px; }
+.rush-err { margin: 0; color: #ff8d84; font-weight: 700; font-size: 14px; }
+.rush-rules { margin: 4px 0 2px; padding: 12px 14px 12px 30px; border-radius: 12px; background: rgba(0,105,74,.22); border: 1px solid rgba(255,255,255,.14); font-size: 13px; line-height: 1.5; color: rgba(255,255,255,.88); }
+.rush-rules b { color: #ffe08a; }
+.rush-code-big { display: flex; flex-direction: column; align-items: center; padding: 10px 0 4px; }
+.rush-code-big small { font-size: 11px; font-weight: 800; letter-spacing: 3px; color: #f2c14e; }
+.rush-code-big b { font-family: var(--display, 'Bebas Neue', Impact, sans-serif); font-size: 64px; letter-spacing: 14px; line-height: 1; margin-right: -14px; color: #fff; text-shadow: 0 4px 18px rgba(242,193,78,.35); }
+.rush-share { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.rush-share .dk-btn { min-width: 220px; }
+.rush-link { font-size: 12px; color: rgba(255,255,255,.6); word-break: break-all; text-align: center; }
+.rush-net { margin: 0; text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .5px; }
+.rush-net.live { color: #29e069; } .rush-net.wait { color: #ffc21a; } .rush-net.down { color: #ff8d84; }
+.rush-players { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rush-players li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); font-weight: 700; font-size: 15px; }
+.rush-players li.me { border-color: rgba(242,193,78,.6); background: rgba(242,193,78,.1); }
+.rush-players li i { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 2px solid rgba(255,255,255,.8); }
+.rush-players li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rush-players li em { font-style: normal; font-weight: 500; opacity: .6; }
+.rush-players li u { text-decoration: none; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; padding: 3px 7px; border-radius: 6px; background: #f2c14e; color: #111; }
+.rush-players li u.racing { background: #00694a; color: #fff; }
+.rush-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rush-opt { padding: 10px 6px; border-radius: 12px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.04); color: #fff; font-weight: 700; font-size: 13.5px; cursor: pointer; }
+.rush-opt.on { border-color: #f2c14e; background: rgba(242,193,78,.16); color: #ffe08a; }
+.rush-note, .rush-wait { margin: 0; text-align: center; font-size: 13.5px; line-height: 1.45; color: rgba(255,255,255,.75); }
+.rush-wait { padding: 12px; border-radius: 12px; background: rgba(255,255,255,.05); }
+.rush-wait b { color: #ffe08a; }
+.rush-loading { min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #fff; }
+
+/* ---------- the race HUD (inside the game frame, which is a size container) ---------- */
+.rush-hud { position: absolute; inset: 0; pointer-events: none; z-index: 7; font-family: Inter, system-ui, sans-serif; color: #fff; }
+.rush-pill { position: absolute; right: 16px; top: 284px; width: 230px; justify-content: center; display: flex; align-items: center; gap: 10px; padding: 6px 14px; border-radius: 99px;
+  background: rgba(10,13,18,.82); border: 1px solid rgba(242,193,78,.6); box-shadow: 0 6px 18px rgba(0,0,0,.4); white-space: nowrap; }
+.rush-pill b { font-family: var(--display, 'Bebas Neue', Impact, sans-serif); font-size: 26px; letter-spacing: 1px; color: #ffe08a; line-height: 1; }
+.rush-pill b small { font-size: 15px; color: rgba(255,255,255,.65); }
+.rush-pill span { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 17px; }
+.rush-pill em { font-style: normal; font-weight: 800; font-size: 14px; color: #ff8d84; }
+.rush-board { position: absolute; right: 16px; top: 334px; width: 230px; margin: 0; padding: 6px; list-style: none; border-radius: 14px; background: rgba(10,13,18,.72); border: 1px solid rgba(255,255,255,.14); backdrop-filter: blur(6px); }
+.rush-board li { display: flex; align-items: center; gap: 7px; padding: 5px 6px; border-radius: 9px; font-size: 13px; font-weight: 700; }
+.rush-board li + li { margin-top: 2px; }
+.rush-board li.me { background: rgba(242,193,78,.18); box-shadow: inset 0 0 0 1px rgba(242,193,78,.55); }
+.rush-board li.out { opacity: .5; }
+.rush-board li.done em { color: #29e069; }
+.rush-board u { text-decoration: none; width: 16px; text-align: center; font-family: var(--display, 'Bebas Neue', Impact, sans-serif); font-size: 17px; color: #f2c14e; }
+.rush-board i { flex: none; width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(255,255,255,.8); }
+.rush-board span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rush-board em { font-style: normal; font-variant-numeric: tabular-nums; color: rgba(255,255,255,.85); }
+.rush-board small { font-size: 11px; color: #ff8d84; font-weight: 800; }
+.rush-feed { position: absolute; left: 16px; bottom: 216px; display: flex; flex-direction: column; gap: 4px; max-width: min(380px, 44%); }
+.rush-feed p { margin: 0; padding: 5px 10px; border-radius: 9px; font-size: 13px; font-weight: 700; background: rgba(10,13,18,.78); border-left: 4px solid #8fd0ff; animation: rush-in .25s ease-out; }
+.rush-feed p.bad { border-left-color: #ff5a4e; } .rush-feed p.good { border-left-color: #29e069; }
+@keyframes rush-in { from { opacity: 0; transform: translateX(-10px); } }
+.rush-done { position: absolute; left: 50%; bottom: 76px; transform: translateX(-50%); padding: 8px 16px; border-radius: 12px; background: #00694a; border: 2px solid #fff; font-family: var(--display, 'Bebas Neue', Impact, sans-serif); font-size: 20px; letter-spacing: 1.5px; white-space: nowrap; box-shadow: 0 8px 20px rgba(0,0,0,.4); }
+.rush-grid-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100% - 32px)); padding: 16px 18px; border-radius: 18px; text-align: center;
+  background: rgba(8,12,18,.88); border: 1px solid rgba(242,193,78,.6); box-shadow: 0 14px 40px rgba(0,0,0,.5); }
+.rush-grid-card small { display: block; font-size: 11px; font-weight: 800; letter-spacing: 2px; color: #f2c14e; }
+.rush-grid-card b { display: block; margin: 6px 0; font-family: var(--display, 'Bebas Neue', Impact, sans-serif); font-size: 34px; letter-spacing: 1px; line-height: 1; }
+.rush-grid-card span { display: block; font-size: 13px; color: rgba(255,255,255,.8); }
+.rush-grid-card ol { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.rush-grid-card li { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; background: rgba(255,255,255,.08); font-size: 13px; font-weight: 700; }
+.rush-grid-card li i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid rgba(255,255,255,.8); }
+
+/* phones: the race pill sits between the reset button and the map, the board under the reset button, the feed under the map */
+@container (max-width: 760px) {
+  .rush-pill { left: 50%; right: auto; width: auto; transform: translateX(-50%); top: 250px; gap: 7px; padding: 4px 11px; }
+  .rush-pill b { font-size: 21px; } .rush-pill b small { font-size: 12px; } .rush-pill span { font-size: 14px; } .rush-pill em { font-size: 12px; }
+  .rush-board { left: 8px; right: auto; top: 300px; width: 138px; padding: 4px; border-radius: 11px; }
+  .rush-board li { gap: 5px; padding: 3px 4px; font-size: 11px; }
+  .rush-board u { font-size: 14px; width: 11px; } .rush-board i { width: 9px; height: 9px; } .rush-board small { display: none; }
+  .rush-feed { left: auto; right: 8px; bottom: auto; top: 362px; align-items: flex-end; max-width: 58%; }
+  .rush-feed p { font-size: 11.5px; padding: 4px 8px; border-left: none; border-right: 4px solid #8fd0ff; }
+  .rush-feed p.bad { border-right-color: #ff5a4e; } .rush-feed p.good { border-right-color: #29e069; }
+  .rush-done { bottom: auto; top: 290px; font-size: 16px; }
+}
+@container (max-width: 760px) and (max-height: 640px) { .rush-board { top: 280px; } .rush-feed { top: 320px; } }
+/* landscape phones: only the race pill, under the GPS card */
+@container (max-height: 520px) {
+  .rush-pill { left: 50%; right: auto; width: auto; transform: translateX(-50%); top: 76px; } .rush-board, .rush-feed { display: none; } .rush-done { top: 112px; bottom: auto; font-size: 15px; }
+}
+
+/* ---------- results ---------- */
+.rush-results { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(4,6,10,.72); backdrop-filter: blur(4px); overflow-y: auto; }
+.rush-results-card { width: min(560px, 100%); padding: 18px 16px 16px; border-radius: 22px; color: #fff; text-align: center;
+  background: radial-gradient(120% 90% at 50% -10%, rgba(242,193,78,.25), transparent 60%), linear-gradient(170deg, #0b3b2a, #07121a 70%); border: 1px solid rgba(242,193,78,.7); box-shadow: 0 20px 60px rgba(0,0,0,.6); animation: rush-pop .35s cubic-bezier(.2,1.4,.4,1); }
+@keyframes rush-pop { from { transform: scale(.92); opacity: 0; } }
+.rush-results-card > small { font-size: 11px; font-weight: 800; letter-spacing: 2.5px; color: #f2c14e; }
+.rush-results-card h2 { margin: 6px 0 12px; font-family: var(--display, 'Bebas Neue', Impact, sans-serif); font-size: clamp(30px, 8vw, 42px); letter-spacing: 1px; line-height: 1; color: #ffe08a; }
+.rush-podium { display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: end; gap: 8px; margin: 4px 0 14px; }
+.rush-podium .step { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+.rush-podium .step > i { width: 30px; height: 30px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,.45); }
+.rush-podium .step b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.rush-podium .step span { font-size: 12px; font-variant-numeric: tabular-nums; color: rgba(255,255,255,.8); }
+.rush-podium .block { width: 100%; margin-top: 4px; border-radius: 10px 10px 4px 4px; display: flex; align-items: flex-start; justify-content: center; padding-top: 6px;
+  font-family: var(--display, 'Bebas Neue', Impact, sans-serif); font-size: 30px; color: #111; background: linear-gradient(180deg, #ffe08a, #c9971f); box-shadow: inset 0 -6px 0 rgba(0,0,0,.15); }
+.rush-podium .s1 .block { height: 86px; } .rush-podium .s2 .block { height: 62px; background: linear-gradient(180deg, #eef1f4, #a9b2bb); } .rush-podium .s3 .block { height: 46px; background: linear-gradient(180deg, #f0b98a, #b8763e); }
+.rush-podium .s1 > i { width: 38px; height: 38px; }
+.rush-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rush-table th { font-size: 10px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: #f2c14e; padding: 4px 4px 6px; text-align: left; }
+.rush-table td { padding: 7px 4px; border-top: 1px solid rgba(255,255,255,.1); text-align: left; font-variant-numeric: tabular-nums; }
+.rush-table td i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 2px solid rgba(255,255,255,.8); margin-right: 6px; vertical-align: -1px; }
+.rush-table tr.me td { background: rgba(242,193,78,.12); }
+.rush-tip { margin: 10px 0 4px; font-size: 12px; color: rgba(255,255,255,.7); }
+.rush-btns { justify-content: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.rush-btns .dk-btn { min-width: 150px; }
+@media (max-width: 420px) { .rush-table th:nth-child(4), .rush-table td:nth-child(4) { display: none; } }

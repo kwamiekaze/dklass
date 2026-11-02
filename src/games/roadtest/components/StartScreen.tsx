@@ -25,6 +25,8 @@ interface Props {
   onPublicLeaderboard?: () => void;
   onBadgeCabinet?: () => void;
   onMultiplayer: () => void;
+  /** Carrollton Rush: live 3D multiplayer, no sign-in */
+  onRush?: () => void;
   onMyStats?: () => void;
   onSignInPrompt?: () => void;
   publicMode?: boolean; // when true, "back" goes to homepage not dashboard
@@ -51,7 +53,7 @@ function guestStreak(): number {
   } catch { return 0; }
 }
 
-export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, onStartDaily, onHowToPlay, onLeaderboard, onPublicLeaderboard, onBadgeCabinet, onMultiplayer, onMyStats, onSignInPrompt, publicMode }: Props) {
+export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, onStartDaily, onHowToPlay, onLeaderboard, onPublicLeaderboard, onBadgeCabinet, onMultiplayer, onRush, onMyStats, onSignInPrompt, publicMode }: Props) {
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const [signedIn, setSignedIn] = useState(false);
@@ -115,20 +117,28 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
 
       <div className="hero-card">
         <img
-          src="/assets/drivingklass-hero.webp"
-          alt="The gold five-star DrivingKlass training car"
+          src="/assets/rt-hero-carrollton.webp"
+          alt="The DrivingKlass car outside the Carroll County Courthouse in Carrollton, Georgia"
           className="hero-img"
           loading="eager"
           onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
         />
         <div className="hero-overlay">
           <h1>Road Test Challenge</h1>
-          <p>Hold your lane. Stop at the signs. Earn a 5-star report card.</p>
+          <p>Real Georgia streets, real traffic laws. Earn a 5-star report card.</p>
           {streak > 0 && (
             <div className="streak-badge">🔥 {streak}-day streak{bestStreak > streak ? ` · best ${bestStreak}` : ''}</div>
           )}
         </div>
       </div>
+
+      {onRush && (
+        <button className="rush-cta" onClick={() => { clickTick(); onRush(); }}>
+          <span className="rush-badge" aria-hidden="true"><b>RUSH</b><i>LIVE · 2-6</i></span>
+          <span><strong>Carrollton Rush</strong><small>Race friends live through real Carrollton, GA. Same trips, every traffic law counts. No sign-in.</small></span>
+          <em>Play</em>
+        </button>
+      )}
 
       <RankBar />
 
@@ -278,7 +288,7 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
           onMultiplayer();
         }}
       >
-        Multiplayer: Star Rush {!signedIn && '· Sign in required'}
+        Classic 2D Star Rush {!signedIn && '· Sign in required'}
       </button>
 
       <a className="dk-btn dk-btn-black book-cta" href="https://drivingklass.com" target="_blank" rel="noopener noreferrer">

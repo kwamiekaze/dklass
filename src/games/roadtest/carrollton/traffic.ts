@@ -174,8 +174,12 @@ export class Traffic {
   }
   private oncomingLeft(node: Node, c: Car, plr: Mover): boolean {
     // true when an oncoming car is close enough that a left turn would cut it off
+    // a driver who has waited a long time takes the gap: two left-turners facing each other would otherwise wait for ever
+    if (c.blockedT > 12) return false;
     const fx = Math.sin(c.h), fz = Math.cos(c.h);
     const test = (m: Mover) => {
+      // a stopped oncoming car (waiting at its own line, or to turn left itself) is not traffic to yield to
+      if (m.v < 1) return false;
       const dx = node.x - m.x, dz = node.z - m.z, d = Math.hypot(dx, dz); if (d > 55 || d < 2) return false;
       const dir = Math.sin(m.h) * fx + Math.cos(m.h) * fz; if (dir > -0.6) return false;
       const toward = (dx * Math.sin(m.h) + dz * Math.cos(m.h)) / d; if (toward < 0.5) return false;

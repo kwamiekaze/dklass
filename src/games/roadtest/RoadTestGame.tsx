@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { StartScreen } from './components/StartScreen';
 import { HowToPlay } from './components/HowToPlay';
 import { GameCanvas } from './components/GameCanvas';
@@ -24,7 +24,11 @@ import { lovable } from '@/integrations/lovable';
 import type { Difficulty, LevelResult } from './game/types';
 import './roadtest.css';
 
-type Screen = 'menu' | 'playing' | 'report' | 'multiplayer';
+const RushRoot = lazy(() => import('./carrollton/rush/Rush'));
+/** a shared Carrollton Rush link: /play?room=ABCD */
+const roomInUrl = () => { try { return (new URLSearchParams(window.location.search).get('room') ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4); } catch { return ''; } };
+
+type Screen = 'menu' | 'playing' | 'report' | 'multiplayer' | 'rush';
 const DIFF_KEY = 'dk-game-difficulty';
 
 interface RoadTestGameProps {
@@ -37,7 +41,9 @@ interface RoadTestGameProps {
 const GAME_SURFACE_SELECTOR = 'canvas, .game-host, .touch-controls';
 
 export default function RoadTestGame({ publicMode }: RoadTestGameProps = {}) {
-  const [screen, setScreen] = useState<Screen>('menu');
+  const [screen, setScreen] = useState<Screen>(() => (roomInUrl().length === 4 ? 'rush' : 'menu'));
+  const [rushCode] = useState(() => roomInUrl());
+  const [rushRacing, setRushRacing] = useState(false);
   const [levelId, setLevelId] = useState('parking-lot');
   const [difficulty, setDifficultyState] = useState<Difficulty>('learner');
   const [dailyRun, setDailyRun] = useState(false);
@@ -166,8 +172,8 @@ export default function RoadTestGame({ publicMode }: RoadTestGameProps = {}) {
 
   return (
     <div className="dk-game" ref={rootRef}>
-      {screen !== 'playing' && <SiteHeader />}
-      {screen !== 'playing' && <div className="rt-audio-float"><AudioSettingsButton /></div>}
+      {screen !== 'playing' && !rushRacing && <SiteHeader />}
+      {screen !== 'playing' && !rushRacing && <div className="rt-audio-float"><AudioSettingsButton /></div>}
       {trackToast && (
         <div className="dk-track-toast" role="status">♪ {trackToast}</div>
       )}
@@ -184,10 +190,17 @@ export default function RoadTestGame({ publicMode }: RoadTestGameProps = {}) {
             onPublicLeaderboard={() => setShowPublicLb(true)}
             onBadgeCabinet={() => setShowBadges(true)}
             onMultiplayer={() => setScreen('multiplayer')}
+            onRush={() => setScreen('rush')}
             onMyStats={() => setShowMyStats(true)}
             onSignInPrompt={signInWithGoogle}
             publicMode={publicMode}
           />
+        )}
+
+        {screen === 'rush' && (
+          <Suspense fallback={<div className="rush-loading"><div className="rt3d-spin" /><p>Opening Carrollton Rush…</p></div>}>
+            <RushRoot initialCode={rushCode} onExit={() => { setRushRacing(false); setScreen('menu'); }} onRacing={setRushRacing} />
+          </Suspense>
         )}
 
         {screen === 'multiplayer' && (
