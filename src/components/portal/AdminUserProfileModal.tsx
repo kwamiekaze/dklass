@@ -22,6 +22,7 @@ import { StudentProgressSection } from "./StudentProgressSection";
 import { SecondaryEmailsSection } from "./SecondaryEmailsSection";
 import { MergeAccountDialog } from "./MergeAccountDialog";
 import { StudentHoursBreakdown } from "./StudentHoursBreakdown";
+import { MakeupTimeCard } from "./MakeupTimeCard";
 
 interface AdminUserProfileModalProps {
   open: boolean;
@@ -561,6 +562,8 @@ export function AdminUserProfileModal({
                   hoursCompletedStored={Number((profile as any)?.hours_completed ?? 0)}
                 />
               )}
+
+              {profile.role === 'student' && <MakeupTimeCard studentId={profile.id} canManage className="border-primary/20 bg-primary/5" />}
 
               {/* Scheduled Sessions Section */}
               {profile.role === 'student' && (

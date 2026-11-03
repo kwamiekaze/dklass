@@ -16,6 +16,7 @@ import { ReportCardList } from "@/components/portal/ReportCardList";
 import { getDisplayName } from "@/lib/profileUtils";
 import { PermitPreview } from "@/components/portal/PermitPreview";
 import { StudentDocumentSection } from "@/components/portal/StudentDocumentSection";
+import { MakeupTimeCard } from "@/components/portal/MakeupTimeCard";
 
 export default function InstructorStudentView() {
   return (
@@ -280,6 +281,8 @@ function InstructorStudentViewContent() {
               </CardContent>
             </Card>
           </div>
+
+          {id && <MakeupTimeCard studentId={id} canManage />}
 
           {/* Document History */}
           {id && (

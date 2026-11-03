@@ -1,3 +1,4 @@
+import { MakeupTimeCard } from "@/components/portal/MakeupTimeCard";
 import { PortalBackground } from "@/components/portal/PortalBackground";
 import { useState, useRef, useEffect } from "react";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
@@ -475,6 +476,9 @@ function ProfileContent() {
           </Card>
         )}
 
+
+        {/* Makeup time — read-only for the student */}
+        {isStudent && user?.id && <MakeupTimeCard studentId={user.id} />}
 
         {/* Addresses - Students and Admin/Staff only */}
         {(isStudent || isStaffOrAdmin) && (
