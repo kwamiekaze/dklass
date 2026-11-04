@@ -13,6 +13,7 @@ import { DailyChallengeCard } from './DailyChallengeCard';
 import { RankBar } from './RankBar';
 import { MissionsPanel } from './MissionsPanel';
 import { GaragePicker, ConditionsPicker } from './GaragePicker';
+import { GameModes, type ModeTile } from './GameModes';
 
 interface Props {
   bestScores: Record<string, number>;
@@ -110,6 +111,19 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
   const weakLabels = weak.map((k) => SKILL_LABELS[k] ?? k);
   const [freePick, setFreePick] = useState(getFreeStart());
   const startLevel = (id: string) => { clickTick(); onStart(id); };
+  const jump = (id: string) => { clickTick(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  const bestOf = (id: string, fallback: string) => (bestScores[id] ? `Best ${bestScores[id]}` : fallback);
+  const starRush = () => { clickTick(); if (!signedIn && onSignInPrompt) { onSignInPrompt(); return; } onMultiplayer(); };
+  const featured: ModeTile | null = onRush ? { id: 'rush', title: 'Carrollton Rush', sub: 'Race friends live through real Carrollton, GA. Same trips, every traffic law counts. No sign-in.', tags: ['multiplayer'], kind: 'MULTIPLAYER · 2 TO 6 PLAYERS', icon: 'users', stat: '', cta: 'Play', hue: '#0b3b2a', onPick: () => { clickTick(); onRush(); } } : null;
+  const tiles: ModeTile[] = [
+    { id: 'open', title: 'Open World', sub: 'Drive all of Carrollton. GPS trips, day and night, real traffic.', tags: ['solo'], kind: 'SOLO · FREE DRIVE', icon: 'map', stat: bestOf('atl-carrollton-open', 'Real town map'), cta: 'Drive', hue: '#0e4a5c', onPick: () => startLevel('atl-carrollton-open') },
+    ...(endless ? [{ id: 'endless', title: 'Endless Rush', sub: endless.subtitle, tags: ['solo', 'endless'] as ModeTile['tags'], kind: 'SOLO · ENDLESS', icon: 'infinity' as const, stat: bestOf(endless.id, 'No finish line'), cta: 'Start', hue: '#4a1a6b', onPick: () => startLevel(endless.id) }] : []),
+    { id: 'star', title: 'Star Rush', sub: 'Classic 2D multiplayer. Collect stars and beat your friends.', tags: ['multiplayer'], kind: 'MULTIPLAYER · 2D', icon: 'star', stat: signedIn ? 'Live rooms' : 'Sign in to play', cta: 'Play', hue: '#6b4a08', onPick: starRush },
+    { id: 'free', title: 'Free Roam', sub: 'Real Atlanta highways. Take any exit, no finish line.', tags: ['solo', 'endless'], kind: 'SOLO · ENDLESS', icon: 'compass', stat: bestOf(FREE_ID, 'Atlanta roads'), cta: 'Pick start', hue: '#7a3a0c', onPick: () => jump('rt-freeroam') },
+    { id: 'atl', title: 'Atlanta Drive', sub: 'Phase by phase, from quiet streets to I 285.', tags: ['solo'], kind: 'SOLO · STAGES', icon: 'route', stat: `${ATL_STAGES.length} stages`, cta: 'Browse', hue: '#12306b', onPick: () => jump('rt-atlanta') },
+    { id: 'lessons', title: 'Road Test Lessons', sub: 'Learn the rules, one skill at a time. Earn a 5 star report.', tags: ['solo'], kind: 'SOLO · LEVELS', icon: 'grad', stat: `${lessons.length} lessons`, cta: 'Browse', hue: '#1b2a5c', onPick: () => jump('rt-lessons') },
+    ...(onStartDaily ? [{ id: 'daily', title: 'Daily Challenge', sub: 'A new run every day. Keep your streak alive.', tags: ['solo'] as ModeTile['tags'], kind: 'SOLO · DAILY', icon: 'calendar' as const, stat: streak > 0 ? `${streak} day streak` : 'New today', cta: 'Open', hue: '#6b2c0c', onPick: () => jump('rt-daily') }] : []),
+  ];
 
 
   return (
@@ -132,18 +146,12 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
         </div>
       </div>
 
-      {onRush && (
-        <button className="rush-cta" onClick={() => { clickTick(); onRush(); }}>
-          <span className="rush-badge" aria-hidden="true"><b>RUSH</b><i>LIVE · 2-6</i></span>
-          <span><strong>Carrollton Rush</strong><small>Race friends live through real Carrollton, GA. Same trips, every traffic law counts. No sign-in.</small></span>
-          <em>Play</em>
-        </button>
-      )}
+      <GameModes featured={featured} tiles={tiles} />
 
       <RankBar />
 
       {onStartDaily && (
-        <DailyChallengeCard onStart={(id) => { clickTick(); onStartDaily(id); }} />
+        <div id="rt-daily" className="gm-anchor"><DailyChallengeCard onStart={(id) => { clickTick(); onStartDaily(id); }} /></div>
       )}
 
       <MissionsPanel />
@@ -187,7 +195,8 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
         </button>
       )}
 
-      <section className="atl-menu" aria-label="Atlanta Drive">
+      <section className="atl-menu gm-anchor" id="rt-atlanta" aria-label="Atlanta Drive">
+        <button className="gm-back" onClick={() => jump('rt-modes')}>↑ All game modes</button>
         <div className="atl-menu-hero">
           <div className="atl-menu-badge" aria-hidden="true"><b>I</b><i>75 85</i></div>
           <div>
@@ -212,7 +221,7 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
             </button>
           </div>
         </div>
-        <div className="atl-group atl-free">
+        <div className="atl-group atl-free gm-anchor" id="rt-freeroam">
           <h3>Free Roam<small>Endless · real Atlanta roads · exits, merges and left turns</small></h3>
           <p className="atl-free-note">No finish line. Take any exit, turn at any cross street, merge from the ramps and keep going. The real exit numbers and street names are on the signs. Three crashes ends the drive; a clean road drops one strike.</p>
           <div className="atl-free-starts" role="group" aria-label="Where to start">
@@ -247,7 +256,8 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
         ))}
       </section>
 
-      <section className="level-list" aria-label="Choose a lesson">
+      <section className="level-list gm-anchor" id="rt-lessons" aria-label="Choose a lesson">
+        <button className="gm-back" onClick={() => jump('rt-modes')}>↑ All game modes</button>
         {lessons.map((lvl, i) => (
           <button key={lvl.id} className="level-card" onClick={() => startLevel(lvl.id)}>
             <span className="level-num">{i + 1}</span>
