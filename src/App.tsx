@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -61,6 +62,7 @@ import AdminEmails from "./pages/portal/AdminEmails";
 import PracticeTest from "./pages/portal/PracticeTest";
 import AdminPracticeQuestions from "./pages/portal/AdminPracticeQuestions";
 import RoadTestGame from "./games/roadtest/RoadTestGame";
+const StopGame = lazy(() => import("./games/stopgame/StopGame"));
 import { ProtectedRoute } from "./components/portal/ProtectedRoute";
 
 import Unsubscribe from "./pages/Unsubscribe";
@@ -108,6 +110,8 @@ const App = () => (
                       <Route path="/" element={<NuHome2 />} />
                       <Route path="/nuhome2" element={<Nuhome2Redirect />} />
                       <Route path="/classic-home" element={<Index />} />
+                      {/* staff-only while the game is being finished */}
+                      <Route path="/stop-game" element={<Suspense fallback={null}><StopGame /></Suspense>} />
                       <Route path="/auth" element={<Auth />} />
                       
                       {/* Portal Auth Routes */}
