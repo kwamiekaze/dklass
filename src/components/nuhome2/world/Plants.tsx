@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { rng } from './theme';
+import { leafCard, leafCardMaterial } from './Grounds';
 
 /*
  * Real-looking planting: every plant is a solid core wrapped in hundreds of small leaf clusters in a spread of greens,
@@ -8,9 +9,6 @@ import { rng } from './theme';
  */
 export type PlantKind = 'cone' | 'ball' | 'tree' | 'small';
 
-const geos: Record<number, THREE.IcosahedronGeometry> = {};
-const blobGeo = (d: number) => (geos[d] ??= new THREE.IcosahedronGeometry(1, d));
-const leafMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: .88 });
 const coreMat = new THREE.MeshStandardMaterial({ color: '#1f4a27', roughness: 1 });
 const barkMat = new THREE.MeshStandardMaterial({ color: '#5a4331', roughness: 1 });
 
@@ -19,7 +17,7 @@ function build(kind: PlantKind, seed: number): { blobs: Blob[]; height: number }
   const r = rng(seed * 131 + kind.length * 17), out: Blob[] = [];
   const col = (up: number, outer: number, cypress = false) => {
     const hue = cypress ? .33 + r() * .03 : r() > .9 ? .19 + r() * .03 : .25 + r() * .07;
-    return new THREE.Color().setHSL(hue, (cypress ? .4 : .5) + r() * .25, (cypress ? .035 : .045) + up * .085 + outer * .035 + r() * .03);
+    return new THREE.Color().setHSL(hue, (cypress ? .36 : .44) + r() * .2, (cypress ? .2 : .25) + up * .16 + outer * .08 + r() * .06);
   };
   if (kind === 'tree') {
     const lobes = [[0, 2.15, 0, .72], [.5, 2.0, .2, .55], [-.5, 2.05, -.15, .55], [.1, 2.65, -.1, .5], [-.1, 1.7, .5, .5]];
@@ -49,7 +47,7 @@ export function Plant({ kind, y = 0, seed = 1, detail = 0, scale = 1 }: { kind: 
   const { blobs, height } = useMemo(() => build(kind, seed), [kind, seed]);
   useLayoutEffect(() => {
     const m = ref.current; if (!m) return; const o = new THREE.Object3D(), rr = rng(seed * 7 + 3);
-    blobs.forEach((b, i) => { o.position.copy(b.p); o.scale.set(b.s * (1 + rr() * .5), b.s * (.75 + rr() * .4), b.s * (1 + rr() * .5)); o.rotation.set(rr() * 3, rr() * 3, rr() * 3); o.updateMatrix(); m.setMatrixAt(i, o.matrix); m.setColorAt(i, b.c); });
+    blobs.forEach((b, i) => { o.position.copy(b.p); const k = b.s * 2.1 * (1 + rr() * .4); o.scale.set(k, k, k); o.rotation.set(rr() * 3, rr() * 3, rr() * 3); o.updateMatrix(); m.setMatrixAt(i, o.matrix); m.setColorAt(i, b.c); });
     m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; m.computeBoundingSphere();
   }, [blobs, seed]);
   return <group position={[0, y, 0]} scale={scale}>
@@ -58,6 +56,6 @@ export function Plant({ kind, y = 0, seed = 1, detail = 0, scale = 1 }: { kind: 
       {[[.3, 1.55, .1, .5], [-.3, 1.6, -.1, -.5], [.05, 1.7, .3, .1]].map(([x, h, z, tilt], i) => <mesh key={i} position={[x! * .5, h!, z! * .5]} rotation={[z! * .8, 0, -tilt!]} material={barkMat}><cylinderGeometry args={[.025, .05, .7, 6]} /></mesh>)}
     </group>}
     <mesh position={kind === 'tree' ? [0, 2.1, 0] : kind === 'ball' ? [0, .78, 0] : [0, height * .4, 0]} scale={kind === 'tree' ? [.8, .7, .8] : kind === 'ball' ? [.68, .68, .68] : kind === 'cone' ? [.6, height * .38, .6] : [.34, height * .38, .34]} material={coreMat} castShadow><sphereGeometry args={[1, 10, 8]} /></mesh>
-    <instancedMesh ref={ref} args={[blobGeo(detail), leafMat, blobs.length]} frustumCulled={false} />
+    <instancedMesh ref={ref} args={[leafCard(), leafCardMaterial(), blobs.length]} frustumCulled={false} castShadow={detail > 0} receiveShadow />
   </group>;
 }

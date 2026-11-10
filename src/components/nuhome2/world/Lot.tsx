@@ -11,6 +11,7 @@ import { FLEET_COLORS, FleetCar } from './Fleet';
 const FLEET_ORDER = [FLEET_COLORS.white, FLEET_COLORS.red, FLEET_COLORS.green, FLEET_COLORS.yellow, FLEET_COLORS.black];
 import { StopSign } from './StopSign';
 import { Plant } from './Plants';
+import { leafCard, leafCardMaterial } from './Grounds';
 import { Halo, champagneMat, starRow, useGlow, wordGeometry } from './Signage';
 import { BackPatio } from './BackPatio';
 import { BL, bx, bz, BL_CONES, CONN_X, CONN_Z0, BAY_LINE, EXIT } from './rearlot';
@@ -131,14 +132,14 @@ export function Hedge({ x, z, w, d = 1, h = .9, y = .16, seed = 1, pl, density =
       else if (pick < 2 * h) { px = (r() * 2 - 1) * hw; py = r() * hh; pz = -hd; v = py / hh; }
       else { px = (r() * 2 - 1) * hw; py = hh; pz = (r() * 2 - 1) * hd; v = 1; }
       o.position.set(x + px, y0 + py, z + pz + (pick < 2 * h ? (pick < h ? -.04 : .04) : 0));
-      o.scale.set(s * (1 + r() * .5), s * (.7 + r() * .4), s * (1 + r() * .5)); o.rotation.set(r() * 3, r() * 3, r() * 3); o.updateMatrix(); m.setMatrixAt(i, o.matrix);
-      c.setHSL(.27 + r() * .05, .5 + r() * .25, .03 + v * .045 + r() * .03); m.setColorAt(i, c);
+      const k = s * .4 * (1 + r() * .4); o.scale.set(k, k, k); o.rotation.set((r() - .5) * 1.4, r() * 6.28, (r() - .5) * 1.4); o.updateMatrix(); m.setMatrixAt(i, o.matrix);
+      c.setHSL(.26 + r() * .05, .42 + r() * .2, .2 + v * .17 + r() * .08); m.setColorAt(i, c);
     }
     m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; m.computeBoundingSphere();
   }, [n, x, z, w, d, h, y, seed]);
   return <group>
     <mesh position={[x, y + h * .46, z]} material={pl.core} castShadow receiveShadow><boxGeometry args={[w - .25, h * .88, d - .3]} /></mesh>
-    <instancedMesh ref={ref} args={[pl.blob, pl.leaf, n]} frustumCulled={false} />
+    <instancedMesh ref={ref} args={[pl.blob, pl.leaf, n]} frustumCulled={false} receiveShadow />
   </group>;
 }
 
@@ -295,8 +296,8 @@ export function Lot({ lite, tier, asphalt }: { lite: boolean; tier: 'high' | 'mi
   const arrows = useMemo(() => [{ x: 31.7, z: 6, yaw: 0 }, { x: 31.7, z: -.2, yaw: 0 }, { x: -31.7, z: 6, yaw: Math.PI }, { x: -31.7, z: -.2, yaw: Math.PI }], []);
   const pl = useMemo<Plant>(() => ({
     core: (() => { const t = foliageTexture(); t.repeat.set(2, 1); return new THREE.MeshStandardMaterial({ map: t, roughness: .95, color: '#5f7a5a' }); })(),
-    blob: new THREE.IcosahedronGeometry(.17, tier === 'high' ? 1 : 0),
-    leaf: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: .9 }),
+    blob: leafCard(),
+    leaf: leafCardMaterial(),
     k: tier === 'high' ? 1 : tier === 'mid' ? .62 : .32,
   }), [lite, tier]);
   useFrame(() => { const n = mix.current; lampMat.emissiveIntensity = .5 + 2.6 * n; wellMat.emissiveIntensity = .15 + 2 * n; glowMat.opacity = .05 + .62 * n; });

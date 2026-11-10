@@ -3,7 +3,12 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { NightCtx, rng } from './theme';
 import { Plant } from './Plants';
-import { Halo, carvedRow, carvedWord, goldMat } from './Signage';
+import { Hedge, type HedgePlant } from './Lot';
+import { leafCard, leafCardMaterial } from './Grounds';
+import { Halo, carvedRow, carvedWord, facetedStar, goldMat } from './Signage';
+import { atmo } from './atmosphere';
+import { makeGlazing } from './Glazing';
+import { type B, box, columnGeometry, dressedStone, limestone, masonry, slate, tiled, weather } from './surfaces';
 import { SIGN_FONT, goldGradient, makeCanvasTexture, starShape } from './parts';
 
 /*
@@ -18,54 +23,7 @@ import { SIGN_FONT, goldGradient, makeCanvasTexture, starShape } from './parts';
  */
 const WALL_H = 6.4, PAV_H = 8.0, FRONT = 3, DEPTH = .9, HALF = 22.4, BACK = -2.95;   // BACK: the back wall's outer face, in building space
 
-function limestone() {
-  const c = document.createElement('canvas'); c.width = c.height = 512;
-  const g = c.getContext('2d')!; const r = rng(41);
-  g.fillStyle = '#eadfce'; g.fillRect(0, 0, 512, 512);
-  for (let row = 0; row < 8; row++) for (let col = -1; col < 4; col++) {
-    const x = col * 128 + (row % 2) * 64, y = row * 64; const v = (r() - .5) * 12;
-    g.fillStyle = `rgb(${236 + v},${225 + v},${208 + v})`; g.fillRect(x + 2, y + 2, 124, 60);
-  }
-  g.strokeStyle = 'rgba(150,132,110,.34)'; g.lineWidth = 4;
-  for (let row = 0; row <= 8; row++) { g.beginPath(); g.moveTo(0, row * 64); g.lineTo(512, row * 64); g.stroke(); }
-  for (let row = 0; row < 8; row++) for (let col = -1; col < 5; col++) { const x = col * 128 + (row % 2) * 64; g.beginPath(); g.moveTo(x, row * 64); g.lineTo(x, row * 64 + 64); g.stroke(); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; return t;
-}
-
 type Kind = 'tv' | 'meeting' | 'office' | 'hall' | 'lobby';
-/** What you see through a window: warm light, desks, chairs, a TV with a car on it. Flat, so it never shimmers. */
-function interiorTexture(kind: Kind, w: number, h: number) {
-  return makeCanvasTexture(w, h, (g) => {
-    const bg = g.createLinearGradient(0, 0, 0, h); bg.addColorStop(0, '#fff0c8'); bg.addColorStop(.55, '#ffd98a'); bg.addColorStop(1, '#d99a45');
-    g.fillStyle = bg; g.fillRect(0, 0, w, h);
-    const glow = g.createRadialGradient(w / 2, 0, 0, w / 2, 0, h * .8); glow.addColorStop(0, 'rgba(255,255,240,.85)'); glow.addColorStop(1, 'rgba(255,255,240,0)'); g.fillStyle = glow; g.fillRect(0, 0, w, h);
-    g.fillStyle = '#b97c36'; g.fillRect(0, h * .84, w, h * .16);                                  // floor
-    const desk = (x: number, y: number, dw: number) => { g.fillStyle = '#8a5a2b'; g.fillRect(x, y, dw, h * .035); g.fillStyle = '#6b4320'; g.fillRect(x + 4, y + h * .035, 6, h * .1); g.fillRect(x + dw - 10, y + h * .035, 6, h * .1); };
-    const chair = (x: number, y: number, s: number) => { g.fillStyle = '#26262c'; g.fillRect(x, y, s, s * .8); g.fillRect(x + s * .1, y + s * .8, s * .8, s * .2); g.fillRect(x + s * .45, y + s, s * .1, s * .5); };
-    const plant = (x: number, y: number, s: number) => { g.fillStyle = '#6b4320'; g.fillRect(x - s * .25, y, s * .5, s * .5); g.fillStyle = '#3f8a45'; g.beginPath(); g.arc(x, y - s * .1, s * .6, 0, 7); g.fill(); g.fillStyle = '#58a85a'; g.beginPath(); g.arc(x - s * .2, y - s * .3, s * .38, 0, 7); g.fill(); };
-    if (kind === 'tv') {
-      g.fillStyle = '#1b2230'; g.fillRect(w * .12, h * .2, w * .56, h * .24); g.fillStyle = '#2f66c8'; g.fillRect(w * .14, h * .22, w * .52, h * .2);
-      g.fillStyle = '#fff'; g.beginPath(); g.roundRect(w * .26, h * .3, w * .28, h * .07, 6); g.fill(); g.beginPath(); g.roundRect(w * .31, h * .26, w * .16, h * .06, 6); g.fill();
-      g.fillStyle = '#2f66c8'; [w * .31, w * .49].forEach(x => { g.beginPath(); g.arc(x, h * .375, w * .025, 0, 7); g.fill(); });
-      desk(w * .08, h * .6, w * .5); chair(w * .16, h * .52, w * .13); chair(w * .42, h * .52, w * .13); desk(w * .62, h * .66, w * .34); chair(w * .72, h * .58, w * .12);
-    } else if (kind === 'meeting') {
-      [[.1, .18], [.4, .2], [.7, .18]].forEach(([x, y]) => { g.fillStyle = '#c9971f'; g.fillRect(w * x!, h * y!, w * .2, h * .13); g.fillStyle = '#fff3d6'; g.fillRect(w * x! + 5, h * y! + 5, w * .2 - 10, h * .13 - 10); });
-      desk(w * .12, h * .62, w * .78); [.18, .36, .56, .74].forEach(x => chair(w * x, h * .54, w * .1)); plant(w * .9, h * .72, w * .12);
-    } else if (kind === 'office') {
-      desk(w * .08, h * .62, w * .84); [.2, .5, .74].forEach(x => { g.fillStyle = '#20222a'; g.fillRect(w * x, h * .5, w * .13, h * .1); chair(w * x, h * .56, w * .12); }); plant(w * .12, h * .72, w * .1);
-    } else if (kind === 'hall') {
-      plant(w * .2, h * .8, w * .24); plant(w * .8, h * .8, w * .24);
-      g.fillStyle = '#fffbe6'; g.fillRect(w * .42, h * .1, w * .16, h * .55);
-      g.fillStyle = '#26262c'; g.fillRect(w * .3, h * .72, w * .4, h * .05); g.fillRect(w * .34, h * .77, w * .06, h * .08); g.fillRect(w * .6, h * .77, w * .06, h * .08);
-    } else {
-      g.fillStyle = '#fff6dd'; g.fillRect(0, 0, w, h * .84);
-      g.strokeStyle = '#c9971f'; g.lineWidth = 6; g.beginPath(); g.ellipse(w / 2, h * .16, w * .2, h * .05, 0, 0, 7); g.stroke();
-      for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2; g.fillStyle = '#fff6b0'; g.beginPath(); g.arc(w / 2 + Math.cos(a) * w * .2, h * .16 + Math.sin(a) * h * .05, 7, 0, 7); g.fill(); }
-      g.fillStyle = '#c9971f'; g.fillRect(w / 2 - 3, 0, 6, h * .12);
-      plant(w * .14, h * .72, w * .16); plant(w * .86, h * .72, w * .16); desk(w * .32, h * .7, w * .36);
-    }
-  }, 8, false);
-}
 
 function lettersTexture(color: 'face' | 'side') {
   return makeCanvasTexture(2048, 256, (g, w, h) => {
@@ -126,21 +84,6 @@ function hipRoof(w: number, d: number, h: number) {
   return g;
 }
 
-function slateTexture() {
-  const W = 512, H = 512, rows = 10, tw = 64;
-  return makeCanvasTexture(W, H, (g) => {
-    const r = rng(17); g.fillStyle = '#2a2d35'; g.fillRect(0, 0, W, H);
-    for (let y = 0; y < rows; y++) { const off = (y % 2) * tw / 2, rh = H / rows;
-      for (let x = -1; x < W / tw + 1; x++) {
-        const v = (r() - .5) * 20, tone = 62 + v; g.fillStyle = `rgb(${tone},${tone + 3},${tone + 12})`;
-        g.fillRect(x * tw + off + 1.5, y * rh + 1, tw - 3, rh - 1);
-        g.fillStyle = 'rgba(255,255,255,.07)'; g.fillRect(x * tw + off + 1.5, y * rh + 1, tw - 3, 2);
-        const sh = g.createLinearGradient(0, y * rh + rh * .55, 0, y * rh + rh); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,.4)'); g.fillStyle = sh; g.fillRect(x * tw + off + 1.5, y * rh + rh * .55, tw - 3, rh * .45);
-        if (r() > .86) { g.fillStyle = 'rgba(120,130,110,.14)'; g.fillRect(x * tw + off + 4, y * rh + 6, tw * .5, rh * .3); }
-      } }
-  }, 8, false);
-}
-
 function Bar({ a, b, r = .09, m }: { a: [number, number, number]; b: [number, number, number]; r?: number; m: THREE.Material }) {
   const { pos, q, len } = useMemo(() => {
     const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b), dir = new THREE.Vector3().subVectors(vb, va), len = dir.length();
@@ -189,16 +132,22 @@ function AFrame({ position, rotY = 0, map }: { position: [number, number, number
 
 export function Building({ position, lite, open }: { position: [number, number, number]; lite: boolean; open: boolean }) {
   const mix = useContext(NightCtx);
-  const base = useMemo(limestone, []);
+  const lime = useMemo(() => limestone(lite ? 256 : 512), [lite]);
   const stoneMats = useMemo(() => new Map<string, THREE.MeshStandardMaterial>(), []);
+  const stoneMat = (rx: number, ry: number) => { const t = tiled(lime.map, rx, ry); return new THREE.MeshStandardMaterial({ map: t, normalMap: tiled(lime.normalMap, rx, ry), normalScale: new THREE.Vector2(1.15, 1.15), emissiveMap: t, emissive: '#ffcf80', emissiveIntensity: .05, roughness: .86, color: '#efe3c9' }); };
   const stone = (w: number, h: number) => {
     const k = `${w.toFixed(1)}x${h.toFixed(1)}`; let m = stoneMats.get(k);
-    if (!m) { const t = base.clone(); t.repeat.set(Math.max(.25, w / 3.2), Math.max(.25, h / 1.6)); t.needsUpdate = true; m = new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: '#ffcf80', emissiveIntensity: .05, roughness: .9, color: '#f6ecd2' }); stoneMats.set(k, m); }
+    if (!m) { m = stoneMat(Math.max(.25, w / 3.2), Math.max(.25, h / 1.6)); stoneMats.set(k, m); }
     return m;
   };
+  // the walls are single meshes with the stone laid in world metres, so the courses run unbroken; each carries its own weathering
+  const wallMat = useMemo(() => { const m = weather(stoneMat(1, 1), .16, WALL_H); stoneMats.set('wall', m); return m; }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const pavMat = useMemo(() => { const m = weather(stoneMat(1, 1), .16, PAV_H); stoneMats.set('pav', m); return m; }, []);      // eslint-disable-line react-hooks/exhaustive-deps
+  const baseMat = useMemo(() => { const m = stoneMat(1, 1); m.color.set('#d9ccb1'); m.normalScale.set(1.5, 1.5); m.roughness = .92; stoneMats.set('base', m); return m; }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   const M = useMemo(() => ({
     trim: new THREE.MeshStandardMaterial({ color: '#f5ecdc', roughness: .6 }),
-    roof: (() => { const t = slateTexture(); t.wrapS = t.wrapT = THREE.RepeatWrapping; return new THREE.MeshStandardMaterial({ map: t, bumpMap: t, bumpScale: 1.5, color: '#ffffff', roughness: .5, metalness: .12, side: THREE.DoubleSide }); })(),
+    roof: (() => { const sl = slate(lite ? 256 : 512); return new THREE.MeshStandardMaterial({ map: sl.map, normalMap: sl.normalMap, normalScale: new THREE.Vector2(1.1, 1.1), color: '#ffffff', roughness: .46, metalness: .16, side: THREE.DoubleSide }); })(),
+    dress: (() => { const d = dressedStone(256); return new THREE.MeshStandardMaterial({ map: d.map, normalMap: d.normalMap, normalScale: new THREE.Vector2(.6, .6), color: '#fbf3e4', roughness: .62, emissiveMap: d.map, emissive: '#ffcf80', emissiveIntensity: .03 }); })(),
     black: new THREE.MeshStandardMaterial({ color: '#15161a', roughness: .45, metalness: .3 }),
     led: new THREE.MeshStandardMaterial({ color: '#fff4cf', emissive: '#ffd070', emissiveIntensity: .8, roughness: .5 }),
     lamp: new THREE.MeshStandardMaterial({ color: '#fff0d0', emissive: '#ffbf70', emissiveIntensity: 1 }),
@@ -207,24 +156,20 @@ export function Building({ position, lite, open }: { position: [number, number, 
     leaf: new THREE.MeshStandardMaterial({ color: '#2f6b34', roughness: .95, flatShading: true }),
     leaf2: new THREE.MeshStandardMaterial({ color: '#3d8a42', roughness: .95, flatShading: true }),
     bark: new THREE.MeshStandardMaterial({ color: '#5a3b20', roughness: .9 }),
-  }), []);
+  }), [lite]);
   const tex = useMemo(() => ({
-    tv: interiorTexture('tv', 256, 480), meeting: interiorTexture('meeting', 256, 480), office: interiorTexture('office', 256, 480),
-    hall: interiorTexture('hall', 256, 768), lobby: interiorTexture('lobby', 512, 512),
     face: lettersTexture('face'), side: lettersTexture('side'), door: { open: doorSignTexture(true), closed: doorSignTexture(false) }, hours: hoursSignTexture(),
   }), []);
-  const glass = useMemo(() => {
-    const mk = (t: THREE.Texture) => new THREE.MeshBasicMaterial({ map: t, toneMapped: false });
-    return { tv: mk(tex.tv), meeting: mk(tex.meeting), office: mk(tex.office), hall: mk(tex.hall), lobby: mk(tex.lobby) };
-  }, [tex]);
+  const glz = useMemo(() => makeGlazing(lite), [lite]), glass = glz.mats;
+  const pane = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
   const letterFace = useMemo(() => new THREE.MeshBasicMaterial({ map: tex.face, transparent: true, toneMapped: false, depthWrite: false }), [tex]);
   const letterSide = useMemo(() => new THREE.MeshBasicMaterial({ map: tex.side, transparent: true, toneMapped: false, depthWrite: false }), [tex]);
 
   useFrame(() => {
     const n = mix.current;
     M.led.emissiveIntensity = .7 + 3.4 * n; M.lamp.emissiveIntensity = .7 + 2.0 * n; M.crown.emissiveIntensity = .3 + 1.5 * n;
-    stoneMats.forEach(m => { m.emissiveIntensity = .03 + .26 * n; });
-    Object.values(glass).forEach(m => m.color.setScalar(.8 + .2 * n));
+    stoneMats.forEach(m => { m.emissiveIntensity = .03 + .26 * n; }); M.dress.emissiveIntensity = .03 + .24 * n;
+    glz.update(n, atmo.deep, atmo.look.cloud, open);
   });
 
   const archShape = useMemo(() => {
@@ -235,7 +180,7 @@ export function Building({ position, lite, open }: { position: [number, number, 
   }, []);
   const archLed = useMemo(() => { const R = 5.55, cy = .55 + 2.3 - R, pts: THREE.Vector3[] = []; for (let i = 0; i <= 48; i++) { const x = -4.1 + (8.2 * i) / 48; pts.push(new THREE.Vector3(x, cy + Math.sqrt(R * R - x * x) - .3, 0)); } return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 64, .08, 6, false); }, []);
   const capM = useMemo(() => new THREE.MeshStandardMaterial({ color: '#e6dfd0', roughness: .55 }), []), fasM = useMemo(() => new THREE.MeshStandardMaterial({ color: '#2b2d34', roughness: .5, metalness: .3 }), []);
-  const roofs = useMemo(() => ({ main: hipRoof(45, 6.6, 1.9), center: hipRoof(14, 6.4, 4.1), pav: hipRoof(6.4, 5.6, 2.0) }), []);
+  const roofs = useMemo(() => ({ main: hipRoof(45, 6.6, 1.9), center: hipRoof(14, 6.4, 4.1), pav: hipRoof(7.2, 7.1, 2.5) }), []);
   // The sign is carved into the stone, built as real geometry so nothing can flicker: a stone face with the letters and the five stars
   // cut out of it, the letters seen as gilded cavities (inside walls and floor), the stars as gilded V-cuts.
   // Faces never overlap at the same depth: face z 5.0 | cavity floor 4.84 | band body ends at 4.78 | arch body ends at 4.75.
@@ -258,22 +203,17 @@ export function Building({ position, lite, open }: { position: [number, number, 
   const crownGeo = useMemo(() => { const g = new THREE.ExtrudeGeometry(starShape(1, .46), { depth: .34, bevelEnabled: true, bevelThickness: .12, bevelSize: .06, bevelSegments: 2 }); g.translate(0, 0, -.17); g.computeVertexNormals(); return g; }, []);
 
   /** A wall built from boxes with real openings, so every window has depth. */
-  const Wall = ({ x0, x1, y0, y1, z, d, openings }: { x0: number; x1: number; y0: number; y1: number; z: number; d: number; openings: Opening[] }) => {
-    const ops = [...openings].sort((a, b) => a.cx - b.cx), parts: JSX.Element[] = []; let cur = x0;
-    const box = (xa: number, xb: number, ya: number, yb: number, key: string) => {
-      const w = xb - xa, h = yb - ya; if (w < .01 || h < .01) return;
-      parts.push(<mesh key={key} position={[(xa + xb) / 2, (ya + yb) / 2, z - d / 2]} material={stone(w, h)} castShadow receiveShadow><boxGeometry args={[w, h, d]} /></mesh>);
-    };
-    ops.forEach((o, i) => { const l = o.cx - o.w / 2, r = o.cx + o.w / 2; box(cur, l, y0, y1, `p${i}`); box(l, r, y0, o.y0, `s${i}`); box(l, r, o.y1, y1, `h${i}`); cur = r; });
-    box(cur, x1, y0, y1, 'pe');
-    return <>{parts}</>;
+  const wallBoxes = (x0: number, x1: number, y0: number, y1: number, z: number, d: number, openings: Opening[]): B[] => {
+    const ops = [...openings].sort((a, b) => a.cx - b.cx), out: B[] = []; let cur = x0;
+    ops.forEach(o => { const l = o.cx - o.w / 2, r = o.cx + o.w / 2; out.push(box(cur, l, y0, y1, z - d, z), box(l, r, y0, o.y0, z - d, z), box(l, r, o.y1, y1, z - d, z)); cur = r; });
+    out.push(box(cur, x1, y0, y1, z - d, z)); return out;
   };
 
   /** Black window frame with mullions, glass showing the interior texture behind it. */
   const Bay = ({ cx, w, y0, y1, z, kind, rows = 2 }: { cx: number; w: number; y0: number; y1: number; z: number; kind: keyof typeof glass; rows?: number }) => {
-    const h = y1 - y0, zf = z - .12, f = .13, planeZ = FRONT - DEPTH - .05;
+    const h = y1 - y0, zf = z - .12, f = .13;
     return <group>
-      <mesh position={[cx, (y0 + y1) / 2, planeZ]} material={glass[kind]}><planeGeometry args={[w + .3, h + .3]} /></mesh>
+      <mesh position={[cx, (y0 + y1) / 2, z - .16]} scale={[w, h, 1]} geometry={pane} material={glass[kind]} />
       {[-1, 1].map(s => <mesh key={s} position={[cx + s * (w / 2 - f / 2), (y0 + y1) / 2, zf]} material={M.black}><boxGeometry args={[f, h, .22]} /></mesh>)}
       {[y0 + f / 2, y1 - f / 2].map(y => <mesh key={y} position={[cx, y, zf]} material={M.black}><boxGeometry args={[w, f, .22]} /></mesh>)}
       <mesh position={[cx, (y0 + y1) / 2, zf]} material={M.black}><boxGeometry args={[.08, h, .2]} /></mesh>
@@ -285,7 +225,7 @@ export function Building({ position, lite, open }: { position: [number, number, 
   const BackBay = ({ cx, w, y0, y1, kind, rows = 2, sill = true }: { cx: number; w: number; y0: number; y1: number; kind: keyof typeof glass; rows?: number; sill?: boolean }) => {
     const h = y1 - y0, zf = BACK - .1, f = .13;
     return <group>
-      <mesh position={[cx, (y0 + y1) / 2, BACK - .03]} rotation-y={Math.PI} material={glass[kind]}><planeGeometry args={[w + .3, h + .3]} /></mesh>
+      <mesh position={[cx, (y0 + y1) / 2, BACK - .03]} rotation-y={Math.PI} scale={[w, h, 1]} geometry={pane} material={glass[kind]} />
       {[-1, 1].map(s => <mesh key={s} position={[cx + s * (w / 2 - f / 2), (y0 + y1) / 2, zf]} material={M.black}><boxGeometry args={[f, h, .22]} /></mesh>)}
       {[y0 + f / 2, y1 - f / 2].map(y => <mesh key={y} position={[cx, y, zf]} material={M.black}><boxGeometry args={[w, f, .22]} /></mesh>)}
       <mesh position={[cx, (y0 + y1) / 2, zf]} material={M.black}><boxGeometry args={[.08, h, .2]} /></mesh>
@@ -310,13 +250,76 @@ export function Building({ position, lite, open }: { position: [number, number, 
     ...[-1, 1].flatMap(s => [{ cx: s * 6.55, w: 2.1, y0: 1.0, y1: 4.9 }, { cx: s * 10.5, w: 2.0, y0: 1.0, y1: 6.0 }, { cx: s * 15.4, w: 2.1, y0: 1.0, y1: 4.9 }, { cx: s * 19.4, w: 2.1, y0: 1.0, y1: 4.9 }]),
   ];
   const pavOps = (s: number): Opening[] => [{ cx: s * 10.5, w: 2.0, y0: 1.0, y1: 6.0 }];
-  const kinds: Record<number, Kind> = { 6.55: 'tv', 15.4: 'office', 19.4: 'meeting' };
+  /*
+   * The masonry, merged: the two kinds of wall, the rusticated base, and one "kit" of dressed stone that carries every moulding
+   * (window surrounds with sills, keystones and caps, the entablature with its dentils, quoins, pavilion pilasters, chimneys,
+   * dormer fronts). Five draw calls for all of it, and the stone is laid in world metres so every course lines up.
+   */
+  const kit = useMemo(() => {
+    const Z = FRONT, PZ = FRONT + .6, t: B[] = [], base: B[] = [], extra: THREE.BufferGeometry[] = [];
+    const main = [...wallBoxes(-HALF, HALF, .16, WALL_H, Z, DEPTH, wallOps), box(-HALF, HALF, .16, WALL_H, BACK, Z - DEPTH)];
+    const pav = [-1, 1].flatMap(s => [...wallBoxes(s < 0 ? -13.1 : 7.7, s < 0 ? -7.7 : 13.1, .16, PAV_H, PZ, .9, pavOps(s)), box(s * 7.7, s * 13.1, WALL_H, PAV_H, -2.7, 1.5)]);
+    const tri = (cx: number, y: number, z: number, half: number, rise: number, depth: number) => { const sh = new THREE.Shape(); sh.moveTo(-half, 0); sh.lineTo(half, 0); sh.lineTo(0, rise); sh.closePath(); const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false }); g.translate(cx, y, z); extra.push(g); };
+    /** An architrave round an opening: jambs, head, keystone, a projecting cap and a sill; a pediment over the grand ones. */
+    const surround = (cx: number, w: number, y0: number, y1: number, z: number, sill = true, grand = false) => {
+      const j = .2;
+      [-1, 1].forEach(sd => t.push(box(cx + sd * w / 2, cx + sd * (w / 2 + j), y0, y1 + j, z - .03, z + .09)));
+      t.push(box(cx - w / 2, cx + w / 2, y1, y1 + j, z - .03, z + .09), box(cx - .17, cx + .17, y1 - .03, y1 + j, z - .03, z + .15));
+      t.push(box(cx - w / 2 - j - .12, cx + w / 2 + j + .12, y1 + j, y1 + j + .1, z - .03, z + .2));
+      if (sill) t.push(box(cx - w / 2 - j - .06, cx + w / 2 + j + .06, y0 - .1, y0 + .02, z - .03, z + .3));
+      if (grand) tri(cx, y1 + j + .1, z - .02, w / 2 + j + .3, .58, .2);
+    };
+    surround(0, 3.8, 1.0, 4.7, Z, false);
+    [-1, 1].forEach(s => {
+      [6.55, 15.4, 19.4].forEach(x => surround(s * x, 2.1, 1.0, 4.9, Z));
+      surround(s * 10.5, 2.0, 1.0, 6.0, PZ, true, true);
+      // rusticated base under a moulded cap: wings, pavilion, the gable end and the back
+      const seg = (a: number, b: number) => { base.push(box(s * a, s * b, .16, .9, Z - .03, Z + .12)); t.push(box(s * a, s * b, .88, 1.0, Z - .03, Z + .18)); };
+      seg(5.8, 7.58); seg(13.22, HALF);
+      base.push(box(s * 7.58, s * 13.22, .16, .9, 2.9, PZ + .12)); t.push(box(s * 7.52, s * 13.28, .88, 1.0, 2.9, PZ + .18));
+      base.push(box(s * (HALF - .03), s * (HALF + .12), .16, .9, BACK - .12, Z + .12)); t.push(box(s * (HALF - .03), s * (HALF + .18), .88, 1.0, BACK - .18, Z + .18));
+      base.push(box(s * 3.1, s * HALF, .16, .78, BACK - .12, BACK + .03)); t.push(box(s * 3.1, s * HALF, .74, .84, BACK - .17, BACK + .03));
+      // entablature on the wing: dentils under the cornice
+      for (let x = 13.4; x < 22.2; x += .44) t.push(box(s * x, s * (x + .22), 6.04, 6.24, Z - .02, Z + .17));
+      // pavilion: corner pilasters with caps, dentils, a cornice that oversails the face, a top fillet
+      [7.7, 12.6].forEach(xe => { t.push(box(s * xe, s * (xe + .5), 1.0, 7.78, PZ - .03, PZ + .09), box(s * (xe - .06), s * (xe + .56), 7.58, 7.78, PZ - .03, PZ + .15)); });
+      for (let x = 8.42; x < 12.3; x += .44) t.push(box(s * x, s * (x + .22), 7.72, 7.92, PZ - .02, PZ + .16));
+      t.push(box(s * 7.7, s * 13.1, 7.92, 8.0, PZ - .03, PZ + .2), box(s * 7.35, s * 13.45, 8.0, 8.6, 3.3, PZ + .35), box(s * 7.0, s * 13.8, 8.6, 8.68, -3.3, PZ + .55));
+      // quoins on the two gable corners, front and back: long and short turn about up the corner
+      for (let i = 0, y = 1.06; y + .36 < 5.45; i++, y += .44) { const fw = i % 2 ? .8 : .5, dw = i % 2 ? .5 : .8; t.push(box(s * (HALF - fw), s * (HALF + .07), y, y + .36, Z - dw, Z + .07), box(s * (HALF - fw), s * (HALF + .07), y, y + .36, BACK - .07, BACK + dw)); }
+      // the door's pilaster: base and cap
+      t.push(box(s * 3.3, s * 4.2, 1.0, 1.2, Z - .03, Z + .76), box(s * 3.3, s * 4.2, 5.06, 5.25, Z - .03, Z + .76));
+      // a chimney behind the ridge, and a dormer on the wing's front slope
+      t.push(box(s * 14.5, s * 15.4, 7.3, 9.9, -1.75, -.95), box(s * 14.4, s * 15.5, 9.9, 10.03, -1.85, -.85), box(s * 14.62, s * 15.28, 10.03, 10.25, -1.63, -1.07));
+      t.push(box(s * 16.65, s * 18.15, 7.25, 8.1, 1.0, 2.35), box(s * 16.57, s * 18.23, 7.4, 7.49, 2.2, 2.45)); tri(s * 17.4, 8.1, 2.4, .86, .44, .08);
+    });
+    // across the whole front: an architrave line, the bed mould under the cornice, and a fillet over it (in three lengths, clear of the pavilions)
+    t.push(box(-HALF - .03, HALF + .03, 5.5, 5.6, Z - .03, Z + .07), box(-HALF - .1, HALF + .1, 6.24, 6.4, BACK - .26, Z + .26));
+    [[-22.82, -13.1], [-7.7, 7.7], [13.1, 22.82]].forEach(([a, b]) => t.push(box(a!, b!, 6.9, 6.98, -3.62, 3.62)));
+    t.push(box(-6.9, 6.9, 5.895, 5.97, Z - .03, 6.6));                       // the canopy's own top fillet
+    // dormer roofs: two slopes of slate each, the courses running along the little ridge
+    const dr: number[] = [], du: number[] = [];
+    [-1, 1].forEach(s => { const cx = s * 17.4, y = 8.1, z0 = .3, z1 = 2.52, hw = .98, rise = .5, L = Math.hypot(hw, rise);
+      [-1, 1].forEach(sd => { const A = [cx + sd * hw, y, z0], Bq = [cx + sd * hw, y, z1], Cq = [cx, y + rise, z1], D = [cx, y + rise, z0];
+        const quad = sd > 0 ? [A, Bq, Cq, A, Cq, D] : [A, Cq, Bq, A, D, Cq]; quad.forEach(v => { dr.push(...(v as number[])); du.push((v as number[])[2]! / 2.2, (v as number[])[1] === y ? 0 : L / 2.2); }); }); });
+    const dormRoof = new THREE.BufferGeometry(); dormRoof.setAttribute('position', new THREE.Float32BufferAttribute(dr, 3)); dormRoof.setAttribute('uv', new THREE.Float32BufferAttribute(du, 2)); dormRoof.computeVertexNormals();
+    return { main: masonry(main), pav: masonry(pav), base: masonry(base, [], 4.8, 2.4), trim: masonry(t, extra), dormRoof };
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const pl = useMemo<HedgePlant>(() => ({ core: new THREE.MeshStandardMaterial({ color: '#27452a', roughness: 1 }), blob: leafCard(), leaf: leafCardMaterial(), k: lite ? .32 : .8 }), [lite]);
+  const colGeo = useMemo(() => columnGeometry(4.345, .52), []);
+  const pavStar = useMemo(() => facetedStar(.32, .3), []);
+  const finial = useMemo(() => new THREE.LatheGeometry([[0, 0], [.16, 0], [.17, .06], [.07, .14], [.12, .26], [.15, .36], [.11, .47], [.035, .56], [.02, .95], [0, 1.0]].map(([r, y]) => new THREE.Vector2(r!, y!)), 14), []);
   const lampOn = open;
 
   return <group position={position}>
     {/* body, cornice and roofs */}
-    <mesh position={[0, WALL_H / 2 + .08, -.5]} material={stone(44.8, 6)}><boxGeometry args={[44.8, WALL_H - .16, 4.9]} /></mesh>
-    <Wall x0={-HALF} x1={HALF} y0={.16} y1={WALL_H} z={FRONT} d={DEPTH} openings={wallOps} />
+    <mesh geometry={kit.main} material={wallMat} castShadow receiveShadow />
+    <mesh geometry={kit.pav} material={pavMat} castShadow receiveShadow />
+    <mesh geometry={kit.base} material={baseMat} castShadow receiveShadow />
+    <mesh geometry={kit.trim} material={M.dress} castShadow receiveShadow />
+    <mesh geometry={kit.dormRoof} material={M.roof} castShadow />
+    {/* gilded finials on the ridge of the centre roof and at the point of each pavilion roof */}
+    {[[-3.8, WALL_H + 4.55, -.2], [3.8, WALL_H + 4.55, -.2], [-10.4, PAV_H + 3.05, .45], [10.4, PAV_H + 3.05, .45]].map(([x, y, z]) => <mesh key={`fin${x}`} geometry={finial} material={signGold} position={[x!, y!, z!]} castShadow />)}
     <mesh position={[0, WALL_H + .25, 0]} material={M.trim} castShadow><boxGeometry args={[HALF * 2 + .4, .5, 7]} /></mesh>
     <mesh geometry={roofs.main} material={M.roof} position={[0, WALL_H + .5, 0]} castShadow />
     <mesh geometry={roofs.center} material={M.roof} position={[0, WALL_H + .5, -.2]} castShadow />
@@ -325,18 +328,18 @@ export function Building({ position, lite, open }: { position: [number, number, 
 
     {/* pavilions: taller, proud of the wall, each with a tall lit window and its own pyramid roof */}
     {[-1, 1].map(s => <group key={s}>
-      <Wall x0={s < 0 ? -13.1 : 7.7} x1={s < 0 ? -7.7 : 13.1} y0={.16} y1={PAV_H} z={FRONT + .6} d={.9} openings={pavOps(s)} />
       <mesh position={[s * 10.4, PAV_H + .3, -.3]} material={M.trim} castShadow><boxGeometry args={[6.1, .6, 7.2]} /></mesh>
-      <mesh geometry={roofs.pav} material={M.roof} position={[s * 10.4, PAV_H + .6, -.1]} castShadow />
-      <RoofTrim w={6.4} d={5.6} h={2} y={PAV_H + .6} x={s * 10.4} z={-.1} cap={capM} fascia={fasM} />
-      <mesh position={[s * 10.4, (WALL_H + PAV_H) / 2, -.6]} material={stone(5.4, 1.6)}><boxGeometry args={[5.4, PAV_H - WALL_H, 4.2]} /></mesh>
+      <mesh geometry={roofs.pav} material={M.roof} position={[s * 10.4, PAV_H + .6, .45]} castShadow />
+      <RoofTrim w={7.2} d={7.1} h={2.5} y={PAV_H + .6} x={s * 10.4} z={.45} cap={capM} fascia={fasM} />
+      <mesh geometry={pavStar} material={signGold} position={[s * 10.5, 7.3, FRONT + .62]} />
+      <mesh position={[s * 17.4, 7.78, 2.37]} scale={[1.0, .5, 1]} geometry={pane} material={glass.office} />
       <Bay cx={s * 10.5} w={2.0} y0={1.0} y1={6.0} z={FRONT + .6} kind="hall" rows={3} />
       <Bay cx={s * 6.55} w={2.1} y0={1.0} y1={4.9} z={FRONT} kind={s < 0 ? 'tv' : 'meeting'} />
       <Bay cx={s * 15.4} w={2.1} y0={1.0} y1={4.9} z={FRONT} kind="office" />
       <Bay cx={s * 19.4} w={2.1} y0={1.0} y1={4.9} z={FRONT} kind={s < 0 ? 'meeting' : 'tv'} />
       {/* low hedges under the far windows and a round, a cone and a tree at each end */}
-      <mesh position={[s * 17.4, .55, FRONT + .9]} material={M.leaf} castShadow><boxGeometry args={[8.8, .8, .9]} /></mesh>
-      <mesh position={[s * 6.55, .5, FRONT + .8]} material={M.leaf} castShadow><boxGeometry args={[3.2, .7, .8]} /></mesh>
+      <Hedge x={s * 17.4} y={.16} z={FRONT + .9} w={8.8} d={.9} h={.8} seed={41 + s} pl={pl} />
+      <Hedge x={s * 6.55} y={.16} z={FRONT + .8} w={3.2} d={.8} h={.7} seed={45 + s} pl={pl} />
       <Planter x={s * 8.6} z={FRONT + 2.2} kind="cone" /><Planter x={s * 13.4} z={FRONT + 2.4} kind="tree" /><Planter x={s * 12.2} z={FRONT + 2.2} kind="small" />
       {/* the steps' handrails: two posts and a sloped top rail beside each flight */}
       <mesh position={[s * 3.7, 1.45, 6.25]} material={M.black}><cylinderGeometry args={[.045, .045, .9, 8]} /></mesh>
@@ -354,9 +357,7 @@ export function Building({ position, lite, open }: { position: [number, number, 
       <mesh position={[s * 3.75, 3.1, FRONT + .35]} material={stone(.8, 4.3)} castShadow><boxGeometry args={[.8, 4.3, .7]} /></mesh>
       <mesh position={[s * 2.7, 3.9, FRONT + .25]} material={M.black}><boxGeometry args={[.16, .5, .16]} /></mesh>
       <mesh position={[s * 2.7, 3.9, FRONT + .43]} material={M.lamp}><boxGeometry args={[.22, .42, .22]} /></mesh>
-      <mesh position={[s * 4.8, 3.2, 5.7]} material={M.trim} castShadow><cylinderGeometry args={[.55, .55, 4.1, 28]} /></mesh>
-      <mesh position={[s * 4.8, 1.2, 5.7]} material={M.trim}><cylinderGeometry args={[.72, .76, .4, 28]} /></mesh>
-      <mesh position={[s * 4.8, 5.15, 5.7]} material={M.trim}><cylinderGeometry args={[.74, .6, .4, 28]} /></mesh>
+      <mesh geometry={colGeo} position={[s * 4.8, 1.0, 5.7]} material={M.dress} castShadow receiveShadow />
       <Planter x={s * 2.85} z={4.6} kind="ball" />
     </group>)}
     <mesh position={[0, .58, 4.7]} material={stone(11.6, .9)} receiveShadow><boxGeometry args={[11.6, .84, 3.4]} /></mesh>
@@ -393,9 +394,7 @@ export function Building({ position, lite, open }: { position: [number, number, 
     {[.72, .48, .24].map((top, i) => <mesh key={top} position={[0, top / 2, BACK - 1.15 - .19 - i * .38]} material={stone(6.2, top)} castShadow receiveShadow><boxGeometry args={[6.2, top, .38]} /></mesh>)}
     {/* two columns and a flat canopy with a light line and downlights */}
     {[-1, 1].map(sg => <group key={`bc${sg}`}>
-      <mesh position={[sg * 3.9, 3.06, BACK - 1.0]} material={M.trim} castShadow><cylinderGeometry args={[.4, .4, 4.2, 28]} /></mesh>
-      <mesh position={[sg * 3.9, 1.06, BACK - 1.0]} material={M.trim}><cylinderGeometry args={[.56, .6, .22, 28]} /></mesh>
-      <mesh position={[sg * 3.9, 5.1, BACK - 1.0]} material={M.trim}><cylinderGeometry args={[.58, .44, .22, 28]} /></mesh>
+      <mesh geometry={colGeo} position={[sg * 3.9, .96, BACK - 1.0]} scale={[.76, 4.19 / 4.345, .76]} material={M.dress} castShadow receiveShadow />
       <mesh position={[sg * 2.7, 3.35, BACK - .1]} material={M.black}><boxGeometry args={[.14, .06, .2]} /></mesh>
       <mesh position={[sg * 2.7, 3.2, BACK - .16]} material={M.lamp}><boxGeometry args={[.2, .4, .2]} /></mesh>
     </group>)}

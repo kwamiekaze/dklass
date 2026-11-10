@@ -1,4 +1,4 @@
-import { useContext, useMemo } from 'react';
+import { useContext, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { NightCtx, rng } from './theme';
@@ -9,19 +9,29 @@ import { CAR_POS, ISLANDS, ISLAND_TREES, Lot } from './Lot';
 import { Blooms, Grass, Trees, lawnTexture } from './Grounds';
 import type { Quality } from './quality';
 import { atmo } from './atmosphere';
+import { aggregateNormal, tiled, turfNormal } from './surfaces';
 
+/** Lit windows at night: floor by floor, some floors dark, some offices cold white, most warm. */
 function windowsTexture() {
   const c = document.createElement('canvas'); c.width = 256; c.height = 512;
   const g = c.getContext('2d')!; g.fillStyle = '#000'; g.fillRect(0, 0, 256, 512);
   const r = rng(5);
-  for (let y = 8; y < 512; y += 22) for (let x = 8; x < 256; x += 22) if (r() > .38) { g.fillStyle = r() > .7 ? '#ffd9a0' : r() > .4 ? '#ffb86b' : '#cfe0ff'; g.fillRect(x, y, 12, 14); }
+  for (let y = 6; y < 512; y += 16) { const floor = r(); for (let x = 5; x < 256; x += 16) if (r() > (floor > .8 ? .9 : .42)) { g.fillStyle = r() > .72 ? '#ffe2b0' : r() > .4 ? '#ffbf78' : '#d6e4ff'; g.globalAlpha = .55 + r() * .45; g.fillRect(x, y, 10, 9); } }
+  g.globalAlpha = 1;
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
 }
+/** A curtain wall by day: bands of glass that mirror the sky in different depths, slim mullions, a spandrel at every floor. */
 function dayTexture() {
   const c = document.createElement('canvas'); c.width = 256; c.height = 512;
   const g = c.getContext('2d')!; const r = rng(8);
-  const gr = g.createLinearGradient(0, 0, 0, 512); gr.addColorStop(0, '#8fa3c0'); gr.addColorStop(1, '#6e84a6'); g.fillStyle = gr; g.fillRect(0, 0, 256, 512);
-  for (let y = 8; y < 512; y += 22) for (let x = 8; x < 256; x += 22) { g.fillStyle = r() > .5 ? 'rgba(220,232,248,.55)' : 'rgba(40,60,96,.35)'; g.fillRect(x, y, 12, 14); }
+  g.fillStyle = '#8795a8'; g.fillRect(0, 0, 256, 512);
+  for (let y = 0; y < 512; y += 16) for (let x = 0; x < 256; x += 16) {
+    const v = r(), sky = g.createLinearGradient(0, y + 2, 0, y + 12); sky.addColorStop(0, `rgba(${150 + v * 70},${182 + v * 50},${222 + v * 30},1)`); sky.addColorStop(1, `rgba(${86 + v * 50},${112 + v * 46},${152 + v * 40},1)`);
+    g.fillStyle = sky; g.fillRect(x + 1.5, y + 2, 13, 10);
+    if (r() > .82) { g.fillStyle = 'rgba(244,248,255,.5)'; g.fillRect(x + 1.5, y + 2, 13, 3); }
+  }
+  g.fillStyle = 'rgba(52,60,74,.55)'; for (let y = 12; y < 512; y += 16) g.fillRect(0, y, 256, 4);
+  g.fillStyle = 'rgba(226,232,240,.5)'; for (let x = 0; x < 256; x += 16) g.fillRect(x, 0, 1.5, 512);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
 }
 function asphaltTexture() {
@@ -64,11 +74,18 @@ export function Estate({ quality, open, children }: { quality: Quality; open: bo
   const winTex = useMemo(windowsTexture, []);
   const dayTex = useMemo(dayTexture, []);
   const lawnTex = useMemo(() => { const t = lawnTexture(); t.repeat.set(1 / 8, 1 / 8); return t; }, []);
-  const asphalt = useMemo(() => new THREE.MeshStandardMaterial({ map: asphaltTexture(), color: '#ffffff', roughness: .88 }), []);
-  const lawnMat = useMemo(() => new THREE.MeshStandardMaterial({ map: lawnTex, roughness: .95, emissive: '#dfe8f5', emissiveIntensity: 0 }), [lawnTex]);
-  const lotMat = useMemo(() => new THREE.MeshStandardMaterial({ map: lotTexture(lite), color: '#ffffff', roughness: .86 }), [lite]);
-  const towerMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#d4dbe8', map: dayTex, emissive: '#ffffff', emissiveMap: winTex, emissiveIntensity: .05, roughness: 1 }), [winTex, dayTex]);
-  const dayC = useMemo(() => new THREE.Color('#ffffff'), []), nightC = useMemo(() => new THREE.Color('#55556a'), []), white = useMemo(() => new THREE.Color('#f4f7ff'), []);
+  const grain = useMemo(() => aggregateNormal(256), []);
+  const asphalt = useMemo(() => new THREE.MeshStandardMaterial({ map: asphaltTexture(), normalMap: tiled(grain, 12, 12), normalScale: new THREE.Vector2(.55, .55), color: '#ffffff', roughness: .88 }), [grain]);
+  const lawnMat = useMemo(() => new THREE.MeshStandardMaterial({ map: lawnTex, normalMap: tiled(turfNormal(256), 1 / 1.6, 1 / 1.6), normalScale: new THREE.Vector2(.8, .8), roughness: .95, emissive: '#dfe8f5', emissiveIntensity: 0 }), [lawnTex]);
+  const lotMat = useMemo(() => new THREE.MeshStandardMaterial({ map: lotTexture(lite), normalMap: tiled(grain, 84, 36), normalScale: new THREE.Vector2(.55, .55), color: '#ffffff', roughness: .86 }), [lite, grain]);
+  const towerMat = useMemo(() => {
+    const m = new THREE.MeshStandardMaterial({ color: '#d4dbe8', map: dayTex, emissive: '#ffffff', emissiveMap: winTex, emissiveIntensity: .05, roughness: .55, metalness: .25 });
+    // every tower shows the same size of window, whatever its own size: the texture is laid in metres, from each instance's scale
+    m.onBeforeCompile = sh => { sh.vertexShader = sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n #ifdef USE_INSTANCING\n vec2 twr = vec2(max(1.0, floor(length(instanceMatrix[0].xyz) / 6.0 * 16.0)) / 16.0, max(1.0, floor(length(instanceMatrix[1].xyz) / 14.0 * 32.0)) / 32.0); if (abs(normal.y) > .5) twr = vec2(.0); vMapUv *= twr; vEmissiveMapUv *= twr;\n #endif'); };
+    m.customProgramCacheKey = () => 'tower';
+    return m;
+  }, [winTex, dayTex]);
+  const dayC = useMemo(() => new THREE.Color('#d2d2d6'), []), nightC = useMemo(() => new THREE.Color('#55556a'), []), white = useMemo(() => new THREE.Color('#f4f7ff'), []);
   const dayT = useMemo(() => new THREE.Color('#d4dbe8'), []), nightT = useMemo(() => new THREE.Color('#2a2c55'), []);
   useFrame(() => {
     const m = mix.current;
@@ -89,7 +106,8 @@ export function Estate({ quality, open, children }: { quality: Quality; open: bo
   const skyline = useMemo(() => {
     const r = rng(9), n = lite ? 70 : 130, out: { p: [number, number, number]; s: [number, number, number]; rot: number }[] = [];
     const deg = (a: number) => ((a * 180) / Math.PI + 360) % 360;
-    for (let i = 0; i < n * 3 && out.length < (lite ? 38 : 66); i++) {
+    let bases = 0;
+    for (let i = 0; i < n * 3 && bases < (lite ? 38 : 66); i++) {
       const a = r() * Math.PI * 2, d = deg(a), rad = 92 + r() * 22, x = Math.cos(a) * rad, z = Math.sin(a) * rad;
       const front = z > 0, corner = (d > 30 && d < 62) || (d > 118 && d < 150);
       if (front && !corner) continue;                        // front half: only the two corners
@@ -97,10 +115,20 @@ export function Estate({ quality, open, children }: { quality: Quality; open: bo
       if (Math.abs(x) < 30 && z > -10) continue;             // never along the avenue
       if (Math.abs(z - 25) < 34 && z > 0) continue;          // never along the street
       const h = 8 + r() * 22 + (r() > .85 ? r() * 8 : 0), w = 5 + r() * 5;
-      out.push({ p: [x, h / 2, z], s: [w, h, w], rot: -a });
+      bases++; out.push({ p: [x, h / 2, z], s: [w, h, w * (.7 + r() * .5)], rot: -a });
+      // taller towers step back near the top, and some carry a plant room
+      if (h > 16) { const k = .58 + r() * .2, hh = h * (.14 + r() * .12); out.push({ p: [x, h + hh / 2, z], s: [w * k, hh, w * k], rot: -a }); if (r() > .5) out.push({ p: [x, h + hh + .7, z], s: [w * k * .5, 1.4, w * k * .5], rot: -a }); }
+      else if (r() > .6) out.push({ p: [x, h + .5, z], s: [w * .45, 1.0, w * .45], rot: -a });
     }
     return out;
   }, [lite]);
+  const towers = useRef<THREE.InstancedMesh>(null);
+  useLayoutEffect(() => {
+    const m = towers.current; if (!m) return; const o = new THREE.Object3D(), c = new THREE.Color(), r = rng(4);
+    const tints = ['#ffffff', '#e9eef6', '#cfd9ea', '#f3ead9', '#dfe3e6', '#c4d2e6'];
+    skyline.forEach((t, i) => { o.position.set(...t.p); o.rotation.set(0, t.rot, 0); o.scale.set(...t.s); o.updateMatrix(); m.setMatrixAt(i, o.matrix); m.setColorAt(i, c.set(tints[Math.floor(r() * tints.length)]!).multiplyScalar(.8 + r() * .2)); });
+    m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  }, [skyline]);
   const ring = useMemo<TreeSpec[]>(() => {
     const r = rng(15); const out: TreeSpec[] = [];
     for (let i = 0; out.length < quality.trees && i < 900; i++) {
@@ -127,7 +155,7 @@ export function Estate({ quality, open, children }: { quality: Quality; open: bo
     <mesh rotation-x={-Math.PI / 2} position={[0, -.16, 0]}><planeGeometry args={[900, 900]} /><meshStandardMaterial color="#2b3d26" roughness={1} /></mesh>
     <mesh geometry={lawnGeo} rotation-x={-Math.PI / 2} position={[0, -.07, 0]} receiveShadow material={lawnMat} />
     <mesh rotation-x={-Math.PI / 2} position={[0, FLOOR_Y, PLAZA.cz]} material={lotMat} receiveShadow><planeGeometry args={[PLAZA.x + 1.2, PLAZA.z + 1.2]} /></mesh>
-    {skyline.map((t, i) => <mesh key={i} position={t.p} rotation-y={t.rot} scale={t.s} material={towerMat}><boxGeometry args={[1, 1, 1]} /></mesh>)}
+    <instancedMesh ref={towers} args={[undefined, towerMat, skyline.length]} frustumCulled={false}><boxGeometry args={[1, 1, 1]} /></instancedMesh>
     <Building position={[0, 0, HQ_Z]} lite={lite} open={open} />
     <StarCanopy lite={lite} />
     {/* the fountain: a roundabout in the entry avenue, between the two planted islands */}

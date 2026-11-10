@@ -3,8 +3,12 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { NightCtx, rng } from './theme';
 import { palette } from './palette';
+import { dressedStone, tiled } from './surfaces';
 
 const stone = new THREE.MeshStandardMaterial({ color: '#efe4d6', roughness: .55, metalness: .02 });
+let dressed = false;
+/** The basin and bowls take the same dressed limestone as the building's trim (made on first use, in the browser). */
+function dress() { if (dressed || typeof document === 'undefined') return; dressed = true; const d = dressedStone(256); stone.map = tiled(d.map, 6, 2); stone.normalMap = tiled(d.normalMap, 6, 2); stone.normalScale.set(.7, .7); stone.needsUpdate = true; }
 const gold = new THREE.MeshStandardMaterial({ color: palette.goldBright, roughness: .22, metalness: 1 });
 
 function lathe(points: [number, number][], seg = 56) {
@@ -29,6 +33,7 @@ function streakTexture() {
 /** A three tier stone fountain with jets, falling sheets, ripples and night lighting. */
 export function Fountain({ position, mobile, scale = 1 }: { position: [number, number, number]; mobile: boolean; scale?: number }) {
   const mix = useContext(NightCtx);
+  useMemo(dress, []);
   const normal = useMemo(noiseTexture, []);
   const streaks = useMemo(streakTexture, []);
   const water = useMemo(() => new THREE.MeshPhysicalMaterial({ color: '#6fbad0', roughness: .06, metalness: .1, clearcoat: 1, transparent: true, opacity: .9, normalMap: normal, normalScale: new THREE.Vector2(.35, .35), envMapIntensity: 1.6, emissive: '#3aa0d0', emissiveIntensity: .05 }), [normal]);

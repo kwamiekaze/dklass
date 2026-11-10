@@ -65,7 +65,7 @@ export function Grass({ count }: { count: number }) {
 
 let leafTex: THREE.CanvasTexture | null = null;
 /** A cluster of individual leaves on a transparent card, used for every tree and bush. */
-function leafCluster() {
+export function leafCluster() {
   if (leafTex) return leafTex;
   const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d')!; const r = rng(123);
   for (let i = 0; i < 230; i++) {
@@ -82,6 +82,48 @@ function leafCluster() {
   return leafTex;
 }
 
+let cardGeo: THREE.BufferGeometry | null = null;
+/** Two leaf cards crossed at right angles, one unit across: from any side it reads as a spray of leaves, never as a flat card. */
+export function leafCard() {
+  if (cardGeo) return cardGeo;
+  const a = new THREE.PlaneGeometry(1, 1), b = new THREE.PlaneGeometry(1, 1).rotateY(Math.PI / 2), g = new THREE.BufferGeometry();
+  const cat = (k: 'position' | 'normal' | 'uv', n: number) => { const out = new Float32Array((a.attributes[k]!.count + b.attributes[k]!.count) * n); out.set(a.attributes[k]!.array as Float32Array, 0); out.set(b.attributes[k]!.array as Float32Array, a.attributes[k]!.count * n); g.setAttribute(k, new THREE.BufferAttribute(out, n)); };
+  cat('position', 3); cat('normal', 3); cat('uv', 2);
+  const ia = Array.from(a.index!.array), nb = a.attributes.position!.count; g.setIndex([...ia, ...Array.from(b.index!.array).map(i => i + nb)]);
+  return (cardGeo = g);
+}
+let cardMat: THREE.MeshStandardMaterial | null = null;
+/** The one leaf material every hedge, topiary and planter shares. */
+let sprayTex: THREE.CanvasTexture | null = null;
+/** A spray of small clipped leaves for hedges and topiary: even in tone (the plant's own colour does the shading), dense in the middle, ragged at the edge. */
+function leafSpray() {
+  if (sprayTex) return sprayTex;
+  const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d')!; const r = rng(321);
+  for (let i = 0; i < 420; i++) {
+    const a = r() * Math.PI * 2, q = Math.pow(r(), .55) * S * .46, x = S / 2 + Math.cos(a) * q, y = S / 2 + Math.sin(a) * q, l = Math.floor(118 + r() * 62 + (i / 420) * 40);
+    g.save(); g.translate(x, y); g.rotate(r() * Math.PI * 2);
+    g.fillStyle = `rgb(${l},${l},${l})`; g.beginPath(); g.ellipse(0, 0, 6 + r() * 5, 3 + r() * 2.2, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.16)'; g.lineWidth = 1; g.beginPath(); g.moveTo(-6, 0); g.lineTo(6, 0); g.stroke();
+    g.restore();
+  }
+  sprayTex = new THREE.CanvasTexture(c); sprayTex.colorSpace = THREE.SRGBColorSpace; sprayTex.anisotropy = 4;
+  return sprayTex;
+}
+export function leafCardMaterial() { return (cardMat ??= softFoliage(new THREE.MeshStandardMaterial({ map: leafSpray(), alphaTest: .42, side: THREE.DoubleSide, roughness: .82, metalness: 0 }))); }
+/**
+ * Foliage lit the way a mass of leaves is lit, not the way a flat card is: every card's normal is bent most of the way toward the
+ * sky and is the same on both faces. The crown then shades as one soft volume (bright on top, darker where the colour says so)
+ * and no single card flashes light or dark as the camera moves.
+ */
+export function softFoliage<T extends THREE.MeshStandardMaterial>(m: T): T {
+  m.onBeforeCompile = sh => {
+    sh.vertexShader = sh.vertexShader.replace('#include <defaultnormal_vertex>', '#include <defaultnormal_vertex>\n transformedNormal = normalize(transformedNormal * .3 + (viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', ''));
+  };
+  m.customProgramCacheKey = () => 'softFoliage';
+  return m;
+}
+
 function barkGeo() {
   // tapered trunk with a slight lean baked in
   const g = new THREE.CylinderGeometry(.55, 1, 1, 9, 4); const p = g.attributes.position;
@@ -96,7 +138,7 @@ export function Trees({ list, clumps }: { list: TreeSpec[]; clumps: number }) {
   const cards = useRef<THREE.InstancedMesh>(null), trunks = useRef<THREE.InstancedMesh>(null), limbs = useRef<THREE.InstancedMesh>(null);
   const per = (t: TreeSpec) => (t.kind === 'cypress' ? Math.ceil(clumps * 1.2) : clumps * 2);
   const total = list.reduce((a, t) => a + per(t), 0);
-  const leafMat = useMemo(() => new THREE.MeshStandardMaterial({ map: leafCluster(), alphaTest: .45, side: THREE.DoubleSide, roughness: .85, metalness: 0 }), []);
+  const leafMat = useMemo(() => softFoliage(new THREE.MeshStandardMaterial({ map: leafCluster(), alphaTest: .45, side: THREE.DoubleSide, roughness: .85, metalness: 0 })), []);
   const trunk = useMemo(barkGeo, []);
   useLayoutEffect(() => {
     const f = cards.current, tr = trunks.current, lb = limbs.current; if (!f || !tr || !lb) return;
@@ -138,7 +180,7 @@ export function Trees({ list, clumps }: { list: TreeSpec[]; clumps: number }) {
 export function Blooms({ spots }: { spots: { x: number; z: number; y?: number; r: number; n: number; kind: 'flower' | 'bush' }[] }) {
   const flowers = useRef<THREE.InstancedMesh>(null), bushes = useRef<THREE.InstancedMesh>(null);
   const nf = spots.filter(s => s.kind === 'flower').reduce((a, s) => a + s.n, 0), nb = spots.filter(s => s.kind === 'bush').reduce((a, s) => a + s.n, 0) * 7;
-  const leafMat = useMemo(() => new THREE.MeshStandardMaterial({ map: leafCluster(), alphaTest: .45, side: THREE.DoubleSide, roughness: .85 }), []);
+  const leafMat = useMemo(() => softFoliage(new THREE.MeshStandardMaterial({ map: leafCluster(), alphaTest: .45, side: THREE.DoubleSide, roughness: .85 })), []);
   useLayoutEffect(() => {
     const f = flowers.current, b = bushes.current; if (!f || !b) return; const r = rng(55), d = new THREE.Object3D(), c = new THREE.Color(); let i = 0, j = 0;
     spots.forEach(s => { for (let k = 0; k < s.n; k++) {

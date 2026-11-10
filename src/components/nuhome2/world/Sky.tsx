@@ -25,21 +25,44 @@ function FadeGroup({ day, children }: { day: boolean; children: ReactNode }) {
   return <group ref={ref}>{children}</group>;
 }
 
-export function SkyDome() {
+/** Where the sun and the moon hang (the same places Scene gives them), as directions for the sky's own glow. */
+const SUN_DIR = new THREE.Vector3(40, 36, -74).normalize(), MOON_DIR = new THREE.Vector3(30, 32, -66).normalize();
+
+export function SkyDome({ lite = false }: { lite?: boolean }) {
   const mix = useContext(NightCtx);
   const mat = useMemo(() => new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { uMix: { value: 0 }, dTop: { value: new THREE.Color('#2b6fcf') }, dMid: { value: new THREE.Color('#86bdee') }, dLow: { value: new THREE.Color('#ffe8c2') }, nTop: { value: new THREE.Color('#02041a') }, nMid: { value: new THREE.Color('#0f1748') }, nLow: { value: new THREE.Color('#382a66') }, uCl: { value: 0 }, uDeep: { value: 0 }, uOver: { value: new THREE.Color('#b4bcc6') } },
+    side: THREE.BackSide, depthWrite: false, fog: false, defines: lite ? {} : { CIRRUS: 1 },
+    uniforms: { uMix: { value: 0 }, uTime: { value: 0 }, uSun: { value: SUN_DIR }, uMoon: { value: MOON_DIR }, dTop: { value: new THREE.Color('#1f5fc4') }, dMid: { value: new THREE.Color('#79b4ec') }, dLow: { value: new THREE.Color('#ffe9c6') }, nTop: { value: new THREE.Color('#02041a') }, nMid: { value: new THREE.Color('#0f1748') }, nLow: { value: new THREE.Color('#382a66') }, uCl: { value: 0 }, uDeep: { value: 0 }, uOver: { value: new THREE.Color('#b4bcc6') } },
     vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-    fragmentShader: 'varying vec3 vP; uniform float uMix, uCl, uDeep; uniform vec3 dTop,dMid,dLow,nTop,nMid,nLow,uOver; void main(){ float h = clamp(abs(vP.y),0.0,1.0); vec3 d = mix(dLow,dMid,smoothstep(0.0,0.3,h)); d = mix(d,dTop,smoothstep(0.25,0.9,h)); vec3 n = mix(nLow,nMid,smoothstep(0.0,0.3,h)); n = mix(n,nTop,smoothstep(0.25,0.9,h)); vec3 col = mix(d,n,uMix); col *= 1.0 - uDeep * uMix * .62; col = mix(col, uOver * (.86 + .24 * (1.0 - h)), uCl); gl_FragColor = vec4(col,1.0); }',
-  }), []);
+    fragmentShader: `varying vec3 vP; uniform float uMix, uCl, uDeep, uTime; uniform vec3 dTop,dMid,dLow,nTop,nMid,nLow,uOver,uSun,uMoon;
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash(i), hash(i + vec2(1.,0.)), f.x), mix(hash(i + vec2(0.,1.)), hash(i + vec2(1.,1.)), f.x), f.y); }
+      void main(){
+        vec3 P = normalize(vP); float h = clamp(abs(P.y),0.0,1.0);
+        vec3 d = mix(dLow,dMid,smoothstep(0.0,0.26,h)); d = mix(d,dTop,smoothstep(0.2,0.85,h));
+        vec3 n = mix(nLow,nMid,smoothstep(0.0,0.3,h)); n = mix(n,nTop,smoothstep(0.25,0.9,h));
+        // the sky is brighter and warmer round the sun, and there is always a pale band of haze just over the horizon
+        float sd = max(dot(P, uSun), 0.0), md = max(dot(P, uMoon), 0.0);
+        d += vec3(1.0, .84, .58) * (pow(sd, 5.0) * .2 + pow(sd, 40.0) * .3);
+        d = mix(d, vec3(1.0, .95, .86), (1.0 - smoothstep(0.0, .1, h)) * .35);
+        n += vec3(.2, .26, .5) * pow(md, 9.0) * .32;
+        vec3 col = mix(d,n,uMix);
+        #ifdef CIRRUS
+        // thin, high, wind-drawn cloud: stretched noise that thins toward the zenith and vanishes at the horizon
+        vec2 q = P.xz / (P.y * .8 + .32) * vec2(1.1, 2.6) + vec2(uTime * .004, 0.0);
+        float c = noise(q) * .55 + noise(q * 2.3 + 7.1) * .3 + noise(q * 5.1 + 3.7) * .15;
+        c = smoothstep(.52, .86, c) * smoothstep(.03, .22, P.y) * (1.0 - smoothstep(.55, .95, P.y) * .6);
+        col = mix(col, mix(vec3(1.0, .98, .95), vec3(.42, .46, .66), uMix), c * (.5 - .2 * uMix) * (1.0 - uCl));
+        #endif
+        col *= 1.0 - uDeep * uMix * .62; col = mix(col, uOver * (.86 + .24 * (1.0 - h)), uCl); gl_FragColor = vec4(col,1.0); }`,
+  }), [lite]);
   const over = useMemo(() => ({ d: new THREE.Color('#b9c1cb'), n: new THREE.Color('#0c1024'), s: new THREE.Color('#5d636d') }), []);
-  useFrame(() => {
+  useFrame(({ clock }) => {
     const u = mat.uniforms, m = mix.current, L = atmo.look;
-    u.uMix.value = m; u.uCl.value = Math.min(1, L.cloud * .92 + L.fog * .3); u.uDeep.value = atmo.deep;
+    u.uMix.value = m; u.uTime.value = clock.elapsedTime; u.uCl.value = Math.min(1, L.cloud * .92 + L.fog * .3); u.uDeep.value = atmo.deep;
     (u.uOver!.value as THREE.Color).copy(over.d).lerp(over.n, m).lerp(over.s, L.storm * (1 - m) * .8);
   });
-  return <mesh material={mat} scale={R} renderOrder={-10}><sphereGeometry args={[1, 32, 20]} /></mesh>;
+  return <mesh material={mat} scale={R} renderOrder={-10}><sphereGeometry args={[1, 48, 28]} /></mesh>;
 }
 
 /** Thousands of twinkling stars plus a soft milky way band. */
@@ -202,31 +225,41 @@ export function Sun({ position }: { position: [number, number, number] }) {
   </Billboard></group></FarDepth></FadeGroup>;
 }
 
-/** Soft cloud puffs drifting slowly around the whole scene. */
+/** One cumulus, painted once: dozens of soft lobes heaped on a flat base, sunlit on top and shaded blue-grey underneath. */
+function cumulus(seed: number) {
+  const W = 512, H = 256, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d')!, r = rng(seed);
+  const lobe = (x: number, y: number, rad: number, a: number) => { const gr = g.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, `rgba(255,255,255,${a})`); gr.addColorStop(.55, `rgba(255,255,255,${a * .55})`); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); };
+  const base = H * .7;
+  for (let i = 0; i < 46; i++) { const u = r(), x = W * (.14 + .72 * u), bell = Math.sin(Math.PI * u), rad = 26 + r() * 46 * (.4 + bell); lobe(x, base - rad * .55 - r() * bell * 70, rad, .5 + r() * .4); }
+  for (let i = 0; i < 16; i++) lobe(W * (.12 + .76 * r()), base - 8 - r() * 14, 22 + r() * 26, .55);          // the flat, dense base
+  // shade: keep the alpha, multiply the colour by a top-lit ramp with a cool underside
+  g.globalCompositeOperation = 'source-atop';
+  const sh = g.createLinearGradient(0, H * .12, 0, base + 18); sh.addColorStop(0, 'rgba(255,255,255,0)'); sh.addColorStop(.55, 'rgba(214,222,236,.25)'); sh.addColorStop(1, 'rgba(120,134,160,.72)'); g.fillStyle = sh; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 14; i++) { const x = W * (.2 + .6 * r()), y = base - 30 - r() * 80, rad = 18 + r() * 30; const gr = g.createRadialGradient(x, y + rad * .5, 0, x, y + rad * .5, rad); gr.addColorStop(0, 'rgba(150,162,186,.2)'); gr.addColorStop(1, 'rgba(150,162,186,0)'); g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2.2); }
+  g.globalCompositeOperation = 'source-over';
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+/** Cumulus drifting slowly round the whole scene: soft painted clouds that always face the lens, three shapes, one draw each. */
 export function Clouds({ count = 26 }: { count?: number }) {
   const mix = useContext(NightCtx);
   const grp = useRef<THREE.Group>(null);
-  const mat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: .35, roughness: 1, transparent: true, opacity: .96 }), []);
-  const dayC = useMemo(() => new THREE.Color('#ffffff'), []), nightC = useMemo(() => new THREE.Color('#8d96bd'), []);
-  const grey = useMemo(() => new THREE.Color('#7e858f'), []);
-  const dayE = useMemo(() => new THREE.Color('#fff4e6'), []), nightE = useMemo(() => new THREE.Color('#252c5c'), []);
+  const mats = useMemo(() => [11, 23, 37].map(sd => new THREE.SpriteMaterial({ map: cumulus(sd), transparent: true, depthWrite: false, fog: false, opacity: .96 })), []);
+  const dayC = useMemo(() => new THREE.Color('#ffffff'), []), nightC = useMemo(() => new THREE.Color('#3b4470'), []), grey = useMemo(() => new THREE.Color('#8b929c'), []), tmp = useMemo(() => new THREE.Color(), []);
   const clouds = useMemo(() => {
     const r = rng(21);
     return Array.from({ length: count }).map((_, i) => {
-      const a = (i / count) * Math.PI * 2 + r() * .3, rad = 44 + r() * 40, y = 16 + r() * 24, s = 1.0 + r() * 1.8;
-      const puffs = Array.from({ length: 8 + Math.floor(r() * 4) }).map((_, k) => ({ p: [(k - 4) * (.8 + r() * .5), (r() - .35) * 1.1, (r() - .5) * 1.6] as [number, number, number], s: [1.3 + r() * 1.2, .9 + r() * .9, 1.1 + r() * .8] as [number, number, number] }));
-      return { pos: [Math.cos(a) * rad, y, Math.sin(a) * rad] as [number, number, number], rot: a + Math.PI / 2, s, puffs };
+      const a = (i / count) * Math.PI * 2 + r() * .3, rad = 46 + r() * 38, y = 15 + r() * 24, s = 13 + r() * 15;
+      return { pos: [Math.cos(a) * rad, y, Math.sin(a) * rad] as [number, number, number], scale: [s, s * .5, 1] as [number, number, number], m: i % 3, flip: r() > .5 };
     });
   }, [count]);
   useFrame((_, dt) => {
-    if (grp.current) { grp.current.rotation.y += dt * .0055; const k = 1 + .3 * atmo.look.cloud; grp.current.scale.set(k, 1 + .6 * atmo.look.cloud, k); }
+    if (grp.current) grp.current.rotation.y += dt * .0055;
     const m = mix.current, L = atmo.look;
-    mat.color.copy(dayC).lerp(nightC, m).lerp(grey, Math.min(1, L.cloud * .55 + L.storm * .35) * (1 - .4 * m)).multiplyScalar(1 - .5 * atmo.deep * m);
-    mat.emissive.copy(dayE).lerp(nightE, m); mat.emissiveIntensity = (.38 + .3 * m) * (1 - .45 * L.cloud * (1 - m)) * (1 - .6 * atmo.deep * m);
+    tmp.copy(dayC).lerp(nightC, m).lerp(grey, Math.min(1, L.cloud * .6 + L.storm * .35) * (1 - .4 * m)).multiplyScalar(1 - .5 * atmo.deep * m);
+    mats.forEach(mt => { mt.color.copy(tmp); mt.opacity = .93 - .25 * m; });
   });
   return <group ref={grp}>
-    {clouds.map((c, i) => <group key={i} position={c.pos} rotation-y={c.rot} scale={c.s}>
-      {c.puffs.map((q, k) => <mesh key={k} position={q.p} scale={q.s} material={mat}><sphereGeometry args={[1, 14, 10]} /></mesh>)}
-    </group>)}
+    {clouds.map((c, i) => <sprite key={i} position={c.pos} scale={[c.flip ? -c.scale[0] : c.scale[0], c.scale[1], 1]} material={mats[c.m]} />)}
   </group>;
 }

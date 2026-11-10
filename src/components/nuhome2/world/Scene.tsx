@@ -43,11 +43,11 @@ function ThemeDriver({ night, mix, shadow }: { night: boolean; mix: { current: n
       fog.near = 70 - 66 * L.fog - 30 * L.rain - 22 * L.snow; fog.far = 235 - 190 * L.fog - 95 * L.rain - 80 * L.snow;
       if (flash > .01) fog.color.lerp(tmp.set('#dfe6ff'), flash * .5);
     }
-    scene.environmentIntensity = (1 - .6 * deep) * (1 - .34 * Math.max(0, cl - .06)) * (1 - .12 * L.storm) + flash * .5;   // the sky's own light (it lights the lawn and the road most): dimmer under cloud and in the deep night
+    scene.environmentIntensity = (.85 + .15 * m) * (1 - .6 * deep) * (1 - .34 * Math.max(0, cl - .06)) * (1 - .12 * L.storm) + flash * .5;   // the sky's own light (it lights the lawn and the road most): dimmer under cloud and in the deep night
     gl.toneMappingExposure = (.9 - .1 * deep) * (1 - .1 * L.storm);
-    if (amb.current) { amb.current.color.copy(c.ambD).lerp(c.ambN, m); amb.current.intensity = (.5 - .32 * m) * (1 - .35 * deep) * (1 - .12 * cl * (1 - m)) + flash * 1.6; }
-    if (hemi.current) { hemi.current.color.copy(c.hsD).lerp(c.hsN, m); hemi.current.groundColor.copy(c.hgD).lerp(c.hgN, m); hemi.current.intensity = (1.0 - .68 * m) * (1 - .42 * deep) * (.9 + .1 * (1 - cl)) * (1 - .1 * L.storm) + flash * .8; }
-    if (dir.current) { dir.current.color.copy(c.dirD).lerp(c.dirN, m); dir.current.intensity = (2.7 - 2.1 * m) * dim * (1 - .6 * deep) * (1 - .5 * L.rain * (1 - m)) + flash * 1.4; }
+    if (amb.current) { amb.current.color.copy(c.ambD).lerp(c.ambN, m); amb.current.intensity = (.2 - .02 * m) * (1 - .35 * deep) * (1 - .12 * cl * (1 - m)) + flash * 1.6; }
+    if (hemi.current) { hemi.current.color.copy(c.hsD).lerp(c.hsN, m); hemi.current.groundColor.copy(c.hgD).lerp(c.hgN, m); hemi.current.intensity = (.62 - .3 * m) * (1 - .42 * deep) * (.9 + .1 * (1 - cl)) * (1 - .1 * L.storm) + flash * .8; }
+    if (dir.current) { dir.current.color.copy(c.dirD).lerp(c.dirN, m); dir.current.intensity = (3.4 - 2.8 * m) * dim * (1 - .6 * deep) * (1 - .5 * L.rain * (1 - m)) + flash * 1.4; }
     if (fill.current) fill.current.intensity = .5 * m * (1 - .55 * deep);
   });
   return <>
@@ -56,6 +56,21 @@ function ThemeDriver({ night, mix, shadow }: { night: boolean; mix: { current: n
     <directionalLight ref={dir} position={[-9, 12, 10]} castShadow={shadow > 0} shadow-mapSize-width={shadow || 16} shadow-mapSize-height={shadow || 16} shadow-camera-left={-34} shadow-camera-right={34} shadow-camera-top={30} shadow-camera-bottom={-30} shadow-camera-near={1} shadow-camera-far={110} shadow-bias={-.0002} shadow-normalBias={.025} />
     <directionalLight ref={fill} position={[10, 9, -8]} color="#b8c8ff" />
   </>;
+}
+
+/**
+ * What the world reflects: a whole sky over a whole ground, not a few lamps in a black room. Car paint, glass and gilding pick up
+ * blue from above, a pale horizon and the grey of the lot from below, and every shaded face is filled by sky light.
+ */
+function EnvSky({ night }: { night: boolean }) {
+  const mat = useMemo(() => new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false,
+    uniforms: { top: { value: new THREE.Color() }, hor: { value: new THREE.Color() }, gnd: { value: new THREE.Color() } },
+    vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: 'varying vec3 vP; uniform vec3 top, hor, gnd; void main(){ float y = normalize(vP).y; vec3 c = y > 0.0 ? mix(hor, top, smoothstep(0.0, .6, y)) : mix(hor * .6, gnd, smoothstep(0.0, -.12, y)); gl_FragColor = vec4(c, 1.0); }',
+  }), []);
+  mat.uniforms.top!.value.set(night ? '#070b24' : '#2e6fd0'); mat.uniforms.hor!.value.set(night ? '#1c2452' : '#cfe0ee'); mat.uniforms.gnd!.value.set(night ? '#0b0c12' : '#5b5a58');
+  return <mesh material={mat} scale={60}><sphereGeometry args={[1, 24, 16]} /></mesh>;
 }
 
 /** The sky travels with the camera, so it holds from the far end of the avenue to the back lawn. */
@@ -72,12 +87,13 @@ function World({ quality, shadow, ...p }: Omit<SceneProps, 'onReady' | 'onLost'>
     <PerformanceMonitor ms={350} iterations={8} flipflops={3} onDecline={onTier} onIncline={p.onUp} />
     <ThemeDriver night={night} mix={mix} shadow={shadow} />
     <Environment resolution={lite ? 128 : 256}>
+      <EnvSky night={night} />
       <Lightformer intensity={2.2} position={[0, 8, 4]} scale={[24, 10, 1]} />
       <Lightformer intensity={1.8} color={night ? '#9db4ff' : '#fff0d8'} position={[-12, 3, 6]} scale={[18, 7, 1]} />
       <Lightformer intensity={1.3} color="#ffe2a0" position={[12, 3, 8]} scale={[16, 6, 1]} />
       <Lightformer intensity={1.9} color="#fff0d0" position={[0, 4, 22]} rotation-y={Math.PI} scale={[44, 9, 1]} />
     </Environment>
-    <SkyFollow><SkyDome /><Stars count={lite ? 2600 : 6000} /><ShootingStars />
+    <SkyFollow><SkyDome lite={lite} /><Stars count={lite ? 2600 : 6000} /><ShootingStars />
     <Sun position={[40, 36, -74]} /><Moon position={[30, 32, -66]} />
     <Clouds count={lite ? 12 : 22} /></SkyFollow>
     <Suspense fallback={null}><Estate quality={quality} open={p.open} /></Suspense>
@@ -124,7 +140,7 @@ export default function Scene({ onReady, onLost, ...rest }: SceneProps) {
   useEffect(() => { lost.current = onLost; }, [onLost]);
   return <Canvas
     className="n2-canvas"
-    shadows={fixed.shadow > 0}
+    shadows={fixed.shadow > 0 ? (fixed.tier === 'high' ? 'soft' : true) : false}
     dpr={dprOverride() ?? dprNow}
     gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
     camera={{ position: k0.p, fov: k0.fov, near: .5, far: 320 }}
