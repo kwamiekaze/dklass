@@ -27,13 +27,21 @@ interface Props {
   className?: string;
 }
 
-const fmt = (n: number) => `${(Math.round(n * 100) / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+// Stored as hours (2 decimals). Whole minutes survive the round trip exactly
+// (error is at most 0.3 min), so we do all math and display in minutes.
+const toMins = (h: number) => Math.round(h * 60);
+const fmtMins = (m: number) => {
+  const h = Math.floor(m / 60), r = m % 60;
+  if (h && r) return `${h}h ${r}m`;
+  return h ? `${h}h` : `${r}m`;
+};
 
 export function MakeupTimeCard({ studentId, canManage = false, className }: Props) {
   const { toast } = useToast();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hours, setHours] = useState("");
+  const [hrs, setHrs] = useState("");
+  const [mins, setMins] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -49,20 +57,23 @@ export function MakeupTimeCard({ studentId, canManage = false, className }: Prop
   useEffect(() => { setLoading(true); load(); }, [load]);
 
   const { owed, madeUp } = useMemo(() => ({
-    owed: entries.filter((e) => e.status === "owed").reduce((a, e) => a + e.hours, 0),
-    madeUp: entries.filter((e) => e.status === "made_up").reduce((a, e) => a + e.hours, 0),
+    owed: entries.filter((e) => e.status === "owed").reduce((a, e) => a + toMins(e.hours), 0),
+    madeUp: entries.filter((e) => e.status === "made_up").reduce((a, e) => a + toMins(e.hours), 0),
   }), [entries]);
 
   const add = async () => {
-    const n = parseFloat(hours);
-    if (isNaN(n) || n <= 0 || n > 100) { toast({ title: "Invalid hours", description: "Enter hours greater than 0.", variant: "destructive" }); return; }
+    const h = hrs.trim() === "" ? 0 : Number(hrs);
+    const m = mins.trim() === "" ? 0 : Number(mins);
+    const total = Math.round(h * 60 + m);
+    if (!Number.isFinite(total) || h < 0 || m < 0 || total < 1 || total > 6000) { toast({ title: "Invalid time", description: "Enter at least 1 minute (up to 100 hours).", variant: "destructive" }); return; }
+    const n = Math.round((total / 60) * 100) / 100;
     setBusy("add");
     const { data: u } = await supabase.auth.getUser();
     const { error } = await table().insert({ student_id: studentId, hours: n, reason: reason.trim() || null, created_by: u.user?.id ?? null });
     setBusy(null);
     if (error) { toast({ title: "Could not add makeup time", description: error.message, variant: "destructive" }); return; }
-    setHours(""); setReason("");
-    toast({ title: "Makeup time added", description: `${fmt(n)}h added.` });
+    setHrs(""); setMins(""); setReason("");
+    toast({ title: "Makeup time added", description: `${fmtMins(total)} added.` });
     load();
   };
 
@@ -97,25 +108,29 @@ export function MakeupTimeCard({ studentId, canManage = false, className }: Prop
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg border bg-background/40 p-3 min-w-0">
             <p className="text-[11px] text-muted-foreground">To make up</p>
-            <p className="text-2xl font-semibold theme-heading text-amber-500">{fmt(owed)}<span className="text-sm font-normal text-muted-foreground ml-1">hours</span></p>
+            <p className="text-2xl font-semibold theme-heading text-amber-500">{fmtMins(owed)}</p>
           </div>
           <div className="rounded-lg border bg-background/40 p-3 min-w-0">
             <p className="text-[11px] text-muted-foreground">Made up</p>
-            <p className="text-2xl font-semibold theme-heading text-green-500">{fmt(madeUp)}<span className="text-sm font-normal text-muted-foreground ml-1">hours</span></p>
+            <p className="text-2xl font-semibold theme-heading text-green-500">{fmtMins(madeUp)}</p>
           </div>
         </div>
 
         {canManage && (
           <div className="space-y-2 rounded-lg border bg-background/40 p-3">
-            <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label className="text-xs">Hours</Label>
-                <Input type="number" step="0.5" min="0.5" inputMode="decimal" value={hours} onChange={(e) => setHours(e.target.value)} placeholder="1.5" className="min-h-[44px]" />
+                <Input type="number" step="1" min="0" max="100" inputMode="numeric" value={hrs} onChange={(e) => setHrs(e.target.value)} placeholder="0" className="min-h-[44px]" />
               </div>
-              <div className="space-y-1 min-w-0">
-                <Label className="text-xs">Reason (optional)</Label>
-                <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Missed lesson, left early…" maxLength={200} className="min-h-[44px]" />
+              <div className="space-y-1">
+                <Label className="text-xs">Minutes</Label>
+                <Input type="number" step="1" min="0" max="59" inputMode="numeric" value={mins} onChange={(e) => setMins(e.target.value)} placeholder="30" className="min-h-[44px]" />
               </div>
+            </div>
+            <div className="space-y-1 min-w-0">
+              <Label className="text-xs">Reason (optional)</Label>
+              <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Missed lesson, left early…" maxLength={200} className="min-h-[44px]" />
             </div>
             <Button type="button" onClick={add} disabled={busy === "add"} className="w-full gap-2 min-h-[44px]">
               {busy === "add" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -133,7 +148,7 @@ export function MakeupTimeCard({ studentId, canManage = false, className }: Prop
             {entries.map((e) => (
               <div key={e.id} className="rounded-lg border bg-background/40 p-2.5 space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold">{fmt(e.hours)}h</span>
+                  <span className="font-semibold">{fmtMins(toMins(e.hours))}</span>
                   <Badge className={cn("text-[10px] border-0 shrink-0", e.status === "made_up" ? "bg-green-500/20 text-green-700 dark:text-green-300" : "bg-amber-500/20 text-amber-700 dark:text-amber-300")}>
                     {e.status === "made_up" ? <><CheckCircle className="h-2.5 w-2.5 mr-0.5" />Made up</> : <><Clock className="h-2.5 w-2.5 mr-0.5" />To make up</>}
                   </Badge>
