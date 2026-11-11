@@ -8,7 +8,7 @@ import { leafCard, leafCardMaterial } from './Grounds';
 import { Halo, carvedRow, carvedWord, facetedStar, goldMat } from './Signage';
 import { atmo } from './atmosphere';
 import { makeGlazing } from './Glazing';
-import { type B, box, columnGeometry, dressedStone, limestone, masonry, slate, tiled, weather } from './surfaces';
+import { type B, box, columnGeometry, dressedStone, masonry, slate, tiled } from './surfaces';
 import { SIGN_FONT, goldGradient, makeCanvasTexture, starShape } from './parts';
 
 /*
@@ -24,6 +24,21 @@ import { SIGN_FONT, goldGradient, makeCanvasTexture, starShape } from './parts';
 const WALL_H = 6.4, PAV_H = 8.0, FRONT = 3, DEPTH = .9, HALF = 22.4, BACK = -2.95;   // BACK: the back wall's outer face, in building space
 
 type Kind = 'tv' | 'meeting' | 'office' | 'hall' | 'lobby';
+
+/** Pale limestone in a running bond with fine joints: a quiet wall that never competes with the lettering on it. */
+function plainLimestone() {
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const g = c.getContext('2d')!; const r = rng(41);
+  g.fillStyle = '#eadfce'; g.fillRect(0, 0, 512, 512);
+  for (let row = 0; row < 8; row++) for (let col = -1; col < 4; col++) {
+    const x = col * 128 + (row % 2) * 64, y = row * 64; const v = (r() - .5) * 12;
+    g.fillStyle = `rgb(${236 + v},${225 + v},${208 + v})`; g.fillRect(x + 2, y + 2, 124, 60);
+  }
+  g.strokeStyle = 'rgba(150,132,110,.34)'; g.lineWidth = 4;
+  for (let row = 0; row <= 8; row++) { g.beginPath(); g.moveTo(0, row * 64); g.lineTo(512, row * 64); g.stroke(); }
+  for (let row = 0; row < 8; row++) for (let col = -1; col < 5; col++) { const x = col * 128 + (row % 2) * 64; g.beginPath(); g.moveTo(x, row * 64); g.lineTo(x, row * 64 + 64); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; return t;
+}
 
 function lettersTexture(color: 'face' | 'side') {
   return makeCanvasTexture(2048, 256, (g, w, h) => {
@@ -132,18 +147,19 @@ function AFrame({ position, rotY = 0, map }: { position: [number, number, number
 
 export function Building({ position, lite, open }: { position: [number, number, number]; lite: boolean; open: boolean }) {
   const mix = useContext(NightCtx);
-  const lime = useMemo(() => limestone(lite ? 256 : 512), [lite]);
+  const lime = useMemo(plainLimestone, []);
   const stoneMats = useMemo(() => new Map<string, THREE.MeshStandardMaterial>(), []);
-  const stoneMat = (rx: number, ry: number) => { const t = tiled(lime.map, rx, ry); return new THREE.MeshStandardMaterial({ map: t, normalMap: tiled(lime.normalMap, rx, ry), normalScale: new THREE.Vector2(1.15, 1.15), emissiveMap: t, emissive: '#ffcf80', emissiveIntensity: .05, roughness: .86, color: '#efe3c9' }); };
+  // the calm, pale stone the building first had: fine joints and no relief, so the gold name over the door reads at a glance
+  const stoneMat = (rx: number, ry: number) => { const t = tiled(lime, rx, ry); return new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: '#ffcf80', emissiveIntensity: .05, roughness: .9, color: '#f6ecd2' }); };
   const stone = (w: number, h: number) => {
     const k = `${w.toFixed(1)}x${h.toFixed(1)}`; let m = stoneMats.get(k);
     if (!m) { m = stoneMat(Math.max(.25, w / 3.2), Math.max(.25, h / 1.6)); stoneMats.set(k, m); }
     return m;
   };
   // the walls are single meshes with the stone laid in world metres, so the courses run unbroken; each carries its own weathering
-  const wallMat = useMemo(() => { const m = weather(stoneMat(1, 1), .16, WALL_H); stoneMats.set('wall', m); return m; }, []);   // eslint-disable-line react-hooks/exhaustive-deps
-  const pavMat = useMemo(() => { const m = weather(stoneMat(1, 1), .16, PAV_H); stoneMats.set('pav', m); return m; }, []);      // eslint-disable-line react-hooks/exhaustive-deps
-  const baseMat = useMemo(() => { const m = stoneMat(1, 1); m.color.set('#d9ccb1'); m.normalScale.set(1.5, 1.5); m.roughness = .92; stoneMats.set('base', m); return m; }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const wallMat = useMemo(() => { const m = stoneMat(1, 1); stoneMats.set('wall', m); return m; }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const pavMat = useMemo(() => { const m = stoneMat(1, 1); stoneMats.set('pav', m); return m; }, []);      // eslint-disable-line react-hooks/exhaustive-deps
+  const baseMat = useMemo(() => { const m = stoneMat(1, 1); m.color.set('#e6dbc2'); stoneMats.set('base', m); return m; }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   const M = useMemo(() => ({
     trim: new THREE.MeshStandardMaterial({ color: '#f5ecdc', roughness: .6 }),
     roof: (() => { const sl = slate(lite ? 256 : 512); return new THREE.MeshStandardMaterial({ map: sl.map, normalMap: sl.normalMap, normalScale: new THREE.Vector2(1.1, 1.1), color: '#ffffff', roughness: .46, metalness: .16, side: THREE.DoubleSide }); })(),
@@ -308,7 +324,6 @@ export function Building({ position, lite, open }: { position: [number, number, 
   const pl = useMemo<HedgePlant>(() => ({ core: new THREE.MeshStandardMaterial({ color: '#27452a', roughness: 1 }), blob: leafCard(), leaf: leafCardMaterial(), k: lite ? .32 : .8 }), [lite]);
   const colGeo = useMemo(() => columnGeometry(4.345, .52), []);
   const pavStar = useMemo(() => facetedStar(.32, .3), []);
-  const finial = useMemo(() => new THREE.LatheGeometry([[0, 0], [.16, 0], [.17, .06], [.07, .14], [.12, .26], [.15, .36], [.11, .47], [.035, .56], [.02, .95], [0, 1.0]].map(([r, y]) => new THREE.Vector2(r!, y!)), 14), []);
   const lampOn = open;
 
   return <group position={position}>
@@ -318,8 +333,6 @@ export function Building({ position, lite, open }: { position: [number, number, 
     <mesh geometry={kit.base} material={baseMat} castShadow receiveShadow />
     <mesh geometry={kit.trim} material={M.dress} castShadow receiveShadow />
     <mesh geometry={kit.dormRoof} material={M.roof} castShadow />
-    {/* gilded finials on the ridge of the centre roof and at the point of each pavilion roof */}
-    {[[-3.8, WALL_H + 4.55, -.2], [3.8, WALL_H + 4.55, -.2], [-10.4, PAV_H + 3.05, .45], [10.4, PAV_H + 3.05, .45]].map(([x, y, z]) => <mesh key={`fin${x}`} geometry={finial} material={signGold} position={[x!, y!, z!]} castShadow />)}
     <mesh position={[0, WALL_H + .25, 0]} material={M.trim} castShadow><boxGeometry args={[HALF * 2 + .4, .5, 7]} /></mesh>
     <mesh geometry={roofs.main} material={M.roof} position={[0, WALL_H + .5, 0]} castShadow />
     <mesh geometry={roofs.center} material={M.roof} position={[0, WALL_H + .5, -.2]} castShadow />
