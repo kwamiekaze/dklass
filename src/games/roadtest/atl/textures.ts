@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import type { Arrow, GuideSign, Shield, Skyline } from './stageTypes';
 import type { Layout } from './layout';
 import { LANE } from './layout';
+import overpassUrl from './fonts/overpass-latin-700-normal.woff2?url';
 
 /** Every canvas texture is cached by key, so a recycled billboard or sign never makes a new one. Phones run out of canvas memory otherwise. */
 const CACHE = new Map<string, unknown>();
@@ -131,78 +132,234 @@ function decalTexture_raw(kind: 'crosswalk' | 'stopbar' | 'yield' | 'rail' | 'rr
 }
 
 // ------------------------------------------------------------------ shields and signs ---
-const GREEN = '#00694a';
-function shieldPath(g: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number) {
-  g.beginPath(); g.moveTo(cx - w / 2, cy - h / 2 + h * 0.12);
-  g.quadraticCurveTo(cx - w / 2, cy - h / 2, cx - w * 0.28, cy - h / 2);
-  g.quadraticCurveTo(cx, cy - h / 2 + h * 0.08, cx + w * 0.28, cy - h / 2);
-  g.quadraticCurveTo(cx + w / 2, cy - h / 2, cx + w / 2, cy - h / 2 + h * 0.12);
-  g.lineTo(cx + w / 2, cy + h * 0.1);
-  g.quadraticCurveTo(cx + w / 2, cy + h * 0.38, cx, cy + h / 2);
-  g.quadraticCurveTo(cx - w / 2, cy + h * 0.38, cx - w / 2, cy + h * 0.1);
+// ------------------------------------------------------------------ guide signs ---
+// Drawn the way the FHWA sign manual (MUTCD) and GDOT build them: FHWA green with a white border and rounded corners, Highway Gothic lettering
+// (Overpass is the open font cut from it), mixed-case town names, the exit number on its own plaque at the top right, a yellow EXIT ONLY band
+// with black arrows, real Interstate / US / Georgia route shields. Blue boards for services, brown for places to visit, a green mileage list.
+const GREEN = '#006747', BLUE = '#003f87', BROWN = '#6a3b1c', YELLOW = '#ffcc00';
+let FONT = '"Arial Narrow", "Helvetica Neue", Arial, sans-serif';
+const font = (px: number, w = 700) => `${w} ${px}px ${FONT}`;
+/** signs drawn before the sign font arrived are drawn again when it does, on the same canvas */
+const redraw: (() => void)[] = [];
+let fontReady = false;
+if (typeof document !== 'undefined' && typeof FontFace !== 'undefined') {
+  const f = new FontFace('DK Highway', `url(${overpassUrl}) format('woff2')`, { weight: '700' });
+  f.load().then((ff) => { (document.fonts as unknown as { add: (x: FontFace) => void }).add(ff); FONT = `"DK Highway", ${FONT}`; fontReady = true; for (const r of redraw.splice(0)) { try { r(); } catch { /* a disposed canvas: nothing to do */ } } }).catch(() => { fontReady = true; redraw.length = 0; });
+}
+
+function rr(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+/** a sign blank: colour, white border set in from the edge, rounded corners */
+function blank(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, bg: string, fg = '#fff', r = 30) {
+  g.fillStyle = bg; rr(g, x, y, w, h, r); g.fill();
+  g.strokeStyle = fg; g.lineWidth = 7; rr(g, x + 9, y + 9, w - 18, h - 18, r - 8); g.stroke();
+}
+
+function interstatePath(g: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number) {
+  const l = cx - w / 2, r = cx + w / 2, t = cy - h / 2, b = cy + h / 2;
+  g.beginPath(); g.moveTo(l, t + h * 0.1);
+  g.bezierCurveTo(l + w * 0.12, t + h * 0.02, l + w * 0.34, t - h * 0.02, cx, t + h * 0.05);
+  g.bezierCurveTo(r - w * 0.34, t - h * 0.02, r - w * 0.12, t + h * 0.02, r, t + h * 0.1);
+  g.bezierCurveTo(r + w * 0.01, t + h * 0.34, r - w * 0.02, t + h * 0.58, r - w * 0.1, t + h * 0.72);
+  g.bezierCurveTo(r - w * 0.2, t + h * 0.86, cx + w * 0.08, b - h * 0.04, cx, b);
+  g.bezierCurveTo(cx - w * 0.08, b - h * 0.04, l + w * 0.2, t + h * 0.86, l + w * 0.1, t + h * 0.72);
+  g.bezierCurveTo(l + w * 0.02, t + h * 0.58, l - w * 0.01, t + h * 0.34, l, t + h * 0.1);
   g.closePath();
 }
+function usPath(g: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number) {
+  const l = cx - w / 2, r = cx + w / 2, t = cy - h / 2, b = cy + h / 2;
+  g.beginPath(); g.moveTo(l + w * 0.06, t + h * 0.02);
+  g.quadraticCurveTo(l + w * 0.2, t + h * 0.12, l + w * 0.32, t + h * 0.03);
+  g.quadraticCurveTo(cx, t + h * 0.12, r - w * 0.32, t + h * 0.03);
+  g.quadraticCurveTo(r - w * 0.2, t + h * 0.12, r - w * 0.06, t + h * 0.02);
+  g.quadraticCurveTo(r - w * 0.02, t + h * 0.16, r, t + h * 0.27);
+  g.bezierCurveTo(r - w * 0.1, t + h * 0.42, r + w * 0.06, t + h * 0.66, r - w * 0.16, t + h * 0.84);
+  g.quadraticCurveTo(cx + w * 0.12, t + h * 0.9, cx, b);
+  g.quadraticCurveTo(cx - w * 0.12, t + h * 0.9, l + w * 0.16, t + h * 0.84);
+  g.bezierCurveTo(l - w * 0.06, t + h * 0.66, l + w * 0.1, t + h * 0.42, l, t + h * 0.27);
+  g.quadraticCurveTo(l + w * 0.02, t + h * 0.16, l + w * 0.06, t + h * 0.02);
+  g.closePath();
+}
+/** the outline of the state: Georgia's route marker is the state itself */
+const GA_SHAPE: [number, number][] = [[0.04, 0.02], [0.6, 0.02], [0.63, 0.1], [0.75, 0.22], [0.87, 0.36], [0.98, 0.5], [0.95, 0.6], [0.91, 0.75], [0.87, 0.9], [0.84, 0.985], [0.76, 0.93], [0.72, 0.985], [0.66, 0.955], [0.24, 0.94], [0.17, 0.95], [0.15, 0.8], [0.11, 0.66], [0.13, 0.5], [0.1, 0.36]];
+function gaPath(g: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number) { g.beginPath(); GA_SHAPE.forEach(([x, y], i) => g[i ? 'lineTo' : 'moveTo'](cx - w / 2 + x * w, cy - h / 2 + y * h)); g.closePath(); }
+
+const shieldW = (s: Shield, h: number) => h * (s.t === 'GA' ? (s.n.length >= 3 ? 1.08 : 0.95) : s.n.length >= 3 ? 1.2 : 1.0);
 /** Draw a route shield centred at cx,cy with the given height; returns its width. */
 export function drawShield(g: CanvasRenderingContext2D, s: Shield, cx: number, cy: number, h: number): number {
-  const w = h * (s.n.length >= 3 ? 1.12 : 0.98);
+  const w = shieldW(s, h);
+  g.save(); g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
   if (s.t === 'I') {
-    shieldPath(g, cx, cy, w, h); g.fillStyle = '#ffffff'; g.fill();
-    shieldPath(g, cx, cy, w * 0.9, h * 0.9); g.fillStyle = '#0a3f95'; g.fill();
-    g.save(); shieldPath(g, cx, cy, w * 0.9, h * 0.9); g.clip(); g.fillStyle = '#c8102e'; g.fillRect(cx - w, cy - h / 2, w * 2, h * 0.26); g.restore();
-    g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `700 ${h * 0.13}px Arial, sans-serif`; g.fillText('INTERSTATE', cx, cy - h * 0.34 + 2);
-    g.font = `800 ${h * (s.n.length >= 3 ? 0.4 : 0.5)}px "Arial Black", Arial, sans-serif`; g.fillText(s.n, cx, cy + h * 0.14);
+    interstatePath(g, cx, cy, w, h); g.fillStyle = '#fff'; g.fill();
+    interstatePath(g, cx, cy + h * 0.004, w * 0.92, h * 0.92); g.fillStyle = '#003f87'; g.fill();
+    g.save(); interstatePath(g, cx, cy + h * 0.004, w * 0.92, h * 0.92); g.clip(); g.fillStyle = '#c1121f'; g.fillRect(cx - w, cy - h / 2, w * 2, h * 0.265); g.fillStyle = '#fff'; g.fillRect(cx - w, cy - h / 2 + h * 0.265, w * 2, h * 0.028); g.restore();
+    g.fillStyle = '#fff'; g.font = font(h * 0.105); g.fillText('INTERSTATE', cx, cy - h * 0.335);
+    g.font = font(h * (s.n.length >= 3 ? 0.46 : 0.56)); g.fillText(s.n, cx, cy + h * 0.115);
   } else if (s.t === 'US') {
-    shieldPath(g, cx, cy, w * 0.96, h); g.fillStyle = '#111'; g.fill();
-    shieldPath(g, cx, cy, w * 0.86, h * 0.9); g.fillStyle = '#fff'; g.fill();
-    g.fillStyle = '#111'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `800 ${h * 0.5}px "Arial Black", Arial, sans-serif`; g.fillText(s.n, cx, cy + h * 0.02);
+    usPath(g, cx, cy, w, h); g.fillStyle = '#fff'; g.fill(); g.strokeStyle = '#111'; g.lineWidth = h * 0.035; g.stroke();
+    g.fillStyle = '#111'; g.font = font(h * (s.n.length >= 3 ? 0.46 : 0.58)); g.fillText(s.n, cx, cy + h * 0.03);
   } else {
-    g.beginPath(); g.arc(cx, cy, h * 0.5, 0, Math.PI * 2); g.fillStyle = '#111'; g.fill();
-    g.beginPath(); g.arc(cx, cy, h * 0.45, 0, Math.PI * 2); g.fillStyle = '#fff'; g.fill();
-    g.fillStyle = '#111'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `700 ${h * 0.17}px Arial, sans-serif`; g.fillText('GEORGIA', cx, cy - h * 0.27);
-    g.font = `800 ${h * 0.4}px "Arial Black", Arial, sans-serif`; g.fillText(s.n, cx, cy + h * 0.1);
+    gaPath(g, cx, cy, w, h); g.fillStyle = '#fff'; g.fill(); g.strokeStyle = '#111'; g.lineWidth = h * 0.03; g.stroke();
+    g.fillStyle = '#111'; g.font = font(h * (s.n.length >= 3 ? 0.4 : 0.5)); g.fillText(s.n, cx - w * 0.04, cy - h * 0.04);
   }
+  if (s.b) { g.fillStyle = '#fff'; g.font = font(h * 0.2); g.fillText(s.b, cx, cy - h * 0.62); }
+  g.restore();
   return w;
 }
-function drawArrow(g: CanvasRenderingContext2D, a: Arrow, cx: number, cy: number, s: number) {
-  g.save(); g.translate(cx, cy); g.fillStyle = '#fff';
+/** the MUTCD guide sign arrow: a long shaft with a broad head */
+function drawArrow(g: CanvasRenderingContext2D, a: Arrow, cx: number, cy: number, s: number, color = '#fff') {
+  g.save(); g.translate(cx, cy); g.fillStyle = color;
   const rot: Record<Arrow, number> = { up: 0, upright: Math.PI / 4, upleft: -Math.PI / 4, right: Math.PI / 2, left: -Math.PI / 2, down: Math.PI };
   g.rotate(rot[a]);
-  g.beginPath(); g.moveTo(0, -s * 0.5); g.lineTo(s * 0.34, -s * 0.05); g.lineTo(s * 0.12, -s * 0.05); g.lineTo(s * 0.12, s * 0.5); g.lineTo(-s * 0.12, s * 0.5); g.lineTo(-s * 0.12, -s * 0.05); g.lineTo(-s * 0.34, -s * 0.05); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(0, -s * 0.5); g.lineTo(s * 0.36, -s * 0.06); g.lineTo(s * 0.2, -s * 0.06); g.lineTo(s * 0.105, -s * 0.2); g.lineTo(s * 0.105, s * 0.5); g.lineTo(-s * 0.105, s * 0.5); g.lineTo(-s * 0.105, -s * 0.2); g.lineTo(-s * 0.2, -s * 0.06); g.lineTo(-s * 0.36, -s * 0.06); g.closePath(); g.fill();
   g.restore();
 }
-type PanelSpec = { shields?: Shield[]; dir?: string; dests: string[]; arrows?: Arrow[]; exitOnly?: boolean; tab?: string; dist?: string };
-function drawPanel(g: CanvasRenderingContext2D, p: PanelSpec, x: number, y: number, w: number, h: number) {
-  g.fillStyle = GREEN; g.fillRect(x, y, w, h);
-  g.strokeStyle = '#fff'; g.lineWidth = 8; g.strokeRect(x + 10, y + 10, w - 20, h - 20);
-  let cy = y + 36;
-  if (p.dir) { g.fillStyle = '#fff'; g.font = '700 46px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText(p.dir, x + w / 2, cy); cy += 52; }
-  if (p.shields?.length) {
-    const sh = 118, gap = 20; let tw = 0; const ws = p.shields.map((s) => sh * (s.n.length >= 3 ? 1.12 : 0.98)); tw = ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1);
-    let sx = x + w / 2 - tw / 2; p.shields.forEach((s, i) => { drawShield(g, s, sx + ws[i]! / 2, cy + sh / 2, sh); sx += ws[i]! + gap; }); cy += sh + 14;
-  }
-  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'top';
-  const fs = p.dests.length > 2 ? 52 : 62;
-  for (const dline of p.dests) { g.font = `700 ${fs}px "Arial Narrow", "Helvetica Neue", Arial, sans-serif`; let f = fs; while (g.measureText(dline).width > w - 70 && f > 28) { f -= 2; g.font = `700 ${f}px "Arial Narrow", Arial, sans-serif`; } g.fillText(dline, x + w / 2, cy); cy += fs + 8; }
-  if (p.dist) { g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '700 46px Arial, sans-serif'; g.fillText(p.dist, x + w / 2, y + h - 50); }
-  else if (p.arrows?.length) { const n = p.arrows.length, sp = Math.min(130, (w - 120) / n); p.arrows.forEach((a, i) => drawArrow(g, a, x + w / 2 + (i - (n - 1) / 2) * sp, y + h - 82, 96)); }
-  if (p.exitOnly) { g.fillStyle = '#f2b705'; g.fillRect(x + w / 2 - 110, y + h - 54, 220, 40); g.fillStyle = '#111'; g.font = '700 30px Arial, sans-serif'; g.textBaseline = 'middle'; g.fillText('EXIT ONLY', x + w / 2, y + h - 33); }
+/** text that shrinks until it fits */
+function fit(g: CanvasRenderingContext2D, text: string, px: number, max: number, min = 26) { let f = px; g.font = font(f); while (g.measureText(text).width > max && f > min) { f -= 2; g.font = font(f); } return f; }
+/** a cardinal direction, the first letter taller than the rest (NORTH) */
+function cardinal(g: CanvasRenderingContext2D, word: string, x: number, y: number, px: number, align: 'left' | 'center' = 'left') {
+  g.save(); g.fillStyle = '#fff'; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  const big = font(px), small = font(px * 0.82);
+  g.font = big; const w0 = g.measureText(word[0]!).width; g.font = small; const w1 = g.measureText(word.slice(1)).width;
+  const x0 = align === 'center' ? x - (w0 + w1) / 2 : x;
+  g.font = big; g.fillText(word[0]!, x0, y); g.font = small; g.fillText(word.slice(1), x0 + w0 + 1, y);
+  g.restore(); return w0 + w1;
 }
+const frac = (d: string) => d.replace('1/2', '½').replace('1/4', '¼').replace('3/4', '¾');
+
+type PanelSpec = { shields?: Shield[]; dir?: string; dests: string[]; arrows?: Arrow[]; exitOnly?: boolean; tab?: string; dist?: string; left?: boolean };
+const PW = 640, PH = 470, TAB = 104, GUT = 14;
+function drawPanel(g: CanvasRenderingContext2D, p: PanelSpec, x: number, y: number, w: number, h: number) {
+  blank(g, x, y, w, h, GREEN);
+  const band = p.exitOnly ? 92 : 0, foot = p.dist ? 84 : p.arrows?.length && !p.exitOnly ? 112 : 0;
+  const top = y + 26, bottom = y + h - 22 - band - foot;
+  // what has to fit: one row of shields with the direction beside them, then the town lines
+  const sh = p.shields?.length ? (p.dests.length > 2 ? 118 : p.dests.length > 1 ? 140 : 164) : 0;
+  const lines = p.dests, room = bottom - top - (sh ? sh + 16 : 0);
+  const lh = Math.min(lines.length > 2 ? 84 : 98, room / Math.max(1, lines.length)), fs = Math.min(86, lh * 0.9);
+  const blockH = (sh ? sh + 16 : 0) + lh * lines.length;
+  let cy = top + Math.max(0, (bottom - top - blockH) / 2);
+  if (p.shields?.length) {
+    const gap = 16, ws = p.shields.map((s) => shieldW(s, sh)), dirPx = 62;
+    g.font = font(dirPx); const dw = p.dir ? g.measureText(p.dir).width * 0.9 + 18 : 0;
+    const tw = ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1) + dw;
+    const k = Math.min(1, (w - 60) / tw);
+    let sx = x + w / 2 - (tw * k) / 2;
+    p.shields.forEach((s, i) => { drawShield(g, s, sx + (ws[i]! * k) / 2, cy + sh / 2 + (s.b ? 8 : 0), sh * k * (s.b ? 0.88 : 1)); sx += (ws[i]! + gap) * k; });
+    if (p.dir) cardinal(g, p.dir, sx + 2, cy + sh / 2 + dirPx * 0.36, dirPx * k);
+    cy += sh + 16;
+  } else if (p.dir) { cardinal(g, p.dir, x + w / 2, cy + 52, 62, 'center'); cy += 66; }
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (const ln of lines) { fit(g, ln, fs, w - 56); g.fillText(ln, x + w / 2, cy + lh / 2); cy += lh; }
+  if (p.dist) { g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = font(62); g.fillText(frac(p.dist), x + w / 2, y + h - 22 - band - 38); }
+  else if (p.arrows?.length && !p.exitOnly) { const n = p.arrows.length, sp = Math.min(130, (w - 120) / n); p.arrows.forEach((a, i) => drawArrow(g, a, x + w / 2 + (i - (n - 1) / 2) * sp, y + h - 22 - 56, 104)); }
+  if (p.exitOnly) {
+    // the yellow band across the foot of the sign: EXIT (arrow) ONLY in black
+    const by = y + h - 18 - band, bx = x + 18, bw = w - 36;
+    g.fillStyle = YELLOW; rr(g, bx, by, bw, band, 14); g.fill(); g.strokeStyle = '#111'; g.lineWidth = 4; rr(g, bx + 5, by + 5, bw - 10, band - 10, 10); g.stroke();
+    g.fillStyle = '#111'; g.textBaseline = 'middle'; g.font = font(50);
+    g.textAlign = 'right'; g.fillText('EXIT', x + w / 2 - 56, by + band / 2 + 2); g.textAlign = 'left'; g.fillText('ONLY', x + w / 2 + 56, by + band / 2 + 2);
+    drawArrow(g, p.arrows?.[0] ?? 'upright', x + w / 2, by + band / 2, 70, '#111');
+  }
+}
+/** the exit number plaque: its own small sign on top of the panel, at the right for a right-hand exit, yellow LEFT at the left for a left-hand one */
+function drawTab(g: CanvasRenderingContext2D, p: PanelSpec, x: number, w: number) {
+  if (!p.tab) return;
+  const isExit = /^EXIT/.test(p.tab);
+  g.textBaseline = 'middle';
+  if (!isExit) { const tw = Math.min(w - 40, 300), tx = x + (w - tw) / 2; blank(g, tx, 4, tw, TAB - 6, YELLOW, '#111', 18); g.fillStyle = '#111'; g.textAlign = 'center'; g.font = font(46); g.fillText(p.tab, tx + tw / 2, TAB / 2 + 2); return; }
+  const m = /^EXIT\s+(\d+)\s*([A-Z-]*)$/.exec(p.tab), num = m?.[1] ?? p.tab.replace(/^EXIT\s*/, ''), suf = m?.[2] ?? '';
+  g.font = font(54); const wE = g.measureText('EXIT').width; g.font = font(76); const wN = g.measureText(num).width; g.font = font(60); const wS = suf ? g.measureText(suf).width + 10 : 0;
+  const lw = p.left ? 130 : 0, tw = wE + wN + wS + 66 + lw, tx = p.left ? x + 8 : x + w - tw - 8;
+  blank(g, tx, 4, tw, TAB - 6, GREEN, '#fff', 18);
+  if (p.left) { g.fillStyle = YELLOW; rr(g, tx + 14, 16, lw - 6, TAB - 30, 8); g.fill(); g.fillStyle = '#111'; g.textAlign = 'center'; g.font = font(40); g.fillText('LEFT', tx + 14 + (lw - 6) / 2, TAB / 2 + 2); }
+  g.fillStyle = '#fff'; g.textAlign = 'left';
+  let cx = tx + 26 + lw; g.font = font(54); g.fillText('EXIT', cx, TAB / 2 + 5); cx += wE + 14; g.font = font(76); g.fillText(num, cx, TAB / 2 + 3); cx += wN + 10; if (suf) { g.font = font(60); g.fillText(suf, cx, TAB / 2 + 5); }
+}
+
+// ---- the little pictures on the blue service board
+function icon(g: CanvasRenderingContext2D, kind: string, cx: number, cy: number, s: number) {
+  g.save(); g.translate(cx, cy); g.fillStyle = '#fff'; rr(g, -s / 2, -s / 2, s, s, s * 0.14); g.fill(); g.fillStyle = BLUE; g.strokeStyle = BLUE; g.lineWidth = s * 0.07; g.lineCap = 'round'; g.lineJoin = 'round';
+  const u = s / 100;
+  if (kind === 'GAS') { rr(g, -26 * u, -30 * u, 34 * u, 62 * u, 5 * u); g.fill(); g.fillStyle = '#fff'; g.fillRect(-20 * u, -23 * u, 22 * u, 16 * u); g.beginPath(); g.moveTo(8 * u, -6 * u); g.lineTo(22 * u, -6 * u); g.lineTo(22 * u, 22 * u); g.quadraticCurveTo(22 * u, 30 * u, 30 * u, 26 * u); g.lineTo(30 * u, -18 * u); g.lineTo(20 * u, -28 * u); g.stroke(); }
+  else if (kind === 'FOOD') { g.beginPath(); g.moveTo(-18 * u, -32 * u); g.lineTo(-18 * u, 34 * u); g.moveTo(-28 * u, -32 * u); g.lineTo(-28 * u, -8 * u); g.quadraticCurveTo(-18 * u, 2 * u, -8 * u, -8 * u); g.lineTo(-8 * u, -32 * u); g.stroke(); g.beginPath(); g.moveTo(18 * u, 34 * u); g.lineTo(18 * u, -32 * u); g.quadraticCurveTo(34 * u, -20 * u, 30 * u, 4 * u); g.lineTo(18 * u, 4 * u); g.fill(); g.stroke(); }
+  else if (kind === 'LODGING') { g.fillRect(-36 * u, -2 * u, 72 * u, 14 * u); g.fillRect(-36 * u, -24 * u, 8 * u, 50 * u); g.fillRect(28 * u, 4 * u, 8 * u, 22 * u); g.beginPath(); g.arc(-16 * u, -12 * u, 8 * u, 0, 7); g.fill(); rr(g, -4 * u, -16 * u, 36 * u, 14 * u, 5 * u); g.fill(); }
+  else { g.font = font(s * 0.78); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('H', 0, s * 0.04); }
+  g.restore();
+}
+function drawService(g: CanvasRenderingContext2D, s: GuideSign, W: number, H: number) {
+  blank(g, 0, 0, W, H, BLUE);
+  const icons = s.icons ?? [], n = icons.length, sz = Math.min(150, (W - 60 - (n - 1) * 22) / n), tw = n * sz + (n - 1) * 22;
+  icons.forEach((k, i) => { const cx = W / 2 - tw / 2 + sz / 2 + i * (sz + 22); icon(g, k, cx, 40 + sz / 2, sz); g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = font(k.length > 6 ? 26 : 32); g.fillText(k, cx, 40 + sz + 26); });
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = font(66); g.fillText(s.tab ?? 'NEXT RIGHT', W / 2, H - 62);
+}
+function drawBrown(g: CanvasRenderingContext2D, s: GuideSign, W: number, H: number) {
+  blank(g, 0, 0, W, H, BROWN);
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const lines = s.dests, lh = Math.min(84, (H - 150) / lines.length);
+  lines.forEach((ln, i) => { fit(g, ln, 64, W - 70); g.fillText(ln, W / 2, 46 + lh / 2 + i * lh); });
+  g.font = font(58); g.fillText(s.tab ?? 'NEXT RIGHT', W / 2, H - 58);
+}
+function drawMileage(g: CanvasRenderingContext2D, s: GuideSign, W: number, H: number) {
+  blank(g, 0, 0, W, H, GREEN);
+  const rows = s.rows ?? [], lh = (H - 60) / rows.length;
+  g.fillStyle = '#fff'; g.textBaseline = 'middle';
+  rows.forEach(([place, mi], i) => { const y = 30 + lh / 2 + i * lh; fit(g, place, 66, W - 250); g.textAlign = 'left'; g.fillText(place, 48, y); g.font = font(66); g.textAlign = 'right'; g.fillText(String(mi), W - 48, y); });
+}
+function drawWelcome(g: CanvasRenderingContext2D, s: GuideSign, W: number, H: number) {
+  const ga = /Georgia/.test(s.dests.join(' '));
+  if (ga) {
+    // Georgia's line sign: a peach, "Welcome", and "We're glad Georgia's on your mind"
+    blank(g, 0, 0, W, H, '#f7f3e8', '#1d3a6b');
+    g.fillStyle = '#1d3a6b'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `italic 700 96px Georgia, "Times New Roman", serif`; g.fillText('Welcome', W / 2 + 70, 110);
+    const px = 150, py = 118; const gr = g.createRadialGradient(px - 18, py - 18, 6, px, py, 70); gr.addColorStop(0, '#ffd08a'); gr.addColorStop(0.6, '#ff9a4a'); gr.addColorStop(1, '#e8632a');
+    g.fillStyle = gr; g.beginPath(); g.arc(px, py, 62, 0, 7); g.fill(); g.strokeStyle = 'rgba(160,60,20,.5)'; g.lineWidth = 4; g.beginPath(); g.moveTo(px - 6, py - 60); g.quadraticCurveTo(px - 26, py, px - 4, py + 60); g.stroke();
+    g.fillStyle = '#3f8f3a'; g.beginPath(); g.ellipse(px + 34, py - 62, 34, 13, -0.5, 0, 7); g.fill(); g.fillStyle = '#6b4a2a'; g.fillRect(px - 3, py - 78, 6, 20);
+    g.fillStyle = '#1d3a6b'; rr(g, 26, 214, W - 52, H - 240, 16); g.fill();
+    g.fillStyle = '#fff'; g.font = `italic 700 62px Georgia, "Times New Roman", serif`; g.fillText("We're glad Georgia's", W / 2, 274); g.fillText('on your mind', W / 2, 346);
+    g.font = font(30); g.fillStyle = '#ffcf7a'; g.fillText('STATE LINE', W / 2, H - 46);
+  } else {
+    blank(g, 0, 0, W, H, '#0b4a8f');
+    g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `italic 700 70px Georgia, "Times New Roman", serif`; g.fillText(s.dests[0] ?? 'Welcome to', W / 2, 110);
+    g.font = `italic 700 84px Georgia, "Times New Roman", serif`; fitSerif(g, s.dests[1] ?? '', 84, W - 70); g.fillText(s.dests[1] ?? '', W / 2, 222);
+    g.fillStyle = '#ffcf7a'; g.font = font(40); g.fillText('STATE LINE', W / 2, 330);
+    g.fillStyle = '#fff'; g.font = font(30); g.fillText('The road turns back toward Atlanta', W / 2, H - 52);
+  }
+}
+function fitSerif(g: CanvasRenderingContext2D, t: string, px: number, max: number) { let f = px; g.font = `italic 700 ${f}px Georgia, "Times New Roman", serif`; while (g.measureText(t).width > max && f > 30) { f -= 2; g.font = `italic 700 ${f}px Georgia, "Times New Roman", serif`; } }
+
 export interface SignTex { map: THREE.CanvasTexture; aspect: number }
 const signCache = new Map<string, SignTex>();
 function guideSignTexture_raw(s: GuideSign): SignTex {
   const key = JSON.stringify(s); const hit = signCache.get(key); if (hit) return hit;
-  const panels: PanelSpec[] = [{ shields: s.shields, dir: s.dir, dests: s.dests, arrows: s.arrows, exitOnly: s.exitOnly, tab: s.tab, dist: s.dist }, ...(s.also ?? [])];
-  const PW = 640, PH = 500, TAB = 78, W = PW * panels.length, H = PH + TAB;
-  const c = mkCanvas(W, H), g = c.getContext('2d')!; g.clearRect(0, 0, W, H);
-  panels.forEach((p, i) => { drawPanel(g, p, i * PW, TAB, PW, PH); if (i) { g.fillStyle = '#fff'; g.fillRect(i * PW - 4, TAB + 10, 8, PH - 20); } });
-  panels.forEach((p, i) => {
-    if (!p.tab) return;
-    const green = /^EXIT/.test(p.tab), tw = Math.min(PW - 48, green ? 270 : 330), tx = i * PW + 24;
-    g.fillStyle = green ? GREEN : '#f2b705'; g.fillRect(tx, 6, tw, TAB - 10);
-    g.strokeStyle = green ? '#fff' : '#111'; g.lineWidth = green ? 5 : 4; g.strokeRect(tx + 2, 8, tw - 4, TAB - 14);
-    g.fillStyle = green ? '#fff' : '#111'; g.font = '700 42px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(p.tab, tx + tw / 2, TAB / 2 + 1);
-  });
-  const out = { map: tex(c, true, 8), aspect: W / H }; signCache.set(key, out); return out;
+  const style = s.style ?? 'guide';
+  let W: number, H: number, paint: (g: CanvasRenderingContext2D) => void;
+  if (style === 'guide') {
+    const panels: PanelSpec[] = [{ shields: s.shields, dir: s.dir, dests: s.dests, arrows: s.arrows, exitOnly: s.exitOnly, tab: s.tab, dist: s.dist, left: s.left }, ...(s.also ?? [])];
+    W = PW * panels.length + GUT * (panels.length - 1); H = PH + TAB;
+    paint = (g) => { g.clearRect(0, 0, W, H); panels.forEach((p, i) => { const x = i * (PW + GUT); drawPanel(g, p, x, TAB, PW, PH); drawTab(g, p, x, PW); }); };
+  } else if (style === 'service') { W = 640; H = 400; paint = (g) => { g.clearRect(0, 0, W, H); drawService(g, s, W, H); }; }
+  else if (style === 'brown') { W = 640; H = 150 + 84 * s.dests.length; paint = (g) => { g.clearRect(0, 0, W, H); drawBrown(g, s, W, H); }; }
+  else if (style === 'mileage') { W = 720; H = 60 + 96 * (s.rows?.length ?? 1); paint = (g) => { g.clearRect(0, 0, W, H); drawMileage(g, s, W, H); }; }
+  else { W = 760; H = 440; paint = (g) => { g.clearRect(0, 0, W, H); drawWelcome(g, s, W, H); }; }
+  const c = mkCanvas(W, H), g = c.getContext('2d')!; paint(g);
+  const out = { map: tex(c, true, 8), aspect: W / H };
+  if (!fontReady) redraw.push(() => { paint(g); out.map.needsUpdate = true; });
+  signCache.set(key, out); return out;
+}
+
+/** A Georgia mile marker: the direction, the route shield, MILE and the number, with the tenth below. */
+function mileMarkerTexture_raw(route: Shield, dir: string, mile: number, tenth: number): THREE.CanvasTexture {
+  const W = 200, H = 560, c = mkCanvas(W, H), g = c.getContext('2d')!;
+  const paint = () => {
+    g.clearRect(0, 0, W, H); blank(g, 0, 0, W, H, GREEN, '#fff', 18);
+    g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = font(54); g.fillText(dir[0] ?? '', W / 2, 52);
+    drawShield(g, route, W / 2, 142, 104);
+    g.fillStyle = '#fff'; g.font = font(40); g.fillText('MILE', W / 2, 232);
+    const digits = String(mile); g.font = font(digits.length > 2 ? 78 : 100); g.fillText(digits, W / 2, 322);
+    g.fillRect(34, 392, W - 68, 5); g.font = font(86); g.fillText(String(tenth), W / 2, 468);
+  };
+  paint(); const t = tex(c, true, 4); if (!fontReady) redraw.push(() => { paint(); t.needsUpdate = true; });
+  return t;
 }
 
 /** The amber message board over the road (Georgia 511 style). */
@@ -370,3 +527,4 @@ export const regulatoryTexture = (kind: Parameters<typeof regulatoryTexture_raw>
 export const adTexture = (i: number) => memo(`a:${((i % ADS.length) + ADS.length) % ADS.length}`, () => adTexture_raw(i));
 export const skylineTexture = (kind: Skyline, seed = 7) => memo(`s:${kind}:${seed}`, () => skylineTexture_raw(kind, seed));
 export const softDot = () => memo('dot', () => softDot_raw());
+export const mileMarkerTexture = (route: Shield, dir: string, mile: number, tenth: number) => memo(`mm:${route.t}${route.n}:${dir}:${mile}:${tenth}`, () => mileMarkerTexture_raw(route, dir, mile, tenth));

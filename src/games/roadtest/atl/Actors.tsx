@@ -13,7 +13,7 @@ import { glowTexture } from '../g3d/textures';
 import { clamp } from '../g3d/util';
 import { bendMaterial } from './path';
 import { LANE } from './layout';
-import { decalTexture, guideSignTexture, regulatoryTexture, vmsTexture } from './textures';
+import { decalTexture, guideSignTexture, mileMarkerTexture, regulatoryTexture, vmsTexture } from './textures';
 import { DIM, type Veh } from './sim';
 import { ALL_KINDS, MAX_PER_KIND, vehicleGeo } from './vehicles';
 import { AHEAD, BEHIND, useAtl, useBent } from './World';
@@ -142,36 +142,86 @@ function GuideRig({ g, d, index }: { g: import('./stageTypes').GuideSign; d: num
   const sign = useMemo(() => guideSignTexture(g), [g]);
   const mat = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ map: sign.map, emissiveMap: sign.map, emissive: new THREE.Color('#ffffff'), emissiveIntensity: 0.12, roughness: 0.4, transparent: true, alphaTest: 0.05 }), bend), [sign, bend]);
   const steel = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ color: '#9aa0a6', roughness: 0.45, metalness: 0.75 }), bend), [bend]);
-  const overhead = stage.road === 'interstate' && (index % 3 !== 2 || (g.also?.length ?? 0) > 0);
+  const backMat = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ color: '#7d848b', roughness: 0.6, metalness: 0.5 }), bend), [bend]);
+  const style = g.style ?? 'guide';
+  const overhead = stage.road === 'interstate' && style === 'guide' && !g.post && (index % 3 !== 2 || (g.also?.length ?? 0) > 0);
   const nPanels = 1 + (g.also?.length ?? 0);
-  const H = overhead ? 3.1 : 2.7, W = H * sign.aspect;
-  const cx = (lay.padL + lay.padR) / 2, span = lay.padR - lay.padL + 1.6;
+  const span = lay.padR - lay.padL + 1.6, cx = (lay.padL + lay.padR) / 2;
+  // overhead panels are 3.2 m tall; a sign wider than the road is scaled to fit between the posts
+  const H0 = overhead ? 4.3 : style === 'service' ? 2.9 : style === 'brown' ? 2.5 : style === 'mileage' ? 3.0 : style === 'welcome' ? 4.2 : 3.2;
+  const H = overhead ? Math.min(H0, (span - 1.2) / sign.aspect) : H0, W = H * sign.aspect;
+  // an exit sign hangs over the right lanes, where its exit is; a pull-through sign hangs over the through lanes
+  const exitish = !!g.tab || nPanels > 1;
+  const sx = g.left ? lay.padL + W / 2 + 0.6 : exitish ? Math.max(cx - span / 2 + W / 2 + 0.6, lay.padR - W / 2 - 0.4) : Math.min(cx, lay.padR - W / 2 - 0.4 - LANE * 0.5);
   useFrame(() => {
     const m = grp.current; if (!m) return; const rel = d - sim.traveled;
     m.visible = rel < AHEAD + 20 && rel > -BEHIND - 10; m.position.z = sim.traveled - d;
     mat.emissiveIntensity = 0.1 + clamp(night.current * 1.3 - 0.1, 0, 1) * 0.55;
   });
-  void nPanels;
+  const truss = useMemo(() => { const n = Math.max(4, Math.round(span / 2.2)); return Array.from({ length: n }, (_, i) => ({ x: cx - span / 2 + (i + 0.5) * (span / n), r: i % 2 ? 0.62 : -0.62, w: span / n })); }, [span, cx]);
+  const px = lay.edgeR + 2.8;
   return <group ref={grp}>
     {overhead
       ? <>
-        <mesh material={steel} position={[lay.padL - 0.7, 4.5, 0]}><boxGeometry args={[0.45, 9.0, 0.45]} /></mesh>
-        <mesh material={steel} position={[lay.padR + 0.7, 4.5, 0]}><boxGeometry args={[0.45, 9.0, 0.45]} /></mesh>
-        <mesh material={steel} position={[cx, 8.9, 0]}><boxGeometry args={[span, 0.7, 0.55]} /></mesh>
-        <mesh material={steel} position={[cx, 9.35, 0]}><boxGeometry args={[span, 0.12, 0.12]} /></mesh>
-        <mesh material={mat} position={[cx + (g.left ? -1.5 : 0), 8.55 - H / 2, 0.32]}><planeGeometry args={[W, H]} /></mesh>
+        {/* a box-truss gantry: two legs, two chords, diagonals between them, and the catwalk lights under the panels */}
+        <mesh material={steel} position={[lay.padL - 0.7, 5.5, 0]}><boxGeometry args={[0.42, 11, 0.42]} /></mesh>
+        <mesh material={steel} position={[lay.padR + 0.7, 5.5, 0]}><boxGeometry args={[0.42, 11, 0.42]} /></mesh>
+        <mesh material={steel} position={[lay.padL - 0.7, 0.25, 0]}><boxGeometry args={[0.9, 0.5, 0.9]} /></mesh>
+        <mesh material={steel} position={[lay.padR + 0.7, 0.25, 0]}><boxGeometry args={[0.9, 0.5, 0.9]} /></mesh>
+        <mesh material={steel} position={[cx, 10.85, 0]}><boxGeometry args={[span, 0.16, 0.5]} /></mesh>
+        <mesh material={steel} position={[cx, 9.85, 0]}><boxGeometry args={[span, 0.16, 0.5]} /></mesh>
+        {truss.map((t, i) => <mesh key={i} material={steel} position={[t.x, 10.35, 0]} rotation-z={t.r}><boxGeometry args={[0.08, 1.2, 0.08]} /></mesh>)}
+        <mesh material={backMat} position={[sx, 10.6 - H + (H * PANEL_K) / 2, 0.27]}><boxGeometry args={[W * 0.985, H * PANEL_K * 0.985, 0.06]} /></mesh>
+        <mesh material={mat} position={[sx, 10.6 - H / 2, 0.32]}><planeGeometry args={[W, H]} /></mesh>
+        <mesh material={steel} position={[sx, 10.6 - H - 0.05, 0.75]}><boxGeometry args={[W * 0.9, 0.07, 0.07]} /></mesh>
+        {[-0.3, 0.3].map((k) => <mesh key={k} material={steel} position={[sx + k * W, 10.6 - H - 0.05, 0.52]}><boxGeometry args={[0.06, 0.06, 0.5]} /></mesh>)}
       </>
       : <>
-        <mesh material={steel} position={[lay.edgeR + 2.6, 2.4, 0]}><boxGeometry args={[0.3, 4.8, 0.3]} /></mesh>
-        <mesh material={steel} position={[lay.edgeR + 2.6 + W - 0.6, 2.4, 0]}><boxGeometry args={[0.3, 4.8, 0.3]} /></mesh>
-        <mesh material={mat} position={[lay.edgeR + 2.6 + (W - 0.6) / 2, 4.8 - H / 2 + 0.6, 0.2]}><planeGeometry args={[W, H]} /></mesh>
+        <mesh material={steel} position={[px, (H + 2.1) / 2, 0]}><boxGeometry args={[0.2, H + 2.1, 0.2]} /></mesh>
+        <mesh material={steel} position={[px + W - 0.6, (H + 2.1) / 2, 0]}><boxGeometry args={[0.2, H + 2.1, 0.2]} /></mesh>
+        <mesh material={backMat} position={[px + (W - 0.6) / 2, 2.1 + (H * (style === 'guide' ? PANEL_K : 1)) / 2, 0.13]}><boxGeometry args={[W * 0.985, H * 0.985 * (style === 'guide' ? PANEL_K : 1), 0.05]} /></mesh>
+        <mesh material={mat} position={[px + (W - 0.6) / 2, 2.1 + H / 2, 0.17]}><planeGeometry args={[W, H]} /></mesh>
       </>}
+  </group>;
+}
+/** share of a guide sign texture that is the panel itself (the rest is the exit plaque on top) */
+const PANEL_K = 470 / 574;
+
+// ------------------------------------------------------------------ Georgia mile markers, every two tenths, on the right shoulder ---
+function MileMarkers() {
+  const { sim, stage, bend } = useAtl();
+  const lay = sim.lay, L = sim.effectiveLength;
+  const list = useMemo(() => {
+    if (stage.road !== 'interstate') return [];
+    const ex = (stage.exits ?? []).map((e) => ({ d: 40 + e.at * (L - 90), mi: parseInt(e.no ?? '', 10) })).filter((e) => Number.isFinite(e.mi));
+    if (ex.length < 2) return [];
+    const route = /^(I|GA|US)-(\d+)/.exec(stage.roadName), dir = / (NORTH|SOUTH|EAST|WEST)/.exec(stage.roadName)?.[1] ?? '';
+    if (!route) return [];
+    const shield = { t: route[1] as 'I' | 'GA' | 'US', n: route[2]! };
+    // the mile at any distance, from the exit numbers on either side (Georgia numbers its exits by the mile)
+    const mileAt = (d: number) => { let a = ex[0]!, b = ex[ex.length - 1]!; for (let i = 0; i + 1 < ex.length; i++) if (d >= ex[i]!.d && d <= ex[i + 1]!.d) { a = ex[i]!; b = ex[i + 1]!; break; } if (d < ex[0]!.d) b = ex[1]!; if (d > b.d) a = ex[ex.length - 2]!; return a.mi + ((d - a.d) / Math.max(1, b.d - a.d)) * (b.mi - a.mi); };
+    const out: { d: number; mile: number; tenth: number; shield: typeof shield; dir: string }[] = [];
+    for (let d = 260; d < L - 120; d += 310) { const m = mileAt(d); if (m < 0) continue; const t = Math.round(m * 5) * 2; out.push({ d, mile: Math.floor(t / 10), tenth: t % 10, shield, dir }); }
+    return out;
+  }, [stage, L]);
+  const post = useBent(() => new THREE.MeshStandardMaterial({ color: '#8f959b', roughness: 0.5, metalness: 0.7 }));
+  return <>{list.map((m, i) => <MileMarker key={i} m={m} x={lay.padR + 1.9} post={post} bend={bend} />)}</>;
+}
+function MileMarker({ m, x, post, bend }: { m: { d: number; mile: number; tenth: number; shield: import('./stageTypes').Shield; dir: string }; x: number; post: THREE.Material; bend: ReturnType<typeof useAtl>['bend'] }) {
+  const { sim, night } = useAtl();
+  const grp = useRef<THREE.Group>(null);
+  const tex = useMemo(() => mileMarkerTexture(m.shield, m.dir, m.mile, m.tenth), [m]);
+  const mat = useMemo(() => bendMaterial(new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new THREE.Color('#ffffff'), emissiveIntensity: 0.1, roughness: 0.5, transparent: true, alphaTest: 0.05 }), bend), [tex, bend]);
+  useFrame(() => { const g = grp.current; if (!g) return; const rel = m.d - sim.traveled; g.visible = rel < 220 && rel > -BEHIND; g.position.z = sim.traveled - m.d; mat.emissiveIntensity = 0.1 + clamp(night.current * 1.3 - 0.1, 0, 1) * 0.4; });
+  return <group ref={grp} position={[x, 0, 0]}>
+    <mesh material={post} position={[0, 1.1, -0.04]}><boxGeometry args={[0.07, 2.2, 0.07]} /></mesh>
+    <mesh material={mat} position={[0, 1.75, 0.01]}><planeGeometry args={[0.46, 1.29]} /></mesh>
   </group>;
 }
 export function GuideSigns() {
   const { sim, stage } = useAtl();
   const L = sim.effectiveLength;
-  return <>{stage.guide.map((g, i) => <GuideRig key={i} g={g} index={i} d={40 + g.at * (L - 90)} />)}</>;
+  return <>{stage.guide.map((g, i) => <GuideRig key={i} g={g} index={i} d={40 + g.at * (L - 90)} />)}<MileMarkers /></>;
 }
 
 // ------------------------------------------------------------------ amber message boards over the road ---

@@ -7,6 +7,8 @@ import { loadConditions } from '../g3d/conditions';
 import type { TimeOfDay } from '../g3d/themes';
 import { ScoreTracker } from '../game/scoring';
 import type { LegEnd } from './sim';
+import { FreeHud } from './FreeHud';
+import { getTrip } from './passport';
 
 const CarrolltonPlay = lazy(() => import('../carrollton/Play'));
 const OPEN_WORLD_ID = 'atl-carrollton-open';
@@ -34,7 +36,7 @@ interface Leg { id: string; n: number; mph: number; strikes: number; miles: numb
 function FreeRoam({ difficulty, onHandle, onComplete, onLost }: { difficulty: Difficulty; onHandle: (h: AtlHandle) => void; onComplete: (r: LevelResult) => void; onLost: () => void }) {
   const tracker = useMemo(() => new ScoreTracker(), []);
   const wx = useRef<WeatherKind>('clear');
-  const [leg, setLeg] = useState<Leg>(() => ({ id: freeLeg(getFreeStart()).id, n: 0, mph: 0, strikes: 0, miles: 0 }));
+  const [leg, setLeg] = useState<Leg>(() => ({ id: freeLeg(getTrip()?.start ?? getFreeStart()).id, n: 0, mph: 0, strikes: 0, miles: 0 }));
   const [fade, setFade] = useState(false);
   const busy = useRef(false);
   const handle = useMemo(() => {
@@ -61,5 +63,5 @@ function FreeRoam({ difficulty, onHandle, onComplete, onLost }: { difficulty: Di
       window.setTimeout(() => setFade(false), 180);
     }, 340);
   }, []);
-  return <AtlGame handle={handle} onComplete={onComplete} onLost={onLost} onLeg={onLeg} fade={fade} />;
+  return <AtlGame handle={handle} onComplete={onComplete} onLost={onLost} onLeg={onLeg} fade={fade} overlay={<FreeHud handle={handle} legNo={leg.n} />} />;
 }

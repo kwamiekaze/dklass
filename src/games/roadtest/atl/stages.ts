@@ -468,25 +468,53 @@ const MILE = 1609;
  * gore point where the lane peels off. Everything is built from the one `exits` list so the signs and the ramp in the road can never disagree.
  */
 export function expandExits(st: AtlStage): AtlStage {
-  if (!st.exits?.length) return st;
+  if (!st.exits?.length && !st.extras) return st;
   const L = st.lengthM, D = (at: number) => 40 + at * (L - 90), A = (d: number) => Math.max(0.01, Math.min(0.99, (d - 40) / (L - 90)));
   const extra: GuideSign[] = [];
-  for (const e of st.exits) {
+  const gores = (st.exits ?? []).filter((e) => (e.kind ?? 'exit') === 'exit' || e.kind === 'fork').map((e) => D(e.at)).sort((a, b) => a - b);
+  /** the nearest gore before this one: an advance sign for an exit is never posted before the previous exit has been passed */
+  const prevGore = (d: number) => { let p = -1e9; for (const g of gores) if (g < d - 1) p = g; return p; };
+  const ADV: [number, string][] = [[MILE, '1 MILE'], [MILE / 2, '1/2 MILE'], [MILE / 4, '1/4 MILE']];
+  for (const e of st.exits ?? []) {
     const d = D(e.at), kind = e.kind ?? 'exit', tab = e.no ? `EXIT ${e.no}` : undefined;
     if (kind === 'exit') {
       if (e.quiet) { extra.push(sign(A(d - 150), e.shields, e.dir, e.dests, { tab, arrows: ['upright'], exitOnly: true, also: e.also })); continue; }
-      if (d - MILE > 120) extra.push(sign(A(d - MILE), e.shields, e.dir, e.dests, { tab, dist: '1 MILE', also: e.also }));
-      if (d - MILE / 2 > 120) extra.push(sign(A(d - MILE / 2), e.shields, e.dir, e.dests, { tab, dist: '1/2 MILE', also: e.also }));
-      extra.push(sign(A(d - 150), e.shields, e.dir, e.dests, { tab, arrows: ['upright'], exitOnly: true, also: e.also?.map((a) => ({ ...a, arrows: ['upright' as const] })) }));
+      const floor = Math.max(120, prevGore(d) + 110);
+      let posted = 0;
+      for (const [m, label] of ADV) { if (posted >= 2 || d - m <= floor) continue; if (m < MILE / 2 && posted) continue; extra.push(sign(A(d - m), e.shields, e.dir, e.dests, { tab, dist: label, also: e.also })); posted++; }
+      extra.push(sign(A(d - 150), e.shields, e.dir, e.dests, { tab, arrows: ['upright'], also: e.also?.map((a) => ({ ...a, arrows: ['upright' as const] })) }));
+      // blue services board and brown point-of-interest sign, on posts before the first green sign
+      const sv = e.no ? st.extras?.services?.[e.no] : undefined, br = e.no ? st.extras?.brown?.[e.no] : undefined;
+      if (sv && d - 520 > 150) extra.push({ at: A(d - 520), dests: [], style: 'service', post: true, icons: sv, tab });
+      if (br && d - 330 > 150) extra.push({ at: A(d - 330), dests: br.split('|'), style: 'brown', post: true, tab });
     } else if (kind === 'fork') {
-      if (d - MILE > 120) extra.push(sign(A(d - MILE), e.shields, e.dir, e.dests, { tab, dist: '1 MILE', also: e.also }));
-      extra.push(sign(A(d - MILE * 0.45), e.shields, e.dir, e.dests, { tab, dist: '1/2 MILE', also: e.also }));
+      const floor = Math.max(120, prevGore(d) + 110);
+      if (d - MILE > floor) extra.push(sign(A(d - MILE), e.shields, e.dir, e.dests, { tab, dist: '1 MILE', also: e.also }));
+      if (d - MILE * 0.45 > floor) extra.push(sign(A(d - MILE * 0.45), e.shields, e.dir, e.dests, { tab, dist: '1/2 MILE', also: e.also }));
       extra.push(sign(A(d - 140), e.shields, e.dir, e.dests, { tab, arrows: ['upleft'], also: e.also }));
     } else if (e.street) {
       extra.push(sign(A(d - 9), undefined, undefined, [e.street], { arrows: [kind === 'left' ? 'left' : 'right'] }));
     }
   }
-  return { ...st, guide: [...st.guide, ...extra].sort((a, b) => a.at - b.at) };
+  const x = st.extras;
+  if (x?.welcome) extra.push({ at: A(150), dests: ['Welcome', "We're glad Georgia's", 'on your mind'], style: 'welcome', post: true });
+  if (x?.miles?.length) { const after = gores.length ? gores[0]! + 330 : 500; extra.push({ at: A(after), dests: [], style: 'mileage', post: true, rows: x.miles }); }
+  if (x?.stateLine) extra.push({ at: A(L - 260), dests: ['Welcome to', x.stateLine === 'Alabama' ? 'Sweet Home Alabama' : x.stateLine], style: 'welcome', post: true });
+  // two signs that would stand within 90 m of each other share one gantry, the farther exit on the left
+  const all = [...st.guide, ...extra].sort((a, b) => a.at - b.at), out: GuideSign[] = [];
+  for (const g of all) {
+    const last = out[out.length - 1];
+    const overhead = (s: GuideSign) => !s.post && (s.style ?? 'guide') === 'guide' && !!(s.tab || s.shields?.length);
+    if (last && overhead(last) && overhead(g) && st.road === 'interstate' && (g.at - last.at) * (L - 90) < 90 && 1 + (last.also?.length ?? 0) + 1 + (g.also?.length ?? 0) <= 3) {
+      const asPanel = (s: GuideSign) => ({ shields: s.shields, dir: s.dir, dests: s.dests, arrows: s.arrows, exitOnly: s.exitOnly, tab: s.tab, dist: s.dist });
+      // the exit you are at keeps the right-hand place, over the exit lane
+      const here = (x: GuideSign) => !x.dist && !!x.tab; const [l, r] = here(g) && !here(last) ? [last, g] : here(last) && !here(g) ? [g, last] : [last, g];
+      out[out.length - 1] = { ...l, at: last.at, also: [...(l.also ?? []), asPanel(r), ...(r.also ?? [])] };
+      continue;
+    }
+    out.push(g);
+  }
+  return { ...st, guide: out };
 }
 
 /** the hand-written stage before its signs are expanded (free roam clones these) */

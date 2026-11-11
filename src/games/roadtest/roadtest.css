@@ -1541,3 +1541,18 @@
 @media (min-width: 640px) { .gm-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } .gm-tile { min-height: 190px; } }
 @media (max-width: 340px) { .gm-grid { grid-template-columns: minmax(0, 1fr); } .gm-featured { flex-wrap: wrap; } }
 @media (prefers-reduced-motion: reduce) { .gm-featured, .gm-live i { animation: none; } .gm-tile { transition: none; } }
+
+/* ---- the menu: Georgia Passport and road trips */
+.gp-card { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; padding: 14px 16px; margin: 6px 0 12px; border-radius: 18px; background: linear-gradient(135deg, rgba(0,103,71,.32), rgba(12,14,26,.5)); border: 1px solid rgba(242,193,78,.4); }
+.gp-badge { width: 66px; height: 66px; border-radius: 50%; display: grid; place-items: center; font: 900 26px 'Poppins', sans-serif; color: #1a1405; background: radial-gradient(circle at 35% 30%, #ffe9a6, #e0a92e); box-shadow: 0 0 22px rgba(242,193,78,.5), inset 0 -4px 8px rgba(120,80,0,.35); }
+.gp-info { min-width: 0; } .gp-info h4 { margin: 0; font: 800 17px 'Poppins', sans-serif; color: #fff; } .gp-info h4 small { font-weight: 600; font-size: 11px; color: #f2c14e; margin-left: 8px; letter-spacing: .08em; text-transform: uppercase; }
+.gp-info p { margin: 2px 0 6px; font-size: 12px; color: #d8d2c4; }
+.gp-meter { height: 8px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; } .gp-meter span { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #2fbf87, #f2c14e); }
+.gp-stats { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 7px; font-size: 11px; color: #cfc8bb; } .gp-stats b { color: #fff; font-weight: 800; }
+.gp-trips { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin-top: 4px; }
+.gp-trip { display: flex; align-items: center; gap: 10px; text-align: left; padding: 10px 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: #fff; cursor: pointer; font-family: 'Poppins', sans-serif; transition: transform .15s ease, border-color .15s ease, background .15s ease; }
+.gp-trip:hover, .gp-trip:focus-visible { transform: translateY(-2px); border-color: #f2c14e; background: rgba(242,193,78,.1); outline: none; }
+.gp-trip span.ic { flex: none; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: #006747; border: 1.5px solid #fff; font-size: 18px; font-weight: 900; }
+.gp-trip strong { display: block; font-size: 13px; font-weight: 700; line-height: 1.2; } .gp-trip small { display: block; font-size: 11px; color: #cfc8bb; line-height: 1.25; }
+.gp-trip em { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 800; color: #f2c14e; white-space: nowrap; }
+.gp-h { margin: 12px 0 2px; font: 700 12px 'Poppins', sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #f2c14e; }

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { LEVELS } from '../game/levels';
 import { ATL_STAGES, PHASES } from '../atl/stages';
 import { FREE_ID, FREE_STARTS, getFreeStart, setFreeStart } from '../atl/freeroam';
+import { TRIPS, loadPassport, passportStats, setTrip } from '../atl/passport';
 import { SKILL_LABELS, computeRadarData, SKILL_KEYS, type ReportCardRatings } from '@/lib/reportCardGraphData';
 import '../atl/atl.css';
 import { DIFFICULTIES, type Difficulty } from '../game/types';
@@ -110,6 +111,8 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
   const nextUp = ATL_STAGES.find((x) => !bestScores[x.id]);
   const weakLabels = weak.map((k) => SKILL_LABELS[k] ?? k);
   const [freePick, setFreePick] = useState(getFreeStart());
+  const pass = useMemo(() => passportStats(loadPassport()), []);
+  const tripsDone = useMemo(() => loadPassport().trips, []);
   const startLevel = (id: string) => { clickTick(); onStart(id); };
   const jump = (id: string) => { clickTick(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   const bestOf = (id: string, fallback: string) => (bestScores[id] ? `Best ${bestScores[id]}` : fallback);
@@ -224,9 +227,29 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
         <div className="atl-group atl-free gm-anchor" id="rt-freeroam">
           <h3>Free Roam<small>Endless · real Atlanta roads · exits, merges and left turns</small></h3>
           <p className="atl-free-note">No finish line. Take any exit, turn at any cross street, merge from the ramps and keep going. The real exit numbers and street names are on the signs. Three crashes ends the drive; a clean road drops one strike.</p>
+          <div className="gp-card">
+            <div className="gp-badge" aria-hidden>{pass.rank.level}</div>
+            <div className="gp-info">
+              <h4>Georgia Passport<small>Level {pass.rank.level} · {pass.rank.name}</small></h4>
+              <p>Every exit you drive past is a stamp. Take the exit to collect it. {pass.total} exits from Atlanta to Carrollton, LaGrange and the Alabama line.</p>
+              <div className="gp-meter"><span style={{ width: `${Math.max(2, Math.round((pass.seen / Math.max(1, pass.total)) * 100))}%` }} /></div>
+              <div className="gp-stats"><span><b>{pass.seen}</b>/{pass.total} exits seen</span><span><b>{pass.taken}</b> collected</span><span><b>{pass.roads}</b> roads</span><span><b>{Math.round(pass.miles)}</b> miles</span><span><b>{pass.xp}</b> XP{pass.rank.next ? ` · next: ${pass.rank.next}` : ''}</span>{pass.streak > 0 && <span><b>{pass.streak}</b> day streak</span>}</div>
+            </div>
+          </div>
+          <div className="gp-h">Road trips with GPS</div>
+          <div className="gp-trips" role="group" aria-label="Road trips">
+            {TRIPS.map((t) => (
+              <button key={t.id} className="gp-trip" onClick={() => { setTrip(t.id); startLevel(FREE_ID); }}>
+                <span className="ic" aria-hidden>↱</span>
+                <span><strong>{t.title}</strong><small>{t.sub}</small></span>
+                <em>{tripsDone[t.id] ? `✓ ×${tripsDone[t.id]}` : '+250 XP'}</em>
+              </button>
+            ))}
+          </div>
+          <div className="gp-h">Or just drive</div>
           <div className="atl-free-starts" role="group" aria-label="Where to start">
             {FREE_STARTS.map((f) => (
-              <button key={f.id} className={`atl-card atl-free-card${freePick === f.id ? ' next' : ''}`} onClick={() => { setFreeStart(f.id); setFreePick(f.id); startLevel(FREE_ID); }}>
+              <button key={f.id} className={`atl-card atl-free-card${freePick === f.id ? ' next' : ''}`} onClick={() => { setTrip(null); setFreeStart(f.id); setFreePick(f.id); startLevel(FREE_ID); }}>
                 <span className="atl-lim"><small>START</small><b>GO</b></span>
                 <span className="atl-info"><strong>{f.title}</strong><small>{f.sub}</small></span>
                 <span className="atl-best">{bestScores[FREE_ID] ? `Best ${bestScores[FREE_ID]}` : 'Drive →'}</span>

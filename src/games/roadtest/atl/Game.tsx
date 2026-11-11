@@ -267,7 +267,7 @@ function AtlHud({ handle }: { handle: AtlHandle }) {
   </div>;
 }
 
-export function AtlGame({ handle, onComplete, onLost, onLeg, fade }: { handle: AtlHandle; onComplete: (r: LevelResult) => void; onLost: () => void; onLeg?: (e: LegEnd) => void; fade?: boolean }) {
+export function AtlGame({ handle, onComplete, onLost, onLeg, fade, overlay }: { handle: AtlHandle; onComplete: (r: LevelResult) => void; onLost: () => void; onLeg?: (e: LegEnd) => void; fade?: boolean; overlay?: React.ReactNode }) {
   const [ready, setReady] = useState(!!handle.cont);
   const [carId] = useState(() => selectedCar().id);
   const done = useRef(onComplete); done.current = onComplete;
@@ -322,6 +322,7 @@ export function AtlGame({ handle, onComplete, onLost, onLeg, fade }: { handle: A
     </Canvas>
     <Hud handle={handle as unknown as Parameters<typeof Hud>[0]['handle']} />
     <AtlHud handle={handle} />
+    {overlay}
     {onLeg && <div className={`atl-fade${fade ? ' on' : ''}`} />}
     <div className={`rt3d-loading atl-loading${ready ? ' done' : ''}`} aria-hidden={ready}>
       <div className="rt3d-spin" />

@@ -12,7 +12,8 @@ export type Region =
 export type RoadKind = 'interstate' | 'arterial' | 'local' | 'rural';
 export type Skyline = 'downtown' | 'midtown' | 'buckhead' | 'perimeter' | 'carrollton' | 'airport' | 'stonemtn' | 'cobb' | 'suburb' | 'hills' | 'none';
 
-export interface Shield { t: 'I' | 'US' | 'GA'; n: string }
+/** `b` is the small banner over the shield: ALT, BUS, CONN, SPUR, LOOP, TOLL */
+export interface Shield { t: 'I' | 'US' | 'GA'; n: string; b?: 'ALT' | 'BUS' | 'CONN' | 'SPUR' | 'LOOP' }
 export type Arrow = 'up' | 'upright' | 'upleft' | 'right' | 'left' | 'down';
 
 /** One overhead or roadside green guide sign. `at` is 0..1 along the stage. */
@@ -28,6 +29,18 @@ export interface GuideSign {
   exitOnly?: boolean;
   left?: boolean;
   dist?: string;
+  /**
+   * What kind of sign this is. 'guide' is the green exit sign. The others stand on posts beside the road:
+   * 'service' the blue GAS · FOOD · LODGING board, 'brown' a point of interest, 'mileage' the green list of towns and miles,
+   * 'welcome' the state line sign, 'mile' a mile marker.
+   */
+  style?: 'guide' | 'service' | 'brown' | 'mileage' | 'welcome';
+  /** always on posts at the roadside, never on a gantry */
+  post?: boolean;
+  /** mileage sign rows: [place, miles] */
+  rows?: [string, number][];
+  /** service sign icons */
+  icons?: string[];
   /** a second panel next to the first (the big gantries carry two or three) */
   also?: { shields?: Shield[]; dir?: string; dests: string[]; arrows?: Arrow[]; exitOnly?: boolean; tab?: string; dist?: string }[];
 }
@@ -116,6 +129,8 @@ export interface AtlStage {
   /** where the player is, in the words of the stage: used on the loading screen */
   place: string;
   isRush?: boolean;
+  /** free roam: the extra roadside signs of this stretch (distance boards, services, points of interest, the state line) */
+  extras?: { miles?: [string, number][]; stateLine?: string; welcome?: boolean; services?: Record<string, string[]>; brown?: Record<string, string> };
   /** curriculum phase 1..9, set by the course table in stages.ts */
   phase?: number;
   /** report card skill keys this stage trains (same keys as the portal report card) */
