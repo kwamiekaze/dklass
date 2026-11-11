@@ -43,7 +43,8 @@ Deno.serve(async (req) => {
   const url = Deno.env.get('SUPABASE_URL')!
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
-  const resendKey = Deno.env.get('RESEND_API_KEY') ?? ''
+  // tolerate a pasted key with stray spaces, quotes, a newline or a leading 'Bearer '
+  const resendKey = (Deno.env.get('RESEND_API_KEY') ?? '').trim().replace(/^Bearer\s+/i, '').replace(/^["']+|["']+$/g, '').trim()
   const fromAddress = Deno.env.get('INVITE_FROM') ?? 'DrivingKlass Play <hello@play.drivingklass.com>'
   const replyTo = Deno.env.get('INVITE_REPLY_TO') ?? 'connect@drivingklass.com'
   const configured = resendKey.length > 0
