@@ -411,3 +411,39 @@
   border: 1px solid rgba(229, 184, 74, .65); background: rgba(8, 36, 86, .6); -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); box-shadow: 0 0 8px rgba(229, 184, 74, .22); animation: n2-recenter-in .2s ease-out; }
 .n2-recenter:active { transform: scale(.97); }
 @keyframes n2-recenter-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* Bottom dock. The Reviews / About Us / Call row lives inside the rail: on wide screens it sits in the rail itself, level with
+   Book and Message; on narrower screens and phones it floats just above the gold line with a clear gap, never across it. */
+.n2-rail .n2-navbtns { position: absolute; left: 0; right: 0; bottom: calc(100% + 12px); z-index: 6; }
+@media (min-width: 1180px) and (min-aspect-ratio: 4/5) {
+  .n2-rail .n2-navbtns { position: static; margin-left: auto; padding: 0; --nb-gap: 12px; --nb-w: clamp(124px, 8.4vw, 150px); }
+  .n2-rail .n2-navbtns .n2-nbtn { height: 48px; font-size: 12px; letter-spacing: .16em; }
+  .n2-ctl + .n2-navbtns { margin-left: 16px; }
+  .n2-drag { bottom: 96px; }
+}
+
+/* Landscape phones: the stage fits the screen (no 560px floor pushing the dock out of view), the header slims down and the
+   whole dock sits on one line. */
+.n2-book { white-space: nowrap; }
+@media (max-height: 560px) and (orientation: landscape) {
+  .n2-experience { min-height: 0; }
+  .n2-nav, .n2-hdr-stars { display: none; }
+  .n2-rail { height: 64px; padding: 0 max(4%, env(safe-area-inset-left, 0px)); }
+  .n2-rail-actions { width: min(260px, 36vw); gap: 8px; }
+  .n2-rail-actions .n2-btn, .n2-rail-book { min-height: 40px; font-size: 10.5px; letter-spacing: .08em; }
+  .n2-rail .n2-navbtns { --nb-gap: 8px; --nb-w: clamp(84px, 12vw, 120px); }
+  .n2-rail .n2-navbtns .n2-nbtn { height: 40px; font-size: 10.5px; letter-spacing: .1em; padding: 0 6px; }
+  .n2-rail .n2-navbtns .n2-nbtn svg { display: none; }
+}
+@media (max-height: 560px) and (orientation: landscape) and (min-width: 700px) {
+  .n2-rail .n2-navbtns { position: static; margin-left: auto; padding: 0; }
+  .n2-rail .n2-swipe { margin-left: 12px; }
+}
+
+/* Popups: a deeper glass so the estate never shows through the words. On desktop the panel is wide and the scene behind it is
+   busy (lit towers, string lights), so the panel and each card carry real tint and the backdrop dims the world a little more. */
+.n2-pop-layer { background: radial-gradient(ellipse at center, rgba(0, 0, 0, .3), rgba(0, 0, 0, .58)); }
+.n2-pop, .n2-page[data-theme="day"] .n2-pop { background: linear-gradient(180deg, rgba(18, 13, 5, .86), rgba(10, 8, 4, .9)); }
+.n2-pop-card { background: linear-gradient(180deg, rgba(255, 246, 222, .07), rgba(255, 246, 222, .03)); }
+.n2-pop-card:hover { background: linear-gradient(180deg, rgba(255, 246, 222, .12), rgba(255, 246, 222, .06)); }
+.n2-pop-card > a, .n2-pop-card > button { margin-top: auto; }

@@ -228,18 +228,17 @@ export default function NuHome2() {
           <p className="n2-desc">{BRAND.description}</p>
         </div>
 
-        <div className="n2-navbtns" role="group" aria-label="Reviews, About Us and Call">
-          <button type="button" className="n2-nbtn" onClick={() => setReviewsOpen(true)}><Star size={15} aria-hidden="true" /><span>Reviews</span></button>
-          <button type="button" className="n2-nbtn" onClick={() => setAboutOpen(true)}><Info size={15} aria-hidden="true" /><span>About Us</span></button>
-          <button type="button" className="n2-nbtn" aria-label="Call Driving Klass" onClick={() => { trackClick("call_click"); window.location.href = "tel:+14044045820"; }}><Phone size={15} aria-hidden="true" /><span>Call</span></button>
-        </div>
-
         <div className="n2-rail">
           <div className="n2-rail-actions">
             <button type="button" className="n2-btn n2-btn--gold n2-rail-book" onClick={() => setSheet(true)}>Book a Klass</button>
             <button type="button" className="n2-btn n2-btn--glass n2-rail-msg" onClick={() => setMsgOpen(true)} aria-label="Send us a message"><MessageSquare size={15} aria-hidden="true" /><span>Message</span></button>
           </div>
           <MusicControls />
+          <div className="n2-navbtns" role="group" aria-label="Reviews, About Us and Call">
+            <button type="button" className="n2-nbtn" onClick={() => setReviewsOpen(true)}><Star size={15} aria-hidden="true" /><span>Reviews</span></button>
+            <button type="button" className="n2-nbtn" onClick={() => setAboutOpen(true)}><Info size={15} aria-hidden="true" /><span>About Us</span></button>
+            <button type="button" className="n2-nbtn" aria-label="Call Driving Klass" onClick={() => { trackClick("call_click"); window.location.href = "tel:+14044045820"; }}><Phone size={15} aria-hidden="true" /><span>Call</span></button>
+          </div>
           <div className="n2-swipe" role="button" tabIndex={0} aria-label="Scroll down to send us a message" onClick={scrollDown}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") scrollDown(); }}>
             <span className="n2-lbl-touch">SWIPE</span><span className="n2-lbl-mouse">SCROLL</span>
