@@ -69,15 +69,31 @@ function stripTexture(lines: [number, number][], span: number, across: 'u' | 'v'
   t.needsUpdate = true; return t;
 }
 /**
+ * Road paint runs out to 260 m, past the soft-focus backdrop rings (142 m and 176 m). The rings do not write depth, and the paint is drawn
+ * after them, so paint past them would lie sharp on top of the blurred trees. The paint thins with distance from the middle of the scene
+ * instead: full strength out to PAINT_FADE[0] metres, gone by PAINT_FADE[1], well inside the first ring. The fog has softened it by then anyway.
+ */
+export const PAINT_FADE: [number, number] = [70, 128];
+export function paintFade<T extends THREE.Material>(m: T): T {
+  m.onBeforeCompile = sh => {
+    sh.vertexShader = 'varying vec2 vPaintW;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vPaintW = (modelMatrix * vec4(transformed, 1.0)).xz;');
+    sh.fragmentShader = 'varying vec2 vPaintW;\n' + sh.fragmentShader.replace('#include <alphamap_fragment>', `#include <alphamap_fragment>
+      diffuseColor.a *= 1.0 - smoothstep(${PAINT_FADE[0].toFixed(1)}, ${PAINT_FADE[1].toFixed(1)}, length(vPaintW));`);
+  };
+  m.customProgramCacheKey = () => 'paintFade';
+  return m;
+}
+
+/**
  * One strip of paint over a road. The texture holds one repeat across `span` metres; `across` says which way the lines vary
  * ('u': across x and running along z, 'v': across z and running along x). The plane is `width` (x) by `height` (z) metres and the
  * texture repeats `repeat` times along the way the lines run (or along x for a row of stall lines, whose tile is one bay).
  */
 export function PaintStrip({ lines, span, across, color, x, z, width, height, repeat, y = PAINT_Y }: { lines: [number, number][]; span: number; across: 'u' | 'v'; color: string; x: number; z: number; width: number; height: number; repeat: [number, number]; y?: number }) {
   const tex = useMemo(() => { const t = stripTexture(lines, span, across); t.repeat.set(repeat[0], repeat[1]); return t; }, [lines, span, across, repeat]);
-  return <mesh rotation-x={-Math.PI / 2} position={[x, y, z]} renderOrder={1} receiveShadow>
+  const mat = useMemo(() => paintFade(new THREE.MeshStandardMaterial({ color, alphaMap: tex, transparent: true, depthWrite: false, roughness: .8, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })), [color, tex]);
+  return <mesh rotation-x={-Math.PI / 2} position={[x, y, z]} renderOrder={1} receiveShadow material={mat}>
     <planeGeometry args={[width, height]} />
-    <meshStandardMaterial color={color} alphaMap={tex} transparent depthWrite={false} roughness={.8} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
   </mesh>;
 }
 
