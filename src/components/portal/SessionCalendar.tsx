@@ -160,6 +160,7 @@ export function SessionCalendar({ sessions, userRole, onSessionUpdate, defaultVi
         end: s.ends_at,
         color,
         dotColor,
+        inactive: s.status === 'cancelled' || (s.status as string) === 'missed' || (s.status as string) === 'no_show',
         meta: { session: s },
       };
     });

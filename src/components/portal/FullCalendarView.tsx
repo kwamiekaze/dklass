@@ -20,6 +20,7 @@ export interface CalendarEvent {
   end: string;   // ISO
   color: string; // tailwind classes
   dotColor?: string; // for agenda dot
+  inactive?: boolean; // cancelled / missed: never covers live sessions
   meta?: Record<string, any>;
 }
 
@@ -292,6 +293,46 @@ function DayColumn({ day, events, onEventClick, onSlotClick, wide }: {
     return { top, height };
   };
 
+  // Overlap layout: live sessions keep the full readable block (split into
+  // side by side lanes if they collide with each other). Cancelled or missed
+  // sessions that overlap a live one collapse into a thin strip on the right
+  // edge so they never sit behind and muddy the live text.
+  const span = (ev: CalendarEvent) => {
+    const { top, height } = positionEvent(ev);
+    return { a: top, b: top + Math.max(height, 20) };
+  };
+  const hit = (x: CalendarEvent, y: CalendarEvent) => {
+    const p = span(x), q = span(y);
+    return p.a < q.b && q.a < p.b;
+  };
+  const live = events.filter(e => !e.inactive).sort((x, y) => span(x).a - span(y).a);
+  const dead = events.filter(e => e.inactive);
+  const laneOf = new Map<string, { lane: number; lanes: number }>();
+  let cluster: CalendarEvent[] = [];
+  let clusterEnd = -1;
+  const flush = () => {
+    const ends: number[] = [];
+    const lanes = new Map<string, number>();
+    cluster.forEach(e => {
+      const { a, b } = span(e);
+      let l = ends.findIndex(end => end <= a);
+      if (l === -1) { l = ends.length; ends.push(b); } else ends[l] = b;
+      lanes.set(e.id, l);
+    });
+    cluster.forEach(e => laneOf.set(e.id, { lane: lanes.get(e.id)!, lanes: ends.length }));
+    cluster = [];
+  };
+  live.forEach(e => {
+    const { a, b } = span(e);
+    if (cluster.length && a >= clusterEnd) { flush(); clusterEnd = -1; }
+    cluster.push(e);
+    clusterEnd = Math.max(clusterEnd, b);
+  });
+  if (cluster.length) flush();
+  const STRIP = 18; // px
+  const deadBehind = new Set(dead.filter(d => live.some(l => hit(d, l))).map(d => d.id));
+  const liveBeside = new Set(live.filter(l => dead.some(d => hit(d, l))).map(l => l.id));
+
   return (
     <div className={cn("border-r last:border-r-0 relative", isToday(day) && "bg-primary/[0.02]")}>
       {HOURS.map(hour => (
@@ -306,21 +347,36 @@ function DayColumn({ day, events, onEventClick, onSlotClick, wide }: {
         />
       ))}
       {/* Events positioned absolutely */}
-      {events.map(ev => {
+      {[...dead, ...live].map(ev => {
         const { top, height } = positionEvent(ev);
+        const strip = ev.inactive && deadBehind.has(ev.id);
+        const lane = laneOf.get(ev.id) ?? { lane: 0, lanes: 1 };
+        const reserve = !ev.inactive && liveBeside.has(ev.id) ? STRIP + 2 : 0;
+        const style: React.CSSProperties = { top: `${top}px`, height: `${Math.max(height, 20)}px` };
+        if (strip) {
+          Object.assign(style, { right: 2, left: 'auto', width: STRIP });
+        } else if (!ev.inactive && lane.lanes > 1) {
+          const w = `calc((100% - ${reserve + 4}px) / ${lane.lanes})`;
+          Object.assign(style, { left: `calc(2px + ${w} * ${lane.lane})`, width: `calc(${w} - 2px)`, right: 'auto' });
+        } else if (reserve) {
+          Object.assign(style, { right: reserve + 2 });
+        }
         return (
           <button
             key={ev.id}
+            title={`${format(parseISO(ev.start), 'h:mm a')} ${ev.title}${ev.subtitle ? ' · ' + ev.subtitle : ''}`}
             className={cn(
-              "absolute left-0.5 right-0.5 sm:left-1 sm:right-1 rounded px-1 sm:px-1.5 py-0.5 text-[10px] sm:text-xs overflow-hidden cursor-pointer border border-transparent hover:border-foreground/20 transition-colors z-10",
+              "absolute left-0.5 right-0.5 sm:left-1 sm:right-1 rounded text-[10px] sm:text-xs overflow-hidden cursor-pointer border border-transparent hover:border-foreground/20 transition-colors",
+              strip ? "px-0 py-0 z-0 opacity-70 hover:opacity-100 hover:z-30" : "px-1 sm:px-1.5 py-0.5",
+              ev.inactive ? (strip ? "" : "z-0 opacity-80") : "z-10",
               ev.color
             )}
-            style={{ top: `${top}px`, height: `${Math.max(height, 20)}px` }}
+            style={style}
             onClick={(e) => { e.stopPropagation(); onEventClick?.(ev); }}
           >
-            <div className="font-medium truncate">{format(parseISO(ev.start), 'h:mm a')}</div>
-            {height >= 40 && <div className="truncate opacity-80">{ev.title}</div>}
-            {height >= 55 && ev.subtitle && <div className="truncate opacity-60">{ev.subtitle}</div>}
+            {!strip && <div className="font-medium truncate">{format(parseISO(ev.start), 'h:mm a')}</div>}
+            {!strip && height >= 40 && <div className="truncate opacity-80">{ev.title}</div>}
+            {!strip && height >= 55 && ev.subtitle && <div className="truncate opacity-60">{ev.subtitle}</div>}
           </button>
         );
       })}
