@@ -14,15 +14,23 @@ export function paved(x: number, z: number, margin = 0) {
   return false;
 }
 
-/** Mown lawn texture with alternating stripes and blade level noise. */
+/** A mown lawn seen close: soft mower stripes, tens of thousands of painted blades in many greens, clover, the odd daisy and worn patch. */
 export function lawnTexture() {
-  const c = document.createElement('canvas'); c.width = c.height = 1024;
+  const S = 1024, c = document.createElement('canvas'); c.width = c.height = S;
   const g = c.getContext('2d')!; const r = rng(31);
-  for (let i = 0; i < 16; i++) { g.fillStyle = i % 2 ? '#5d8a4a' : '#6b9954'; g.fillRect(0, i * 64, 1024, 64); }
-  const img = g.getImageData(0, 0, 1024, 1024); const d = img.data;
-  for (let i = 0; i < d.length; i += 4) { const n = (r() - .5) * 26; d[i] += n * .7; d[i + 1] += n; d[i + 2] += n * .6; }
-  g.putImageData(img, 0, 0);
-  for (let i = 0; i < 1800; i++) { g.fillStyle = `rgba(${r() > .5 ? '150,190,90' : '40,80,40'},.25)`; g.fillRect(r() * 1024, r() * 1024, 2, 3 + r() * 6); }
+  for (let i = 0; i < 16; i++) { const gr = g.createLinearGradient(0, i * 64, 0, i * 64 + 64); const a = i % 2 ? ['#55833f', '#5f8d47'] : ['#6c9c52', '#63934b']; gr.addColorStop(0, a[0]!); gr.addColorStop(.5, a[1]!); gr.addColorStop(1, a[0]!); g.fillStyle = gr; g.fillRect(0, i * 64, S, 64); }
+  // drifts of lusher and drier turf (wrapped, so the tile never shows an edge)
+  for (let i = 0; i < 46; i++) { const x = r() * S, y = r() * S, rad = 50 + r() * 120, dry = r() > .62; for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) { const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, rad); gr.addColorStop(0, dry ? 'rgba(176,170,96,.16)' : 'rgba(40,96,40,.2)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x + ox - rad, y + oy - rad, rad * 2, rad * 2); } }
+  // the blades themselves: short strokes leaning with the mower, each its own green
+  g.lineCap = 'round';
+  for (let i = 0; i < 52000; i++) {
+    const x = r() * S, y = r() * S, stripe = Math.floor(y / 64) % 2, len = 4 + r() * 9, lean = (stripe ? -1 : 1) * (.5 + r() * 1.2) + (r() - .5), v = r();
+    g.strokeStyle = v > .9 ? `rgba(188,214,112,${.35 + r() * .3})` : v > .5 ? `rgba(${92 + r() * 50},${150 + r() * 50},${62 + r() * 30},${.3 + r() * .3})` : `rgba(${28 + r() * 26},${70 + r() * 34},${30 + r() * 18},${.3 + r() * .3})`;
+    g.lineWidth = .8 + r() * 1.1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + lean * 2, y - len); g.stroke();
+  }
+  // clover and a few daisies
+  for (let i = 0; i < 260; i++) { const x = r() * S, y = r() * S; g.fillStyle = `rgba(${46 + r() * 20},${112 + r() * 30},${52 + r() * 16},.7)`; for (let k = 0; k < 3; k++) { const a = k * 2.094 + r(); g.beginPath(); g.arc(x + Math.cos(a) * 2.6, y + Math.sin(a) * 2.6, 2.3, 0, 7); g.fill(); } }
+  for (let i = 0; i < 70; i++) { const x = r() * S, y = r() * S; g.fillStyle = 'rgba(255,255,248,.9)'; for (let k = 0; k < 6; k++) { const a = k * 1.047; g.beginPath(); g.arc(x + Math.cos(a) * 2.2, y + Math.sin(a) * 2.2, 1.3, 0, 7); g.fill(); } g.fillStyle = '#f2c232'; g.beginPath(); g.arc(x, y, 1.3, 0, 7); g.fill(); }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; return t;
 }
 
@@ -31,11 +39,17 @@ export function Grass({ count }: { count: number }) {
   const ref = useRef<THREE.InstancedMesh>(null);
   const time = useMemo(() => ({ value: 0 }), []);
   const geo = useMemo(() => {
-    const w = .022, v = [-w, 0, 0, w, 0, 0, -w * .7, .5, 0, w * .7, .5, 0, 0, 1, 0];
-    const col: number[] = []; [0, 0, .5, .5, 1].forEach(h => { const a = .35 + h * .65; col.push(.16 * a + .05, .34 * a + .08, .1 * a + .03); });
+    // a tuft: three blades fanned from one root, each tapering and arching over under its own weight, dark at the root and sunlit at the tip
+    const v: number[] = [], col: number[] = [], idx: number[] = [], w = .024;
+    [[0, 1, 0], [2.2, .78, .5], [4.3, .88, -.4]].forEach(([yaw, hh, tint], b) => {
+      const c0 = Math.cos(yaw!), s0 = Math.sin(yaw!), base = b * 7, lean = b ? .22 : .08;
+      [0, .34, .68].forEach(h => { const ww = w * (1 - h * .55), bend = h * h * lean; [-1, 1].forEach(sd => { v.push((sd * ww) * c0 + bend * s0 + (b ? s0 * .03 : 0), h * hh!, -(sd * ww) * s0 + bend * c0 + (b ? c0 * .03 : 0)); const a = .3 + h * .7; col.push(.15 * a + .04 + tint! * .03 * h, .33 * a + .07, .09 * a + .03); }); });
+      v.push(lean * s0 + (b ? s0 * .03 : 0), hh!, lean * c0 + (b ? c0 * .03 : 0)); col.push(.3 + tint! * .05, .46, .14);
+      idx.push(base, base + 1, base + 2, base + 1, base + 3, base + 2, base + 2, base + 3, base + 4, base + 3, base + 5, base + 4, base + 4, base + 5, base + 6);
+    });
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    g.setIndex([0, 1, 2, 1, 3, 2, 2, 3, 4]); g.computeVertexNormals(); return g;
+    g.setIndex(idx); g.computeVertexNormals(); return g;
   }, []);
   const mat = useMemo(() => {
     const m = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: .9 });
