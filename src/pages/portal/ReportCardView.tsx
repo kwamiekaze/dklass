@@ -5,7 +5,7 @@ import { ReportCardViewLog } from "@/components/portal/ReportCardViewLog";
 import { TimeSplitChart, type TimeSplitEntry } from "@/components/portal/TimeSplitChart";
 import { usePortalAuth } from "@/hooks/usePortalAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { PortalLayout } from "@/components/portal/PortalLayout";
+import { PortalLayout, type PortalLook } from "@/components/portal/PortalLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -28,6 +28,24 @@ import { useSkillLabel } from "@/i18n/skills";
 import { RichTextDisplay } from "@/components/portal/RichTextDisplay";
 import { InstructorProfileModal } from "@/components/portal/InstructorProfileModal";
 import type { Profile } from "@/types/portal";
+
+/**
+ * Which look the report card uses, for everyone (students, instructors, admins):
+ *   V1  the original portal theme, with the animated road videos playing behind the cards
+ *   V2  the navy and gold student look with its sky
+ * Phones get V1 and desktops V2. To switch, change these two lines.
+ */
+const REPORT_CARD_LOOK: { mobile: PortalLook; desktop: PortalLook } = { mobile: 'v1', desktop: 'v2' };
+const MOBILE_MAX = 767;
+function useReportCardLook(): PortalLook {
+  const query = `(max-width: ${MOBILE_MAX}px)`;
+  const [mobile, setMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+  useEffect(() => {
+    const m = window.matchMedia(query), on = () => setMobile(m.matches);
+    on(); m.addEventListener('change', on); return () => m.removeEventListener('change', on);
+  }, [query]);
+  return mobile ? REPORT_CARD_LOOK.mobile : REPORT_CARD_LOOK.desktop;
+}
 
 interface ReportCardDetails {
   id: string;
@@ -116,6 +134,7 @@ export default function ReportCardView() {
   // Staff view mode
   const [viewMode, setViewMode] = useState<StaffViewMode>("normal");
   const isStaff = role === 'admin' || role === 'staff' || role === 'instructor';
+  const look = useReportCardLook();
 
   // Public sharing state
   const [isPublic, setIsPublic] = useState(false);
@@ -435,7 +454,7 @@ export default function ReportCardView() {
   const showGraphSection = viewMode === "accessed" ? showGraphPublicly : true;
 
   return (
-    <PortalLayout>
+    <PortalLayout look={look}>
       {/* Background matching homepage theme */}
       <div className="fixed inset-0 -z-10" style={{ pointerEvents: 'none' }}>
         {isDark ? (

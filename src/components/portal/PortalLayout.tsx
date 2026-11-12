@@ -34,11 +34,17 @@ import { LanguageSwitcherInline } from "@/components/LanguageSwitcher";
 import { useTranslation } from "react-i18next";
 import { useAccountFamily, RELATIONSHIP_LABELS } from "@/hooks/useAccountFamily";
 
+/**
+ * The two portal looks. 'v1' is the original portal theme with the road videos playing behind the page (what staff see);
+ * 'v2' is the navy and gold student look with its own sky. By default students get V2 and staff V1; a page can ask for one.
+ */
+export type PortalLook = 'v1' | 'v2';
 interface PortalLayoutProps {
   children: ReactNode;
+  look?: PortalLook;
 }
 
-export function PortalLayout({ children }: PortalLayoutProps) {
+export function PortalLayout({ children, look }: PortalLayoutProps) {
   const { profile, role, signOut, user } = usePortalAuth();
   const { me: familyMe } = useAccountFamily(user?.id);
   const aliasMe = familyMe && !familyMe.is_primary ? familyMe : null;
@@ -67,7 +73,7 @@ export function PortalLayout({ children }: PortalLayoutProps) {
   };
 
   const navItems = getNavItems(role, t);
-  const isStudent = role === "student";
+  const isStudent = look ? look === "v2" : role === "student";   // the student (V2) look, not the role: menus and permissions still follow `role`
   const { resolvedTheme, setTheme } = useTheme();
   const { trackClick } = useAnalytics();
   const night = resolvedTheme === "dark";
