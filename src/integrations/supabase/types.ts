@@ -1189,6 +1189,64 @@ export type Database = {
           },
         ]
       }
+      makeup_time_entries: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          hours: number
+          id: string
+          made_up_at: string | null
+          made_up_by: string | null
+          reason: string | null
+          status: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          hours: number
+          id?: string
+          made_up_at?: string | null
+          made_up_by?: string | null
+          reason?: string | null
+          status?: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          hours?: number
+          id?: string
+          made_up_at?: string | null
+          made_up_by?: string | null
+          reason?: string | null
+          status?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "makeup_time_entries_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "makeup_time_entries_made_up_by_fkey"
+            columns: ["made_up_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "makeup_time_entries_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       map_pins: {
         Row: {
           active: boolean
