@@ -199,7 +199,7 @@ function AdminScheduleContent() {
     }
 
     if (Object.keys(updates).length > 0 && (newSession as any)?.id) {
-      await supabase.from('sessions').update(updates).eq('id', (newSession as any).id);
+      await supabase.from('sessions').update(updates as any).eq('id', (newSession as any).id);
     }
 
     // Fire road test scheduling emails only for confirmed (non-pending) road tests

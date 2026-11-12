@@ -332,7 +332,7 @@ function IntakeFormContent({ isAdminEdit = false }: { isAdminEdit?: boolean }) {
 
       const { error: updErr } = await supabase
         .from("profiles")
-        .update(update)
+        .update(update as any)
         .eq("id", targetUserId);
       if (updErr) throw updErr;
 

@@ -279,7 +279,7 @@ function ProfileContent() {
 
         const { error: updateError } = await supabase
           .from('profiles')
-          .update(updatePayload)
+          .update(updatePayload as any)
           .eq('id', user.id);
 
         if (updateError) throw updateError;

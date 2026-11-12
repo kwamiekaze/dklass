@@ -414,7 +414,7 @@ export function SessionCalendar({ sessions, userRole, onSessionUpdate, defaultVi
       const previousPickupTime = (selectedSession as any).pickup_time || null;
       const { error } = await supabase
         .from('sessions')
-        .update(updatePayload)
+        .update(updatePayload as any)
         .eq('id', selectedSession.id);
 
       if (error) throw error;
