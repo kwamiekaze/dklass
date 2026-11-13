@@ -63,6 +63,7 @@ import PracticeTest from "./pages/portal/PracticeTest";
 import AdminPracticeQuestions from "./pages/portal/AdminPracticeQuestions";
 import RoadTestGame from "./games/roadtest/RoadTestGame";
 const StopGame = lazy(() => import("./games/stopgame/StopGame"));
+const BookAKlass = lazy(() => import("./pages/bookaklass/BookAKlass"));
 import { ProtectedRoute } from "./components/portal/ProtectedRoute";
 
 import Unsubscribe from "./pages/Unsubscribe";
@@ -109,6 +110,10 @@ const App = () => (
                       {/* Public Routes */}
                       <Route path="/" element={<NuHome2 />} />
                       <Route path="/nuhome2" element={<Nuhome2Redirect />} />
+                      {/* the packages on a plain page, no 3D: the link to send by text or email */}
+                      <Route path="/bookaklass" element={<Suspense fallback={null}><BookAKlass /></Suspense>} />
+                      <Route path="/book-a-klass" element={<Navigate to="/bookaklass" replace />} />
+                      <Route path="/book" element={<Navigate to="/bookaklass" replace />} />
                       <Route path="/classic-home" element={<Index />} />
                       {/* staff-only while the game is being finished */}
                       <Route path="/stop-game" element={<Suspense fallback={null}><StopGame /></Suspense>} />

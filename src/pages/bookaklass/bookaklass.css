@@ -1,0 +1,26 @@
+.bk-page { min-height: 100svh; background: radial-gradient(ellipse at top, #1d2a52 0%, #0d1430 46%, #07091a 100%); color: #f5ead2; padding: max(28px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom)); font-family: "Cormorant Garamond", Georgia, serif; }
+.bk-head { max-width: 720px; margin: 0 auto 28px; text-align: center; }
+.bk-logo { width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 10px; display: block; box-shadow: 0 0 0 1px rgba(229, 184, 74, .5), 0 8px 28px rgba(229, 184, 74, .18); }
+.bk-word { font-family: "Cinzel", Georgia, serif; font-weight: 700; font-size: clamp(28px, 7vw, 44px); color: #e5b84a; letter-spacing: .02em; margin: 0; line-height: 1.05; }
+.bk-tag { font-style: italic; font-weight: 600; font-size: clamp(18px, 4.6vw, 24px); color: #e5b84a; margin: 6px 0 2px; }
+.bk-stars { color: #e5b84a; letter-spacing: .5em; margin: 0 0 22px; padding-left: .5em; font-size: 15px; }
+.bk-title { font-family: "Cinzel", Georgia, serif; font-weight: 700; font-size: clamp(22px, 5.6vw, 32px); letter-spacing: .08em; text-transform: uppercase; margin: 0 0 8px; color: #fff4dc; }
+.bk-sub { font-size: clamp(17px, 4.2vw, 20px); line-height: 1.4; color: rgba(245, 234, 210, .82); margin: 0 auto; max-width: 34ch; }
+
+.bk-grid { list-style: none; margin: 0 auto; padding: 0; max-width: 1080px; display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 680px) { .bk-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1020px) { .bk-grid { grid-template-columns: repeat(3, 1fr); } }
+.bk-card { display: flex; flex-direction: column; gap: 12px; padding: 20px 20px 18px; border-radius: 20px; border: 1px solid rgba(229, 184, 74, .38); background: linear-gradient(180deg, rgba(255, 246, 222, .07), rgba(255, 246, 222, .025)); box-shadow: 0 10px 30px rgba(0, 0, 0, .3); }
+.bk-card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.bk-name { font-family: "Poppins", system-ui, sans-serif; font-weight: 700; font-size: 20px; letter-spacing: .06em; color: #f3d27a; margin: 0; text-transform: uppercase; }
+.bk-price { font-family: "Poppins", system-ui, sans-serif; font-weight: 800; font-size: 24px; color: #fff; white-space: nowrap; }
+.bk-desc { margin: 0; font-size: 18px; line-height: 1.42; color: rgba(245, 234, 210, .9); }
+.bk-book { margin-top: auto; display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; width: 100%; border: 0; border-radius: 999px; cursor: pointer; font-family: "Cormorant Garamond", Georgia, serif; font-weight: 600; font-size: 19px; letter-spacing: .2em; text-transform: uppercase; color: #1b1405; background: linear-gradient(180deg, #f6dc94, #e2b84c 60%, #d3a535); box-shadow: 0 6px 20px rgba(229, 184, 74, .28), inset 0 1px 0 rgba(255, 255, 255, .5); transition: transform .15s ease, filter .15s ease; }
+.bk-book:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.bk-book:active { transform: translateY(0); }
+.bk-book:focus-visible, .bk-call:focus-visible, .bk-home:focus-visible { outline: 2px solid #f3d27a; outline-offset: 3px; }
+
+.bk-foot { max-width: 720px; margin: 28px auto 0; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.bk-call { display: inline-flex; align-items: center; gap: 8px; font-size: 20px; color: #f5ead2; text-decoration: none; padding: 10px 20px; border-radius: 999px; border: 1px solid rgba(229, 184, 74, .45); }
+.bk-home { font-family: "Poppins", system-ui, sans-serif; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: rgba(229, 184, 74, .85); text-decoration: none; }
+html:has(.bk-page), body:has(.bk-page) { background: #07091a; }
