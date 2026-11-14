@@ -1088,7 +1088,8 @@ export class DrivingScene extends Phaser.Scene {
         const dx = Math.abs(this.player.x - ob.sprite.x);
         if (dx > 22 && dx < 40 && this.mph > 10) {
           ob.nearMissed = true;
-          this.award('NEAR_MISS', 'CLOSE!');
+          // a close pass is a warning, never a reward
+          this.float('TOO CLOSE · leave room', '#ffb020');
           sound.nearMissWhoosh();
         }
       }

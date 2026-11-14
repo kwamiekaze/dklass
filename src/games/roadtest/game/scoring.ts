@@ -74,7 +74,7 @@ const LABELS: Record<string, string> = {
   SMOOTH_DRIVING: 'Smooth lane-keeping',
   FINISH_BONUS: 'Completed the course',
   STAR: 'Gold star collected',
-  NEAR_MISS: 'Close call, nice reflexes',
+  NEAR_MISS: 'Passed too close',
   PED_SAFE_PASS: 'Yielded to a pedestrian',
   HIT_CONE: 'Hit a cone',
   LANE_CROSS: 'Drifted over lane line',

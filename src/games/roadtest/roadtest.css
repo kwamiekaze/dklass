@@ -1556,3 +1556,8 @@
 .gp-trip strong { display: block; font-size: 13px; font-weight: 700; line-height: 1.2; } .gp-trip small { display: block; font-size: 11px; color: #cfc8bb; line-height: 1.25; }
 .gp-trip em { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 800; color: #f2c14e; white-space: nowrap; }
 .gp-h { margin: 12px 0 2px; font: 700 12px 'Poppins', sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #f2c14e; }
+
+/* v80: tiles three across on wide screens, so a title never breaks in the middle of a word */
+@media (min-width: 640px) { .gm-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .gm-tile { min-height: 176px; } }
+.gm-tile strong { overflow-wrap: break-word; word-break: normal; hyphens: none; }
+.gm-kind { overflow-wrap: break-word; }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarDays, Compass, GraduationCap, Infinity as InfinityIcon, Map as MapIcon, Route, Star, Users } from 'lucide-react';
+import { CalendarDays, Compass, GraduationCap, Infinity as InfinityIcon, Map as MapIcon, Octagon, Route, Star, Users } from 'lucide-react';
 
 type Filter = 'all' | 'multiplayer' | 'solo' | 'endless';
 
@@ -10,14 +10,14 @@ export interface ModeTile {
   tags: Filter[];
   /** the pill in the corner */
   kind: string;
-  icon: 'users' | 'map' | 'infinity' | 'star' | 'route' | 'compass' | 'grad' | 'calendar';
+  icon: 'users' | 'map' | 'infinity' | 'star' | 'route' | 'compass' | 'grad' | 'calendar' | 'sign';
   stat: string;
   cta: string;
   hue: string;
   onPick: () => void;
 }
 
-const ICONS = { users: Users, map: MapIcon, infinity: InfinityIcon, star: Star, route: Route, compass: Compass, grad: GraduationCap, calendar: CalendarDays } as const;
+const ICONS = { users: Users, map: MapIcon, infinity: InfinityIcon, star: Star, route: Route, compass: Compass, grad: GraduationCap, calendar: CalendarDays, sign: Octagon } as const;
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'all', label: 'All modes' },

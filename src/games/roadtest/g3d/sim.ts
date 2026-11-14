@@ -554,7 +554,8 @@ export class RunSim {
       if (dx > 1.5 && dx < 2.45 && this.mph > 10) {
         ob.nearMissed = true;
         this.nearMisses++;
-        this.award('NEAR_MISS', 'CLOSE!');
+        // a close pass is a warning, never a reward: a driving school does not pay for squeezing by
+        this.float('TOO CLOSE · leave more room', false);
         this.snd('nearMissWhoosh');
       }
     }

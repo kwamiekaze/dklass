@@ -25,10 +25,11 @@ import type { Difficulty, LevelResult } from './game/types';
 import './roadtest.css';
 
 const RushRoot = lazy(() => import('./carrollton/rush/Rush'));
+const SignRush = lazy(() => import('./signs/SignRush'));
 /** a shared Carrollton Rush link: /play?room=ABCD */
 const roomInUrl = () => { try { return (new URLSearchParams(window.location.search).get('room') ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4); } catch { return ''; } };
 
-type Screen = 'menu' | 'playing' | 'report' | 'multiplayer' | 'rush';
+type Screen = 'menu' | 'playing' | 'report' | 'multiplayer' | 'rush' | 'signs';
 const DIFF_KEY = 'dk-game-difficulty';
 
 interface RoadTestGameProps {
@@ -191,6 +192,7 @@ export default function RoadTestGame({ publicMode }: RoadTestGameProps = {}) {
             onBadgeCabinet={() => setShowBadges(true)}
             onMultiplayer={() => setScreen('multiplayer')}
             onRush={() => setScreen('rush')}
+            onSigns={() => setScreen('signs')}
             onMyStats={() => setShowMyStats(true)}
             onSignInPrompt={signInWithGoogle}
             publicMode={publicMode}
@@ -201,6 +203,10 @@ export default function RoadTestGame({ publicMode }: RoadTestGameProps = {}) {
           <Suspense fallback={<div className="rush-loading"><div className="rt3d-spin" /><p>Opening Carrollton Rush…</p></div>}>
             <RushRoot initialCode={rushCode} onExit={() => { setRushRacing(false); setScreen('menu'); }} onRacing={setRushRacing} />
           </Suspense>
+        )}
+
+        {screen === 'signs' && (
+          <Suspense fallback={null}><SignRush onExit={() => setScreen('menu')} /></Suspense>
         )}
 
         {screen === 'multiplayer' && (

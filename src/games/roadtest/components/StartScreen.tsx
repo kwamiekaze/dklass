@@ -8,6 +8,7 @@ import { SKILL_LABELS, computeRadarData, SKILL_KEYS, type ReportCardRatings } fr
 import '../atl/atl.css';
 import { DIFFICULTIES, type Difficulty } from '../game/types';
 import { sound } from '../sound';
+import { signRushBest } from '../signs/best';
 import { InstallTutorial, shouldAutoShowInstallTutorial } from './InstallTutorial';
 import { FeedbackModal } from './FeedbackModal';
 import { DailyChallengeCard } from './DailyChallengeCard';
@@ -29,6 +30,8 @@ interface Props {
   onMultiplayer: () => void;
   /** Carrollton Rush: live 3D multiplayer, no sign-in */
   onRush?: () => void;
+  /** the road sign and road rules game */
+  onSigns?: () => void;
   onMyStats?: () => void;
   onSignInPrompt?: () => void;
   publicMode?: boolean; // when true, "back" goes to homepage not dashboard
@@ -55,7 +58,7 @@ function guestStreak(): number {
   } catch { return 0; }
 }
 
-export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, onStartDaily, onHowToPlay, onLeaderboard, onPublicLeaderboard, onBadgeCabinet, onMultiplayer, onRush, onMyStats, onSignInPrompt, publicMode }: Props) {
+export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, onStartDaily, onHowToPlay, onLeaderboard, onPublicLeaderboard, onBadgeCabinet, onMultiplayer, onRush, onSigns, onMyStats, onSignInPrompt, publicMode }: Props) {
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const [signedIn, setSignedIn] = useState(false);
@@ -118,11 +121,13 @@ export function StartScreen({ bestScores, difficulty, setDifficulty, onStart, on
   const bestOf = (id: string, fallback: string) => (bestScores[id] ? `Best ${bestScores[id]}` : fallback);
   const starRush = () => { clickTick(); if (!signedIn && onSignInPrompt) { onSignInPrompt(); return; } onMultiplayer(); };
   const featured: ModeTile | null = onRush ? { id: 'rush', title: 'Carrollton Rush', sub: 'Race friends live through real Carrollton, GA. Same trips, every traffic law counts. No sign-in.', tags: ['multiplayer'], kind: 'MULTIPLAYER · 2 TO 6 PLAYERS', icon: 'users', stat: '', cta: 'Play', hue: '#0b3b2a', onPick: () => { clickTick(); onRush(); } } : null;
+  const signBest = signRushBest();
   const tiles: ModeTile[] = [
     { id: 'open', title: 'Open World', sub: 'Drive all of Carrollton. GPS trips, day and night, real traffic.', tags: ['solo'], kind: 'SOLO · FREE DRIVE', icon: 'map', stat: bestOf('atl-carrollton-open', 'Real town map'), cta: 'Drive', hue: '#0e4a5c', onPick: () => startLevel('atl-carrollton-open') },
     ...(endless ? [{ id: 'endless', title: 'Endless Rush', sub: endless.subtitle, tags: ['solo', 'endless'] as ModeTile['tags'], kind: 'SOLO · ENDLESS', icon: 'infinity' as const, stat: bestOf(endless.id, 'No finish line'), cta: 'Start', hue: '#4a1a6b', onPick: () => startLevel(endless.id) }] : []),
     { id: 'star', title: 'Star Rush', sub: 'Classic 2D multiplayer. Collect stars and beat your friends.', tags: ['multiplayer'], kind: 'MULTIPLAYER · 2D', icon: 'star', stat: signedIn ? 'Live rooms' : 'Sign in to play', cta: 'Play', hue: '#6b4a08', onPick: starRush },
     { id: 'free', title: 'Free Roam', sub: 'Real Atlanta highways. Take any exit, no finish line.', tags: ['solo', 'endless'], kind: 'SOLO · ENDLESS', icon: 'compass', stat: bestOf(FREE_ID, 'Atlanta roads'), cta: 'Pick start', hue: '#7a3a0c', onPick: () => jump('rt-freeroam') },
+    ...(onSigns ? [{ id: 'signs', title: 'Sign Rush', sub: 'Read every road sign against the clock. Plus the permit test, Georgia style.', tags: ['solo', 'endless'] as ModeTile['tags'], kind: 'SOLO · QUIZ', icon: 'sign' as const, stat: signBest ? `Best ${signBest.toLocaleString()}` : 'New game', cta: 'Play', hue: '#7a1420', onPick: () => { clickTick(); onSigns(); } }] : []),
     { id: 'atl', title: 'Atlanta Drive', sub: 'Phase by phase, from quiet streets to I 285.', tags: ['solo'], kind: 'SOLO · STAGES', icon: 'route', stat: `${ATL_STAGES.length} stages`, cta: 'Browse', hue: '#12306b', onPick: () => jump('rt-atlanta') },
     { id: 'lessons', title: 'Road Test Lessons', sub: 'Learn the rules, one skill at a time. Earn a 5 star report.', tags: ['solo'], kind: 'SOLO · LEVELS', icon: 'grad', stat: `${lessons.length} lessons`, cta: 'Browse', hue: '#1b2a5c', onPick: () => jump('rt-lessons') },
     ...(onStartDaily ? [{ id: 'daily', title: 'Daily Challenge', sub: 'A new run every day. Keep your streak alive.', tags: ['solo'] as ModeTile['tags'], kind: 'SOLO · DAILY', icon: 'calendar' as const, stat: streak > 0 ? `${streak} day streak` : 'New today', cta: 'Open', hue: '#6b2c0c', onPick: () => jump('rt-daily') }] : []),
