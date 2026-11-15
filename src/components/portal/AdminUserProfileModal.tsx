@@ -22,7 +22,7 @@ import { StudentProgressSection } from "./StudentProgressSection";
 import { SecondaryEmailsSection } from "./SecondaryEmailsSection";
 import { MergeAccountDialog } from "./MergeAccountDialog";
 import { StudentHoursBreakdown } from "./StudentHoursBreakdown";
-import { MakeupTimeCard } from "./MakeupTimeCard";
+import { MakeupOwedBadge, MakeupTimeCard } from "./MakeupTimeCard";
 
 interface AdminUserProfileModalProps {
   open: boolean;
@@ -322,6 +322,7 @@ export function AdminUserProfileModal({
                         {profile.role}
                       </Badge>
                     )}
+                    {profile.role === 'student' && <MakeupOwedBadge studentId={profile.id} targetId="admin-makeup-time" />}
                   </div>
                   {/* Assigned Instructor Label */}
                   {assignedInstructors.length > 0 ? (
@@ -337,6 +338,9 @@ export function AdminUserProfileModal({
                   )}
                 </div>
               </div>
+
+              {/* Makeup time: right under the name so staff never have to scroll for it */}
+              {profile.role === 'student' && <MakeupTimeCard studentId={profile.id} canManage anchorId="admin-makeup-time" className="border-primary/20 bg-primary/5" />}
 
               {/* Editable Fields */}
               <div className="space-y-4">
@@ -562,8 +566,6 @@ export function AdminUserProfileModal({
                   hoursCompletedStored={Number((profile as any)?.hours_completed ?? 0)}
                 />
               )}
-
-              {profile.role === 'student' && <MakeupTimeCard studentId={profile.id} canManage className="border-primary/20 bg-primary/5" />}
 
               {/* Scheduled Sessions Section */}
               {profile.role === 'student' && (

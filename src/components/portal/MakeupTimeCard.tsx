@@ -25,7 +25,13 @@ interface Props {
   canManage?: boolean;
   /** use the plain Card (staff pages) or the portal-card look (student profile) */
   className?: string;
+  /** an id for the card, so a badge elsewhere on the page can jump to it */
+  anchorId?: string;
 }
+
+/** fired after the card loads or changes, so the summary badge on the same page stays in step */
+const EVT = "dk-makeup-owed";
+type OwedDetail = { studentId: string; owedMins: number };
 
 // Stored as hours (2 decimals). Whole minutes survive the round trip exactly
 // (error is at most 0.3 min), so we do all math and display in minutes.
@@ -36,7 +42,7 @@ const fmtMins = (m: number) => {
   return h ? `${h}h` : `${r}m`;
 };
 
-export function MakeupTimeCard({ studentId, canManage = false, className }: Props) {
+export function MakeupTimeCard({ studentId, canManage = false, className, anchorId }: Props) {
   const { toast } = useToast();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +56,12 @@ export function MakeupTimeCard({ studentId, canManage = false, className }: Prop
 
   const load = useCallback(async () => {
     const { data, error } = await table().select("id, hours, reason, status, created_at, made_up_at").eq("student_id", studentId).order("created_at", { ascending: false });
-    if (!error && data) setEntries((data as any[]).map((e) => ({ ...e, hours: Number(e.hours) })));
+    if (!error && data) {
+      const list = (data as any[]).map((e) => ({ ...e, hours: Number(e.hours) })) as Entry[];
+      setEntries(list);
+      const owedMins = list.filter((e) => e.status === "owed").reduce((a, e) => a + toMins(e.hours), 0);
+      window.dispatchEvent(new CustomEvent<OwedDetail>(EVT, { detail: { studentId, owedMins } }));
+    }
     setLoading(false);
   }, [studentId]);
 
@@ -97,7 +108,7 @@ export function MakeupTimeCard({ studentId, canManage = false, className }: Prop
   };
 
   return (
-    <Card className={cn("portal-card min-w-0", className)}>
+    <Card id={anchorId} className={cn("portal-card min-w-0 scroll-mt-4", className)}>
       <CardHeader className="pb-3 sm:pb-4">
         <CardTitle className="text-base sm:text-lg flex items-center gap-2"><RotateCcw className="h-4 w-4 text-primary" />Makeup Time</CardTitle>
         <CardDescription className="text-xs sm:text-sm">
@@ -173,5 +184,39 @@ export function MakeupTimeCard({ studentId, canManage = false, className }: Prop
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * A small summary of what a student owes, for the top of a staff view of the student.
+ * Amber with the time when something is owed, quiet when nothing is. Tapping it scrolls to the full card.
+ */
+export function MakeupOwedBadge({ studentId, targetId, className }: { studentId: string; targetId?: string; className?: string }) {
+  const [owed, setOwed] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    (supabase as any).from("makeup_time_entries").select("hours").eq("student_id", studentId).eq("status", "owed")
+      .then(({ data, error }: { data: { hours: number }[] | null; error: unknown }) => { if (live && !error) setOwed((data ?? []).reduce((a, e) => a + toMins(Number(e.hours)), 0)); });
+    const on = (e: Event) => { const d = (e as CustomEvent<OwedDetail>).detail; if (d?.studentId === studentId) setOwed(d.owedMins); };
+    window.addEventListener(EVT, on);
+    return () => { live = false; window.removeEventListener(EVT, on); };
+  }, [studentId]);
+  if (owed === null) return null;
+  const jump = () => { if (targetId) document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  const has = owed > 0;
+  return (
+    <button
+      type="button"
+      onClick={jump}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
+        has ? "border-amber-500/60 bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-300" : "border-border bg-muted/40 text-muted-foreground hover:bg-muted",
+        className,
+      )}
+      aria-label={has ? `Makeup time owed: ${fmtMins(owed)}. Show makeup time` : "No makeup time owed. Show makeup time"}
+    >
+      <RotateCcw className="h-3.5 w-3.5" />
+      {has ? <>Makeup owed: {fmtMins(owed)}</> : <>No makeup owed</>}
+    </button>
   );
 }

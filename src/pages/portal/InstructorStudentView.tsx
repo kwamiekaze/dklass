@@ -16,7 +16,7 @@ import { ReportCardList } from "@/components/portal/ReportCardList";
 import { getDisplayName } from "@/lib/profileUtils";
 import { PermitPreview } from "@/components/portal/PermitPreview";
 import { StudentDocumentSection } from "@/components/portal/StudentDocumentSection";
-import { MakeupTimeCard } from "@/components/portal/MakeupTimeCard";
+import { MakeupOwedBadge, MakeupTimeCard } from "@/components/portal/MakeupTimeCard";
 
 export default function InstructorStudentView() {
   return (
@@ -126,6 +126,7 @@ function InstructorStudentViewContent() {
           {student.public_id && (
             <p className="text-muted-foreground font-mono">ID: {student.public_id}</p>
           )}
+          {id && <MakeupOwedBadge studentId={id} targetId="student-makeup-time" className="mt-2" />}
         </div>
       </div>
 
@@ -172,6 +173,9 @@ function InstructorStudentViewContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Makeup time: above the tabs, so it shows whichever tab is open */}
+      {id && <MakeupTimeCard studentId={id} canManage anchorId="student-makeup-time" />}
 
       {/* Tabs */}
       <Tabs defaultValue="info" className="space-y-4">
@@ -282,7 +286,6 @@ function InstructorStudentViewContent() {
             </Card>
           </div>
 
-          {id && <MakeupTimeCard studentId={id} canManage />}
 
           {/* Document History */}
           {id && (
