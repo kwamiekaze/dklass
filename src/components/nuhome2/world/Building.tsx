@@ -390,8 +390,8 @@ export function Building({ position, lite, open }: { position: [number, number, 
     <mesh geometry={archFace} material={archStone} position={[0, 7.6, 4.75]} castShadow />
     <mesh geometry={archLed} material={M.led} position={[0, 7.6, 5.04]} />
     {/* a soft warm halo behind the lettering and the stars at night, kept gentle so the sign never glares */}
-    <Halo position={[0, 6.75, 5.03]} size={[13.5, 2.6]} strength={.1} />
-    <Halo position={[0, 8.35, 5.03]} size={[9, 3]} strength={.08} />
+    <Halo position={[0, 6.75, 5.12]} size={[13.5, 2.6]} strength={.1} />
+    <Halo position={[0, 8.35, 5.12]} size={[9, 3]} strength={.08} />
     <mesh geometry={stars.cut} material={signGold} position={[0, 8.2, 5.0]} />
     {/* the back: the same lit windows as the front, a back door with its own small portico over the patio, lanterns and a light line under the cornice */}
     {[-1, 1].map(sg => <group key={`bw${sg}`}>

@@ -67,7 +67,7 @@ export function Halo({ position, size, color = '255,190,100', strength = .55 }: 
   const ref = useRef<THREE.MeshBasicMaterial>(null);
   const map = useMemo(() => new THREE.CanvasTexture(radialTexture([[0, `rgba(${color},1)`], [.5, `rgba(${color},.38)`], [1, `rgba(${color},0)`]])), [color]);
   useFrame(() => { if (ref.current) ref.current.opacity = strength * (.08 + .92 * mix.current); });
-  return <mesh position={position} renderOrder={3}><planeGeometry args={size} /><meshBasicMaterial ref={ref} map={map} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} fog={false} /></mesh>;
+  return <mesh position={position} renderOrder={3}><planeGeometry args={size} /><meshBasicMaterial ref={ref} map={map} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} blending={THREE.AdditiveBlending} toneMapped={false} fog={false} /></mesh>;
 }
 
 /*

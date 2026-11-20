@@ -130,9 +130,19 @@ export function leafCardMaterial() { return (cardMat ??= softFoliage(new THREE.M
  * and no single card flashes light or dark as the camera moves.
  */
 export function softFoliage<T extends THREE.MeshStandardMaterial>(m: T): T {
+  // Leaf cut-outs that never shimmer: alpha to coverage turns the hard leaf edge into a smooth one (with the canvas's antialiasing),
+  // and the alpha is lifted as the texture gets smaller on screen, so distant hedges keep their fullness instead of thinning and blinking.
+  m.alphaToCoverage = true;
   m.onBeforeCompile = sh => {
     sh.vertexShader = sh.vertexShader.replace('#include <defaultnormal_vertex>', '#include <defaultnormal_vertex>\n transformedNormal = normalize(transformedNormal * .3 + (viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', ''));
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', ''))
+      .replace('#include <alphatest_fragment>', `#ifdef USE_MAP
+        { vec2 dkT = vMapUv * vec2( textureSize( map, 0 ) ); vec2 dkX = dFdx( dkT ), dkY = dFdy( dkT );
+          float dkLod = max( 0.0, 0.5 * log2( max( dot( dkX, dkX ), dot( dkY, dkY ) ) ) );
+          diffuseColor.a *= 1.0 + dkLod * 0.25; }
+        #endif
+        #include <alphatest_fragment>`);
   };
   m.customProgramCacheKey = () => 'softFoliage';
   return m;
@@ -190,11 +200,38 @@ export function Trees({ list, clumps }: { list: TreeSpec[]; clumps: number }) {
   </group>;
 }
 
+/**
+ * Flower heads are 6 to 11 cm across. Far away that is a pixel or less, and a bright pixel that comes and goes reads as a flicker.
+ * Past FLOWER_NEAR metres each head grows with distance so it keeps the same size on screen, and its colour eases toward the hedge
+ * it sits on, so a far flower bed is a soft speckle instead of blinking white dots. Close up nothing changes.
+ */
+const FLOWER_NEAR = 16;
+function steadyFlowers<T extends THREE.MeshStandardMaterial>(m: T): T {
+  m.onBeforeCompile = sh => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying float vDkFar;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        #ifdef USE_INSTANCING
+        { float dkD = -( modelViewMatrix * instanceMatrix * vec4( 0.0, 0.0, 0.0, 1.0 ) ).z;
+          transformed *= max( 1.0, dkD / ${FLOWER_NEAR.toFixed(1)} );
+          vDkFar = smoothstep( ${FLOWER_NEAR.toFixed(1)}, ${(FLOWER_NEAR * 3.5).toFixed(1)}, dkD ); }
+        #else
+        vDkFar = 0.0;
+        #endif`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vDkFar;')
+      .replace('#include <color_fragment>', '#include <color_fragment>\n diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3( .62, .7, .56 ), .7 * vDkFar );');
+  };
+  m.customProgramCacheKey = () => 'steadyFlowers';
+  return m;
+}
+
 /** Instanced flowers and bushes. */
 export function Blooms({ spots }: { spots: { x: number; z: number; y?: number; r: number; n: number; kind: 'flower' | 'bush' }[] }) {
   const flowers = useRef<THREE.InstancedMesh>(null), bushes = useRef<THREE.InstancedMesh>(null);
   const nf = spots.filter(s => s.kind === 'flower').reduce((a, s) => a + s.n, 0), nb = spots.filter(s => s.kind === 'bush').reduce((a, s) => a + s.n, 0) * 7;
   const leafMat = useMemo(() => softFoliage(new THREE.MeshStandardMaterial({ map: leafCluster(), alphaTest: .45, side: THREE.DoubleSide, roughness: .85 })), []);
+  const flowerMat = useMemo(() => steadyFlowers(new THREE.MeshStandardMaterial({ roughness: .6 })), []);
   useLayoutEffect(() => {
     const f = flowers.current, b = bushes.current; if (!f || !b) return; const r = rng(55), d = new THREE.Object3D(), c = new THREE.Color(); let i = 0, j = 0;
     spots.forEach(s => { for (let k = 0; k < s.n; k++) {
@@ -206,7 +243,7 @@ export function Blooms({ spots }: { spots: { x: number; z: number; y?: number; r
     [f, b].forEach(m => { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; });
   }, [spots]);
   return <group>
-    <instancedMesh ref={flowers} args={[undefined, undefined, Math.max(1, nf)]}><icosahedronGeometry args={[1, 1]} /><meshStandardMaterial roughness={.6} /></instancedMesh>
+    <instancedMesh ref={flowers} args={[undefined, flowerMat, Math.max(1, nf)]}><icosahedronGeometry args={[1, 1]} /></instancedMesh>
     <instancedMesh ref={bushes} args={[undefined, leafMat, Math.max(1, nb)]} castShadow receiveShadow><planeGeometry args={[1, 1]} /></instancedMesh>
   </group>;
 }

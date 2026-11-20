@@ -1,3 +1,4 @@
+import './calm';   // no specular flicker at any distance: must load before any material compiles
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment, Lightformer, OrbitControls, PerformanceMonitor } from '@react-three/drei';
@@ -53,7 +54,7 @@ function ThemeDriver({ night, mix, shadow }: { night: boolean; mix: { current: n
   return <>
     <ambientLight ref={amb} />
     <hemisphereLight ref={hemi} />
-    <directionalLight ref={dir} position={[-9, 12, 10]} castShadow={shadow > 0} shadow-mapSize-width={shadow || 16} shadow-mapSize-height={shadow || 16} shadow-camera-left={-34} shadow-camera-right={34} shadow-camera-top={30} shadow-camera-bottom={-30} shadow-camera-near={1} shadow-camera-far={110} shadow-bias={-.0002} shadow-normalBias={.025} />
+    <directionalLight ref={dir} position={[-9, 12, 10]} castShadow={shadow > 0} shadow-mapSize-width={shadow || 16} shadow-mapSize-height={shadow || 16} shadow-camera-left={-34} shadow-camera-right={34} shadow-camera-top={30} shadow-camera-bottom={-30} shadow-camera-near={1} shadow-camera-far={110} shadow-bias={-.0004} shadow-normalBias={shadow > 0 ? Math.max(.025, (68 / shadow) * 1.15) : .025} />
     <directionalLight ref={fill} position={[10, 9, -8]} color="#b8c8ff" />
   </>;
 }

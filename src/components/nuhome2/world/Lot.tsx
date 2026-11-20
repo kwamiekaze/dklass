@@ -238,7 +238,7 @@ function Monument({ position, pl, lite }: { position: V3; pl: Plant; lite: boole
     <mesh geometry={front} material={metal} position={[0, PY + .72, PD / 2 + .012]} />
     <mesh geometry={word} material={metal} position={[0, PY - .02 - .3, PD / 2 + .012]} castShadow />
     <mesh position={[0, PY - .76, PD / 2 + .02]} renderOrder={2}><planeGeometry args={[4.75, 4.75 * 176 / 2048]} /><meshBasicMaterial map={slogan} transparent toneMapped={false} depthWrite={false} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} /></mesh>
-    <Halo position={[0, PY + .1, PD / 2 + .05]} size={[7.4, 3.2]} strength={.34} />
+    <Halo position={[0, PY + .1, PD / 2 + .14]} size={[7.4, 3.2]} strength={.34} />
     {/* uplights at the foot of the plinth and a low hedge at each end */}
     {[-2.6, 2.6].map(x => <group key={x} position={[x, .06, .88]}>
       <mesh position={[0, .06, 0]}><boxGeometry args={[.3, .16, .26]} /><meshStandardMaterial color="#1c1c20" roughness={.5} metalness={.5} /></mesh>
