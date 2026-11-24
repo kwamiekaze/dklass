@@ -109,6 +109,8 @@ const App = () => (
                     <Routes>
                       {/* Public Routes */}
                       <Route path="/" element={<NuHome2 />} />
+                      {/* the Christmas homepage, previewed here until it goes on the homepage (world/season.ts) */}
+                      <Route path="/xmas" element={<NuHome2 key="xmas" season="xmas" />} />
                       <Route path="/nuhome2" element={<Nuhome2Redirect />} />
                       {/* the packages on a plain page, no 3D: the link to send by text or email */}
                       <Route path="/bookaklass" element={<Suspense fallback={null}><BookAKlass /></Suspense>} />

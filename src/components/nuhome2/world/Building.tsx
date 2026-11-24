@@ -7,6 +7,8 @@ import { Hedge, type HedgePlant } from './Lot';
 import { leafCard, leafCardMaterial } from './Grounds';
 import { Halo, carvedRow, carvedWord, facetedStar, goldMat } from './Signage';
 import { atmo } from './atmosphere';
+import { XMAS } from './season';
+import { ColumnRibbon, Garland, RoofLights, Wreaths, snowOn } from './Xmas';
 import { makeGlazing } from './Glazing';
 import { type B, box, columnGeometry, dressedStone, masonry, slate, tiled } from './surfaces';
 import { SIGN_FONT, goldGradient, makeCanvasTexture, starShape } from './parts';
@@ -162,7 +164,7 @@ export function Building({ position, lite, open }: { position: [number, number, 
   const baseMat = useMemo(() => { const m = stoneMat(1, 1); m.color.set('#e6dbc2'); stoneMats.set('base', m); return m; }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   const M = useMemo(() => ({
     trim: new THREE.MeshStandardMaterial({ color: '#f5ecdc', roughness: .6 }),
-    roof: (() => { const sl = slate(lite ? 256 : 512); return new THREE.MeshStandardMaterial({ map: sl.map, normalMap: sl.normalMap, normalScale: new THREE.Vector2(1.1, 1.1), color: '#ffffff', roughness: .46, metalness: .16, side: THREE.DoubleSide }); })(),
+    roof: (() => { const sl = slate(lite ? 256 : 512); const m = new THREE.MeshStandardMaterial({ map: sl.map, normalMap: sl.normalMap, normalScale: new THREE.Vector2(1.1, 1.1), color: '#ffffff', roughness: .46, metalness: .16, side: THREE.DoubleSide }); return XMAS ? snowOn(m, .72, .55, 'roofSnow') : m; })(),
     dress: (() => { const d = dressedStone(256); return new THREE.MeshStandardMaterial({ map: d.map, normalMap: d.normalMap, normalScale: new THREE.Vector2(.6, .6), color: '#fbf3e4', roughness: .62, emissiveMap: d.map, emissive: '#ffcf80', emissiveIntensity: .03 }); })(),
     black: new THREE.MeshStandardMaterial({ color: '#15161a', roughness: .45, metalness: .3 }),
     led: new THREE.MeshStandardMaterial({ color: '#fff4cf', emissive: '#ffd070', emissiveIntensity: .8, roughness: .5 }),
@@ -416,5 +418,40 @@ export function Building({ position, lite, open }: { position: [number, number, 
     {[-3, -1.5, 0, 1.5, 3].map(x => <mesh key={x} position={[x, 5.13, BACK - 1.3]} rotation-x={Math.PI / 2} material={M.lamp}><circleGeometry args={[.12, 14]} /></mesh>)}
     <mesh position={[0, WALL_H - .08, BACK - .6]} material={M.led}><boxGeometry args={[HALF * 2 + .2, .12, .12]} /></mesh>
     <mesh position={[0, WALL_H - .08, FRONT - 2]} visible={false}><boxGeometry args={[.01, .01, .01]} /></mesh>
+    {XMAS && <BuildingXmas lite={lite} />}
+  </group>;
+}
+
+/**
+ * The building dressed for Christmas (building space): warm white lights on every eave, hip and ridge the street can see, a wreath
+ * in each front window and on the doors, a garland swagged under the canopy and red ribbon wound round the two columns.
+ */
+function BuildingXmas({ lite }: { lite: boolean }) {
+  const lines = useMemo(() => {
+    const L: [number, number, number][][] = [];
+    const MY = WALL_H + .52, PY = PAV_H + .62, CY = WALL_H + .52;
+    [-1, 1].forEach(s => {
+      L.push([[s * 14.05, MY, 3.36], [s * 22.55, MY, 3.36]]);                          // main roof, front eave, past each pavilion
+      L.push([[s * 22.55, MY, 3.36], [s * 19.2, WALL_H + .5 + 1.92, 0]]);              // its end hip, front half
+      L.push([[s * 14.05, WALL_H + .5 + 1.92, 0], [s * 19.2, WALL_H + .5 + 1.92, 0]]);  // its ridge
+      L.push([[s * 6.78, PY, 4.03], [s * 14.02, PY, 4.03]]);                            // pavilion: front eave
+      L.push([[s * 6.78, PY, 4.03], [s * 10.38, PAV_H + .6 + 2.52, .45]], [[s * 14.02, PY, 4.03], [s * 10.42, PAV_H + .6 + 2.52, .45]]);   // its two front hips
+      L.push([[s * 14.02, PY, 4.03], [s * 14.02, PY, -3.13]]);                          // its outer side eave
+      L.push([[s * 7.02, CY, 3.02], [s * 3.8, WALL_H + .5 + 4.12, -.2]]);               // centre roof: front hip
+    });
+    L.push([[-3.8, WALL_H + .5 + 4.12, -.2], [3.8, WALL_H + .5 + 4.12, -.2]]);          // centre roof ridge
+    return L;
+  }, []);
+  const wreaths = useMemo(() => [
+    ...[-1, 1].flatMap(s => [6.55, 15.4, 19.4].map(x => ({ p: [s * x, 3.05, FRONT + .14] as [number, number, number], ry: 0, R: .5 }))),
+    ...[-1, 1].map(s => ({ p: [s * 10.5, 3.9, FRONT + .74] as [number, number, number], ry: 0, R: .62 })),
+    ...[-1, 1].map(s => ({ p: [s * .95, 3.2, FRONT + .06] as [number, number, number], ry: 0, R: .36 })),
+  ], []);
+  const hooks = useMemo(() => [-6.6, -4.4, -2.2, 0, 2.2, 4.4, 6.6].map(x => [x, 5.3, 6.62] as [number, number, number]), []);
+  return <group>
+    <RoofLights lines={lines} />
+    <Wreaths list={wreaths} lite={lite} />
+    <Garland hooks={hooks} sag={.42} lite={lite} />
+    {[-1, 1].map(s => <ColumnRibbon key={s} x={s * 4.8} z={5.7} y0={1.45} y1={4.95} r={.52} />)}
   </group>;
 }

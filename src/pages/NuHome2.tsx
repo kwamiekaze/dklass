@@ -20,7 +20,8 @@ import { AboutModal } from "@/components/AboutModal";
 import { ContactSection } from "@/components/ContactSection";
 import { useTheme } from "@/components/ThemeProvider";
 import { getPackagesSortedByPosition } from "@/data/packages";
-import { BRAND } from "@/components/nuhome2/content";
+import { BRAND, XMAS_COPY } from "@/components/nuhome2/content";
+import { seasonFor, type Season } from "@/components/nuhome2/world/season";
 import { STAGES } from "@/components/nuhome2/world/views";
 import { SplashVideo } from "@/components/nuhome2/SplashVideo";
 import { introHold, sceneWarm } from "@/components/nuhome2/world/intro";
@@ -84,7 +85,9 @@ function hasWebGL() {
  */
 /** True once the home page has shown in this page load: a refresh resets it, moving around the app does not. */
 const INTRO_SEEN = { v: false };
-export default function NuHome2() {
+export default function NuHome2({ season: forced }: { season?: Season } = {}) {
+  const season = forced ?? (typeof window === "undefined" ? "main" : seasonFor(window.location.pathname));
+  const copy = season === "xmas" ? { ...BRAND, ...XMAS_COPY } : BRAND;
   const { theme: pref, resolvedTheme, setTheme } = useTheme();
   const [clockDay, setClockDay] = useState(() => georgiaDay());
   const { trackClick } = useAnalytics();
@@ -124,11 +127,11 @@ export default function NuHome2() {
 
   useEffect(() => {
     const prevTitle = document.title;
-    document.title = "DrivingKlass | Where 5 Star Drivers Are Made";
+    document.title = season === "xmas" ? "DrivingKlass | Happy Holidays" : "DrivingKlass | Where 5 Star Drivers Are Made";
     let link = document.querySelector<HTMLLinkElement>("link[data-nuhome2-fonts]");
     if (!link) { link = document.createElement("link"); link.rel = "stylesheet"; link.href = FONT_HREF; link.dataset.nuhome2Fonts = "true"; document.head.appendChild(link); }
     return () => { document.title = prevTitle; };
-  }, []);
+  }, [season]);
 
   useEffect(() => {
     try { const saved = localStorage.getItem("theme"); if (!saved || saved === "system") setTheme("time-based"); } catch { /* private mode */ }
@@ -168,7 +171,7 @@ export default function NuHome2() {
   const toContact = useCallback(() => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" }), []);
 
   return (
-    <div className="n2-page" data-theme={night ? "night" : "day"}>
+    <div className="n2-page" data-theme={night ? "night" : "day"} data-season={season}>
       <main className="n2-experience" data-pop={sheet || msgOpen ? "true" : "false"}>
         <div className="n2-poster" aria-hidden="true" />
         {gl && !lost && (
@@ -221,11 +224,11 @@ export default function NuHome2() {
         <RecenterButton />
 
         <div className="n2-hero" data-hidden={stage !== 0}>
-          <div className="n2-eyebrow"><span className="n2-eline" /> {BRAND.eyebrow} <span className="n2-eline" /></div>
+          <div className="n2-eyebrow"><span className="n2-eline" /> {copy.eyebrow} <span className="n2-eline" /></div>
           <h1 className="n2-wordmark n2-gold" aria-label={BRAND.wordmark}>{BRAND.wordmark}</h1>
           <p className="n2-script n2-gold">{BRAND.slogan}</p>
           <Stars />
-          <p className="n2-desc">{BRAND.description}</p>
+          <p className="n2-desc">{copy.description}</p>
         </div>
 
         <div className="n2-rail">

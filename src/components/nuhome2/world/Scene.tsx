@@ -3,6 +3,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment, Lightformer, OrbitControls, PerformanceMonitor } from '@react-three/drei';
 import * as THREE from 'three';
+import { XMAS } from './season';
 import { Estate } from './Estate';
 import { Butterflies } from './Butterflies';
 import { Clouds, Moon, ShootingStars, SkyDome, Stars, Sun, skyAnchor } from './Sky';
@@ -98,7 +99,7 @@ function World({ quality, shadow, ...p }: Omit<SceneProps, 'onReady' | 'onLost'>
     <Sun position={[40, 36, -74]} /><Moon position={[30, 32, -66]} />
     <Clouds count={lite ? 12 : 22} /></SkyFollow>
     <Suspense fallback={null}><Estate quality={quality} open={p.open} /></Suspense>
-    <Butterflies count={lite ? 5 : 9} />
+    {!XMAS && <Butterflies count={lite ? 5 : 9} />}
     <Weather lite={lite} />
     <Rig stage={p.stage} reducedMotion={p.reducedMotion} skipIntro={p.skipIntro} onIntroDone={p.onIntroDone} />
     <OrbitControls makeDefault enablePan enableZoom zoomSpeed={.7} panSpeed={.6} rotateSpeed={.55} minDistance={1} maxDistance={120} minPolarAngle={.1} maxPolarAngle={1.9} enableDamping dampingFactor={.07} target={[0, 5, -17.5]} />

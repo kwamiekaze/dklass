@@ -30,8 +30,8 @@ import { LotSign } from './LotSigns';
 export const CAR_POS: V3 = [0, 0, -6];
 export const ISLANDS = [{ x: -16.9, z: 10.8, w: 24.4, d: 5.2 }, { x: 16.9, z: 10.8, w: 24.4, d: 5.2 }];
 export const ISLAND_TREES: [number, number][] = [[-9.5, 10.8], [-16.5, 10.8], [-23.5, 10.8], [9.5, 10.8], [16.5, 10.8], [23.5, 10.8]];
-const LOT_LAMPS: [number, number][] = [[-13, 10.8], [13, 10.8], [-26, 10.8], [26, 10.8], [-24.4, -8.2], [24.4, -8.2]];
-const AVENUE_LAMPS: [number, number][] = [[6.2, 46], [-6.2, 76], [6.2, 106], [-6.2, 136], [6.2, 166], [-6.2, 196]];
+export const LOT_LAMPS: [number, number][] = [[-13, 10.8], [13, 10.8], [-26, 10.8], [26, 10.8], [-24.4, -8.2], [24.4, -8.2]];
+export const AVENUE_LAMPS: [number, number][] = [[6.2, 46], [-6.2, 76], [6.2, 106], [-6.2, 136], [6.2, 166], [-6.2, 196]];
 const PAINT_Y = .034, TOP_Y = .046, HI_Y = .16;   // long lines lie at PAINT_Y; the stop bars, zebra stripes and arrows sit above them at TOP_Y, so no two paints ever share a height
 
 type Dec = { x: number; z: number; w: number; d: number };
