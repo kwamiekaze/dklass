@@ -6,7 +6,7 @@
  * The rest of the site reads XMAS / seasonFor() and never needs another edit.
  */
 export type Season = 'main' | 'xmas';
-export const HOME_SEASON: Season = 'main';
+export const HOME_SEASON: Season = 'xmas';
 
 export function seasonFor(path: string): Season {
   return /^\/xmas\/?$/i.test(path) ? 'xmas' : HOME_SEASON;
