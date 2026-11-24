@@ -1,6 +1,7 @@
 import { useContext, useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { XMAS } from './season';
 import { atmo, tickAtmo, refreshLive, loadSite, debugOverride } from './atmosphere';
 import { NightCtx, rng } from './theme';
 
@@ -95,8 +96,8 @@ export function Weather({ lite }: { lite: boolean }) {
       }
     }
     if (snow) {
-      const on = L.snow > .02; snow.visible = on;
-      if (on) { const u = snowMat.uniforms; u.uTime.value = t; (u.uCam!.value as THREE.Vector3).copy(camera.position); (u.uOrg!.value as THREE.Vector3).copy(org); u.uAmount.value = Math.min(1, .15 + L.snow); u.uSize.value = 150 * px; }
+      const fall = Math.max(L.snow, XMAS ? .22 : 0), on = fall > .02; snow.visible = on;   // at Christmas a light snow is always falling
+      if (on) { const u = snowMat.uniforms; u.uTime.value = t; (u.uCam!.value as THREE.Vector3).copy(camera.position); (u.uOrg!.value as THREE.Vector3).copy(org); u.uAmount.value = Math.min(1, .15 + fall); u.uSize.value = 150 * px; }
     }
     // lightning: a quick double flash every few seconds in a storm (the lights read atmo.flash)
     const b = bolt.current;

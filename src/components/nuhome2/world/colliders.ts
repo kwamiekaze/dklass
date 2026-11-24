@@ -1,3 +1,4 @@
+import { XMAS } from './season';
 import { BL, BL_CONES, CONE_H, CONE_R, EXIT, LOT_SIGN, LOT_SIGNS } from './rearlot';
 /** The solid things in the scene, in world metres, as the camera has to see them. Used to push a free camera out of objects and to test the opening shot. */
 export type Solid = { n: string } & ({ k: 'box'; min: [number, number, number]; max: [number, number, number] } | { k: 'cyl'; x: number; z: number; r: number; y0: number; y1: number } | { k: 'wire'; a: [number, number]; b: [number, number] });
@@ -10,6 +11,8 @@ export const WIRE_POLES: [number, number][] = [[-26, -12.4], [-35, -8], [-35, -.
 export const wireY = (a: [number, number], b: [number, number], t: number) => POLE_H - Math.min(3.4, Math.max(.9, Math.hypot(b[0] - a[0], b[1] - a[1]) * .1)) * 4 * t * (1 - t) - .28;
 
 export const SOLIDS: Solid[] = [
+  // at Christmas the fountain circle holds a tree about 7 m tall: shots that would pass through it are left out
+  ...(XMAS ? [cyl('christmas tree', 0, 6.6, 2.9, 0, 7.3)] : []),
   box('building', -22.6, 22.6, 0, 13, -26, -14.4),
   box('portico deck', -5.9, 5.9, 0, 1.0, -14.5, -11.1), box('steps', -4.2, 4.2, 0, .55, -11.1, -10.2),
   cyl('column L', -4.8, -11.8, .85, 0, 5.7), cyl('column R', 4.8, -11.8, .85, 0, 5.7),

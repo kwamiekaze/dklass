@@ -5,7 +5,9 @@ import { NightCtx, rng } from './theme';
 import { Building } from './Building';
 import { Fountain } from './Fountain';
 import { StarCanopy } from './StarCanopy';
-import { CAR_POS, ISLANDS, ISLAND_TREES, Lot } from './Lot';
+import { AVENUE_LAMPS, CAR_POS, ISLANDS, ISLAND_TREES, LOT_LAMPS, Lot } from './Lot';
+import { XMAS } from './season';
+import { CandyCanes, ChristmasTree, HedgeLights, Wreaths, snowOn } from './Xmas';
 import { Blooms, Grass, Trees, lawnTexture } from './Grounds';
 import type { Quality } from './quality';
 import { atmo } from './atmosphere';
@@ -59,7 +61,7 @@ export function Estate({ quality, open, children }: { quality: Quality; open: bo
       sh.fragmentShader = 'varying vec2 vLawn;\n' + sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n float lw = sin(vLawn.x * .11 + sin(vLawn.y * .07) * 2.0) * sin(vLawn.y * .13 + sin(vLawn.x * .05) * 2.4); diffuseColor.rgb *= vec3(1.0 + lw * .1, 1.0 + lw * .07, 1.0 + lw * .12);');
     };
     m.customProgramCacheKey = () => 'lawn';
-    return m; }, [lawnTex]);
+    return XMAS ? snowOn(m, .42, .16, 'lawnSnow') : m; }, [lawnTex]);
   const lotMat = useMemo(() => new THREE.MeshStandardMaterial({ map: lotTexture(lite), normalMap: tiled(grain, 84, 36), normalScale: new THREE.Vector2(.55, .55), color: '#ffffff', roughness: .86 }), [lite, grain]);
   const dayC = useMemo(() => new THREE.Color('#d2d2d6'), []), nightC = useMemo(() => new THREE.Color('#55556a'), []), white = useMemo(() => new THREE.Color('#f4f7ff'), []);
   useFrame(() => {
@@ -110,8 +112,9 @@ export function Estate({ quality, open, children }: { quality: Quality; open: bo
     <group position={[FOUNTAIN.x, 0, FOUNTAIN.z]}>
       <mesh position={[0, .05, 0]} receiveShadow><cylinderGeometry args={[4, 4, .1, 64]} /><meshStandardMaterial color="#cfc9bd" roughness={.6} /></mesh>
       <mesh position={[0, .1, 0]} receiveShadow><cylinderGeometry args={[3.7, 3.7, .2, 64]} /><meshStandardMaterial color="#e8dcc8" roughness={.7} /></mesh>
-      <Fountain position={[0, .2, 0]} mobile={lite} scale={.8} />
+      {XMAS ? <ChristmasTree lite={lite} /> : <Fountain position={[0, .2, 0]} mobile={lite} scale={.8} />}
     </group>
+    {XMAS && <XmasGrounds lite={lite} />}
     <Lot lite={lite} tier={quality.tier} asphalt={asphalt} />
     <group position={CAR_POS}>{children}</group>
     <Grass count={quality.grass} />
@@ -119,5 +122,27 @@ export function Estate({ quality, open, children }: { quality: Quality; open: bo
     <Trees list={framing} clumps={quality.clumps * 3} />
     <Trees list={young} clumps={Math.max(10, Math.round(quality.clumps * .8))} />
     <Blooms spots={spots} />
+  </group>;
+}
+
+/** Christmas on the grounds: wreaths on the lamp posts, net lights on the hedges, candy canes along the avenue. */
+function XmasGrounds({ lite }: { lite: boolean }) {
+  const lamps = useMemo(() => {
+    const lots = lite ? LOT_LAMPS.slice(0, 4) : LOT_LAMPS, aves = lite ? AVENUE_LAMPS.slice(0, 3) : AVENUE_LAMPS;
+    return [
+      ...lots.map(([x, z]) => ({ p: [x, 3.4, z + (z > 0 ? .24 : -.24)] as [number, number, number], ry: z > 0 ? 0 : Math.PI, R: .42 })),
+      ...aves.map(([x, z]) => ({ p: [x - Math.sign(x) * .24, 3.4, z] as [number, number, number], ry: -Math.sign(x) * Math.PI / 2, R: .42 })),
+    ];
+  }, [lite]);
+  const hedges = useMemo(() => [
+    ...[-1, 1].flatMap(s => ([[-23, -17.2], [-16.6, -10.6], [-10, -3.7]] as [number, number][]).map(([a, b]) => ({ x0: s < 0 ? a : -b, x1: s < 0 ? b : -a, z: -9.25, d: 1, top: 1.21 }))),
+    ...[-1, 1].map(s => ({ x0: s * 16.9 - 11.4, x1: s * 16.9 + 11.4, z: 12.65, d: .9, top: 1.31 })),
+    ...[-1, 1].map(s => ({ x0: s * 22.6 - 6.8, x1: s * 22.6 + 6.8, z: 15, d: 1.1, top: 1.1 })),
+  ], []);
+  const canes = useMemo(() => { const out: { p: [number, number, number]; ry: number }[] = []; for (let z = 40; z <= (lite ? 80 : 110); z += 7) for (const s of [-1, 1]) out.push({ p: [s * 4.55, .1, z + (s > 0 ? 3.5 : 0)], ry: s > 0 ? Math.PI : 0 }); return out; }, [lite]);
+  return <group>
+    <Wreaths list={lamps} lite={lite} />
+    <HedgeLights boxes={hedges} />
+    <CandyCanes at={canes} />
   </group>;
 }
