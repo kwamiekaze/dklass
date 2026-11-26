@@ -8,13 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar, CalendarCheck, Check, Clock, Send, Eye, CheckCircle, XCircle, Plus, Edit3, AlertTriangle, RotateCcw, MapPin } from "lucide-react";
+import { Calendar, CalendarCheck, Check, Clock, Send, Eye, CheckCircle, XCircle, Plus, Edit3, AlertTriangle, RotateCcw, MapPin, Trash2, Package as PackageIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SessionTypeBadge } from "@/components/portal/SessionTypeBadge";
 import { ProposalBuilder } from "@/components/portal/ProposalBuilder";
 import { format, parseISO } from "date-fns";
 import { getDisplayName } from "@/lib/profileUtils";
-import { resolveProposalPackages, sumProposalHours } from "@/lib/packageSelection";
+import { parsePackageIds, resolveProposalPackages, serializePackageIds, sumProposalHours } from "@/lib/packageSelection";
+import { PACKAGES } from "@/data/packages";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -55,6 +58,51 @@ function AdminProposalsContent() {
   const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false);
   const [scheduleConflicts, setScheduleConflicts] = useState<any[]>([]);
   const [overrideConflicts, setOverrideConflicts] = useState(false);
+  const [removeItem, setRemoveItem] = useState<any>(null);
+  const [removingItem, setRemovingItem] = useState(false);
+  const [editingPkg, setEditingPkg] = useState(false);
+  const [pkgDraft, setPkgDraft] = useState<string[]>([]);
+  const [savingPkg, setSavingPkg] = useState(false);
+
+  /** Remove one date from the proposal. With an auto-matched package, the package follows the remaining dates on its own. */
+  const confirmRemoveItem = async () => {
+    if (!removeItem || !selectedProposal) return;
+    setRemovingItem(true);
+    try {
+      const { error } = await supabase.from('schedule_proposal_items').delete().eq('id', removeItem.id);
+      if (error) throw error;
+      toast.success('Date removed');
+      if (editingItemId === removeItem.id) setEditingItemId(null);
+      setRemoveItem(null);
+      await openProposal(selectedProposal);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to remove date');
+    } finally {
+      setRemovingItem(false);
+    }
+  };
+
+  const startEditPkg = () => { setPkgDraft(parsePackageIds(selectedProposal?.package_id)); setEditingPkg(true); };
+
+  /** Save the package choice: an empty list means auto-match from the dates and times. */
+  const savePkg = async () => {
+    if (!selectedProposal) return;
+    setSavingPkg(true);
+    try {
+      const package_id = serializePackageIds(pkgDraft);
+      const { error } = await supabase.from('schedule_proposals').update({ package_id }).eq('id', selectedProposal.id);
+      if (error) throw error;
+      const next = { ...selectedProposal, package_id };
+      setSelectedProposal(next);
+      setProposals(prev => prev.map(p => (p.id === next.id ? { ...p, package_id } : p)));
+      setEditingPkg(false);
+      toast.success(package_id ? 'Package updated' : 'Package set to auto-match from the dates');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update package');
+    } finally {
+      setSavingPkg(false);
+    }
+  };
 
 
   const startEditItem = (item: any) => {
@@ -117,6 +165,7 @@ function AdminProposalsContent() {
   };
 
   const openProposal = async (proposal: any) => {
+    if (proposal?.id !== selectedProposal?.id) { setEditingPkg(false); setEditingItemId(null); }
     setSelectedProposal(proposal);
     const { data } = await supabase
       .from('schedule_proposal_items')
@@ -409,25 +458,89 @@ function AdminProposalsContent() {
                 </div>
               </div>
 
-              {items.length > 0 && (() => {
+              {(() => {
                 const { totalHours, includesRoadTest } = sumProposalHours(items as any);
                 const { pkgs, isExplicit, totalPrice } = resolveProposalPackages({
                   packageId: selectedProposal.package_id,
                   totalHours,
                   includesRoadTest,
                 });
+                const auto = resolveProposalPackages({ packageId: null, totalHours, includesRoadTest }).pkgs[0];
+                const canEditPkg = ['pending_admin_finalize', 'edit_requested', 'under_revision', 'sent', 'revised_and_resent'].includes(selectedProposal.proposal_status);
+                const hrs = Math.round(totalHours * 100) / 100;
+                if (editingPkg) {
+                  const draftTotal = resolveProposalPackages({ packageId: serializePackageIds(pkgDraft), totalHours, includesRoadTest }).totalPrice;
+                  return (
+                    <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium">Package</p>
+                        <Button type="button" variant="outline" size="sm" className="h-8 gap-1 text-xs"
+                          onClick={() => { if (pkgDraft.length >= 10) { toast.error('Maximum 10 packages per proposal'); return; } setPkgDraft(prev => [...prev, auto?.id ?? PACKAGES[0]!.id]); }}>
+                          <Plus className="h-3.5 w-3.5" /> Add package
+                        </Button>
+                      </div>
+                      {pkgDraft.length === 0 ? (
+                        <div className="rounded-md border border-dashed border-border px-3 py-2.5 text-sm">
+                          <p className="font-medium">Auto-match from the dates</p>
+                          <p className="text-xs text-muted-foreground">{hrs} hr{hrs === 1 ? '' : 's'}{includesRoadTest ? ' with road test' : ''} → {auto ? `${auto.label.replace(/\n/g, ' ')} · ${auto.price}` : 'none'}</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {pkgDraft.map((pid, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <Select value={pid} onValueChange={(v) => setPkgDraft(prev => prev.map((x, k) => (k === idx ? v : x)))}>
+                                <SelectTrigger className="min-h-[44px] flex-1"><SelectValue placeholder="Select package" /></SelectTrigger>
+                                <SelectContent className="max-h-72">
+                                  {PACKAGES.map(p => <SelectItem key={p.id} value={p.id}>{p.label.replace(/\n/g, ' ')} · {p.price}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                              <Button type="button" variant="ghost" size="icon" className="h-11 w-11 shrink-0 text-destructive" aria-label="Remove package"
+                                onClick={() => setPkgDraft(prev => prev.filter((_, k) => k !== idx))}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                          {pkgDraft.length > 1 && <p className="text-xs font-medium">Total: {draftTotal}</p>}
+                          <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setPkgDraft([])}>
+                            Use auto-match from the dates instead
+                          </Button>
+                        </div>
+                      )}
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setEditingPkg(false)} disabled={savingPkg}>Cancel</Button>
+                        <Button size="sm" className="h-8 gap-1 text-xs" onClick={savePkg} disabled={savingPkg}>
+                          <Check className="h-3 w-3" /> {savingPkg ? 'Saving…' : 'Save package'}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                }
                 return (
                   <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
-                    <p className="text-xs text-muted-foreground">
-                      {pkgs.length > 1 ? `Packages sent to student (${pkgs.length})` : 'Package sent to student'}
-                      <span className="ml-2">{isExplicit ? 'Selected by admin' : 'Auto-matched'}</span>
-                    </p>
-                    {pkgs.map((pkg, i) => (
-                      <p key={`${pkg.id}-${i}`} className="text-sm font-medium">
-                        {pkg.label.replace(/\n/g, ' ')} · {pkg.price}
-                      </p>
-                    ))}
-                    {pkgs.length > 1 && <p className="text-sm font-semibold mt-1">Total: {totalPrice}</p>}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">
+                          {pkgs.length > 1 ? `Packages sent to student (${pkgs.length})` : 'Package sent to student'}
+                          <span className="ml-2">{isExplicit ? 'Selected by admin' : `Auto-matched · ${hrs} hr${hrs === 1 ? '' : 's'}`}</span>
+                        </p>
+                        {items.length === 0 && !isExplicit ? (
+                          <p className="text-sm text-muted-foreground">No dates yet</p>
+                        ) : pkgs.map((pkg, i) => (
+                          <p key={`${pkg.id}-${i}`} className="text-sm font-medium">
+                            {pkg.label.replace(/\n/g, ' ')} · {pkg.price}
+                          </p>
+                        ))}
+                        {pkgs.length > 1 && <p className="text-sm font-semibold mt-1">Total: {totalPrice}</p>}
+                        {isExplicit && auto && !pkgs.some(p => p.id === auto.id) && (
+                          <p className="text-[11px] text-yellow-600 dark:text-yellow-400 mt-1">The dates now add up to {auto.label.replace(/\n/g, ' ')}. Change the package or switch to auto-match.</p>
+                        )}
+                      </div>
+                      {canEditPkg && (
+                        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs shrink-0" onClick={startEditPkg}>
+                          <PackageIcon className="h-3 w-3" /> Change
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 );
               })()}
@@ -502,9 +615,14 @@ function AdminProposalsContent() {
                         {canEditItem && (
                           <div className="flex gap-2 justify-end">
                             {!isEditing ? (
-                              <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => startEditItem(item)}>
-                                <Edit3 className="h-3 w-3" /> Edit
-                              </Button>
+                              <>
+                                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-destructive hover:text-destructive" onClick={() => setRemoveItem(item)}>
+                                  <Trash2 className="h-3 w-3" /> Remove
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => startEditItem(item)}>
+                                  <Edit3 className="h-3 w-3" /> Edit
+                                </Button>
+                              </>
                             ) : (
                               <>
                                 <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={cancelEditItem} disabled={savingItem}>
@@ -678,6 +796,24 @@ function AdminProposalsContent() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!removeItem} onOpenChange={(o) => { if (!o && !removingItem) setRemoveItem(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this date?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {removeItem && `${format(parseISO(removeItem.proposed_date), 'EEE, MMM d, yyyy')}, ${formatTime24to12(removeItem.start_time)} – ${formatTime24to12(removeItem.end_time)}`}
+              {' '}will be taken off the proposal. An auto-matched package updates to the dates that remain.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removingItem}>Keep</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmRemoveItem(); }} disabled={removingItem} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {removingItem ? 'Removing…' : 'Remove date'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ProposalBuilder
 
