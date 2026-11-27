@@ -59,6 +59,67 @@ function AdminProposalsContent() {
   const [scheduleConflicts, setScheduleConflicts] = useState<any[]>([]);
   const [overrideConflicts, setOverrideConflicts] = useState(false);
   const [removeItem, setRemoveItem] = useState<any>(null);
+  const [adding, setAdding] = useState(false);
+  const [addDate, setAddDate] = useState('');
+  const [addStart, setAddStart] = useState('');
+  const [addEnd, setAddEnd] = useState('');
+  const [addType, setAddType] = useState<'driving' | 'testing'>('driving');
+  const [addDds, setAddDds] = useState('');
+  const [savingAdd, setSavingAdd] = useState(false);
+
+  /** Open the add form, prefilled with the day after the last date at the same times. */
+  const startAdd = () => {
+    const last = items[items.length - 1];
+    let d = new Date(); d.setDate(d.getDate() + 1);
+    if (last?.proposed_date) { d = parseISO(last.proposed_date); d.setDate(d.getDate() + 1); }
+    setAddDate(format(d, 'yyyy-MM-dd'));
+    setAddStart((last?.start_time || '12:00').slice(0, 5));
+    setAddEnd((last?.end_time || '14:00').slice(0, 5));
+    setAddType('driving'); setAddDds('');
+    setEditingItemId(null);
+    setAdding(true);
+  };
+
+  /** Add a date to the proposal. An auto-matched package follows the new total on its own. */
+  const saveAdd = async () => {
+    if (!selectedProposal) return;
+    if (!addDate || !addStart || !addEnd) { toast.error('Date, start and end are required'); return; }
+    if (addEnd <= addStart) { toast.error('End time must be after start time'); return; }
+    if (addType === 'testing' && !addDds.trim()) { toast.error('Add the DDS location for a road test'); return; }
+    setSavingAdd(true);
+    try {
+      const [sh, sm] = addStart.split(':').map(Number);
+      const [eh, em] = addEnd.split(':').map(Number);
+      // the new date takes the same status as the open dates around it, and the student's usual pickup and dropoff
+      const open = items.find(i => ['pending_admin_finalize', 'proposed', 'conflict'].includes(i.item_status));
+      const item_status = open?.item_status === 'pending_admin_finalize' || selectedProposal.proposal_status === 'pending_admin_finalize' ? 'pending_admin_finalize' : 'proposed';
+      let pickup_address = items.find(i => i.pickup_address)?.pickup_address ?? null;
+      let dropoff_address = items.find(i => i.dropoff_address)?.dropoff_address ?? null;
+      if (!pickup_address && !dropoff_address && selectedProposal.student_id) {
+        const { data: sp } = await supabase.from('profiles').select('pickup_address, dropoff_address').eq('id', selectedProposal.student_id).maybeSingle();
+        pickup_address = sp?.pickup_address ?? null; dropoff_address = sp?.dropoff_address ?? null;
+      }
+      const { error } = await supabase.from('schedule_proposal_items').insert({
+        proposal_id: selectedProposal.id,
+        proposed_date: addDate,
+        start_time: `${addStart}:00`,
+        end_time: `${addEnd}:00`,
+        duration_minutes: (eh * 60 + em) - (sh * 60 + sm),
+        session_type: addType,
+        dds_location: addType === 'testing' ? addDds.trim() : null,
+        pickup_address, dropoff_address,
+        item_status,
+      });
+      if (error) throw error;
+      toast.success('Date added');
+      setAdding(false);
+      await openProposal(selectedProposal);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to add date');
+    } finally {
+      setSavingAdd(false);
+    }
+  };
   const [removingItem, setRemovingItem] = useState(false);
   const [editingPkg, setEditingPkg] = useState(false);
   const [pkgDraft, setPkgDraft] = useState<string[]>([]);
@@ -165,7 +226,7 @@ function AdminProposalsContent() {
   };
 
   const openProposal = async (proposal: any) => {
-    if (proposal?.id !== selectedProposal?.id) { setEditingPkg(false); setEditingItemId(null); }
+    if (proposal?.id !== selectedProposal?.id) { setEditingPkg(false); setEditingItemId(null); setAdding(false); }
     setSelectedProposal(proposal);
     const { data } = await supabase
       .from('schedule_proposal_items')
@@ -642,6 +703,38 @@ function AdminProposalsContent() {
                     );
                   })}
                 </div>
+                {['pending_admin_finalize', 'edit_requested', 'under_revision', 'sent', 'revised_and_resent'].includes(selectedProposal.proposal_status) && (
+                  adding ? (
+                    <div className="p-3 border border-primary/40 rounded-lg text-sm space-y-2 bg-primary/5">
+                      <p className="text-xs font-medium">New date</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Input type="date" aria-label="Date" value={addDate} onChange={(e) => setAddDate(e.target.value)} className="h-9 text-xs" />
+                        <Input type="time" aria-label="Start time" value={addStart} onChange={(e) => setAddStart(e.target.value)} className="h-9 text-xs" />
+                        <Input type="time" aria-label="End time" value={addEnd} onChange={(e) => setAddEnd(e.target.value)} className="h-9 text-xs" />
+                      </div>
+                      <Select value={addType} onValueChange={(v) => setAddType(v as 'driving' | 'testing')}>
+                        <SelectTrigger className="h-9 text-xs" aria-label="Session type"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="driving">Driving lesson</SelectItem>
+                          <SelectItem value="testing">Road test</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {addType === 'testing' && (
+                        <Input value={addDds} onChange={(e) => setAddDds(e.target.value)} placeholder="DDS location" className="h-9 text-xs" />
+                      )}
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setAdding(false)} disabled={savingAdd}>Cancel</Button>
+                        <Button size="sm" className="h-8 gap-1 text-xs" onClick={saveAdd} disabled={savingAdd}>
+                          <Check className="h-3 w-3" /> {savingAdd ? 'Adding…' : 'Add date'}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button variant="outline" size="sm" className="w-full min-h-[40px] gap-1 border-dashed" onClick={startAdd}>
+                      <Plus className="h-4 w-4" /> Add date
+                    </Button>
+                  )
+                )}
               </div>
 
               {/* Actions */}
